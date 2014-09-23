@@ -8,9 +8,12 @@ For more info check out [Gurux](http://www.gurux.org/ "Gurux").
 Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.
 Big problem with different databases is that all databases are little bit different and you can't use same SQL sentences to all databases.
 Using Gurux ORM component you can serialize your data to different databases. You can use Gurux ORM to create or drop all your tables.
+
 Best part is that in debug mode you can see generated SQL sentence if you move your mouse over argument.
 
-You can use Lambda with Gurux ORM to tell what kind of queries you want to do.
+![alt tag](https://github.com/Gurux/Gurux.service/debug.png)
+
+You can use [Lambda Expressions](http://msdn.microsoft.com/en-us/library/bb397687.aspx Lambda Expressions) with Gurux ORM to tell what kind of queries you want to do.
 
 At the moment we are supporting following databases:
 
