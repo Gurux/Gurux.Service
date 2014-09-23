@@ -1,0 +1,309 @@
+﻿//
+// --------------------------------------------------------------------------
+//  Gurux Ltd
+// 
+//
+//
+// Filename:        $HeadURL$
+//
+// Version:         $Revision$,
+//                  $Date$
+//                  $Author$
+//
+// Copyright (c) Gurux Ltd
+//
+//---------------------------------------------------------------------------
+//
+//  DESCRIPTION
+//
+// This file is a part of Gurux Device Framework.
+//
+// Gurux Device Framework is Open Source software; you can redistribute it
+// and/or modify it under the terms of the GNU General Public License 
+// as published by the Free Software Foundation; version 2 of the License.
+// Gurux Device Framework is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of 
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// See the GNU General Public License for more details.
+//
+// This code is licensed under the GNU General Public License v2. 
+// Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
+//---------------------------------------------------------------------------
+
+using System;
+using System.Net;
+using System.Threading;
+using System.IO;
+using Gurux.Common.JSon;
+using System.Web;
+using System.Security.Principal;
+using System.Data.Common;
+using System.Text;
+using System.Collections;
+using Gurux.Service.Db;
+using Gurux.Common.Internal;
+
+namespace Gurux.Service.Rest
+{         
+    public class GXServer
+    {
+        /// <summary>
+        /// REST message map.
+        /// </summary>
+        internal Hashtable MessageMap;
+
+        internal GXJsonParser Parser;
+        
+        private Hashtable RestMap;
+
+        public GXDbConnection Connection
+        {
+            get;
+            private set;
+        }
+
+        private HttpListener Listener;
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        public GXServer(string prefixes, GXDbConnection connection) :
+            this(new string[] { prefixes }, connection)
+        {
+            
+        }
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        public GXServer(string[] prefixes, GXDbConnection connection)
+        {
+            RestMap = new Hashtable();
+            Parser = new GXJsonParser();
+            Connection = connection;            
+            if (MessageMap == null)
+            {
+                MessageMap = new Hashtable();
+                GXGeneral.UpdateRestMessageTypes(MessageMap);
+            }
+            Listener = new HttpListener();
+            foreach (string it in prefixes)
+            {
+                Listener.Prefixes.Add(it);
+            }
+            Listener.Start();
+            Thread thread = new Thread(new ParameterizedThreadStart(ListenThread));
+            thread.Start(this);
+        }
+        /// <summary>
+        /// Listen clients as long as server is up and running.
+        /// </summary>
+        /// <param name="parameter"></param>
+        void ListenThread(object parameter)
+        {
+            IPrincipal user;
+            HttpListenerContext c = null;
+            GXServer tmp = parameter as GXServer;
+            HttpListener Listener = tmp.Listener;
+            while (Listener.IsListening)
+            {
+                bool accept = false;
+                string username, password;
+                AutoResetEvent h = new AutoResetEvent(false);
+                IAsyncResult result = Listener.BeginGetContext(delegate(IAsyncResult ListenerCallback)
+                {                    
+                    HttpListener listener = (HttpListener)ListenerCallback.AsyncState;
+                    //If server is not closed.
+                    if (listener.IsListening)
+                    {
+                        c = listener.EndGetContext(ListenerCallback);
+                        GXWebServiceModule.TryAuthenticate(tmp.MessageMap, c.Request, out username, out password);
+                        //Anonymous access is allowed.
+                        if (username == null && password == null)
+                        {
+                            accept = true;
+                            user = null;
+                        }
+                        else
+                        {
+                            user = TryAuthenticate(username, password);
+                            accept = user != null;                            
+                        }
+                        
+                        if (accept)
+                        {
+                            Thread thread = new Thread(new ParameterizedThreadStart(Process));
+                            thread.Start(new object[] { tmp, c, user});
+                        }
+                        else
+                        {
+                            c.Response.StatusCode = 401;
+                            c.Response.StatusDescription = "Access Denied";
+                            c.Response.AddHeader("WWW-Authenticate", "Basic Realm");
+                            GXErrorWrapper err = new GXErrorWrapper(new HttpException(401, "Access Denied"));
+                            using (TextWriter writer = new StreamWriter(c.Response.OutputStream, Encoding.ASCII))
+                            {
+                                GXJsonParser parser = new GXJsonParser();
+                                string data = parser.Serialize(err);
+                                c.Response.ContentLength64 = data.Length;
+                                writer.Write(data);
+                            }                            
+                            c.Response.Close();
+                        }
+                        h.Set();
+                    }
+                }, Listener);
+                h.WaitOne();
+                if (!accept || !Listener.IsListening)
+                {
+                    break;
+                }
+            }
+        }
+
+        static private void Process(object parameter)
+        {            
+            object[] tmp = parameter as object[];
+            GXServer server = tmp[0] as GXServer;
+            HttpListenerContext context = tmp[1] as HttpListenerContext;
+            IPrincipal user = tmp[2] as IPrincipal;
+            try
+            {
+                ProcessRequest(server, context, user);
+            }
+            catch (Exception ex)
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                GXErrorWrapper err = new GXErrorWrapper(ex);
+                using (TextWriter writer = new StreamWriter(context.Response.OutputStream, Encoding.ASCII))
+                {
+                    GXJsonParser parser = new GXJsonParser();
+                    string data = parser.Serialize(err);
+                    context.Response.ContentLength64 = data.Length;
+                    writer.Write(data);
+                }                
+            }
+        }
+
+        static void ProcessRequest(GXServer server, HttpListenerContext context, IPrincipal user)
+        {
+            if (context.Request.ContentType.Contains("json"))
+            {
+                string method = context.Request.HttpMethod.ToUpper();
+                bool content = method == "POST" || method == "PUT";
+                string path, data;
+                if (content)
+                {
+                    int cnt = (int)context.Request.ContentLength64;
+                    byte[] buff = new byte[cnt];
+                    context.Request.InputStream.Read(buff, 0, cnt);
+                    data = ASCIIEncoding.ASCII.GetString(buff, 0, cnt);
+                    path = context.Request.RawUrl;
+                }
+                else
+                {
+                    int pos = context.Request.RawUrl.IndexOf('?');
+                    if (pos != -1)
+                    {
+                        path = context.Request.RawUrl.Substring(0, pos);
+                        data = context.Request.RawUrl.Substring(pos + 1);
+                    }
+                    else
+                    {
+                        path = context.Request.RawUrl;
+                        data = null;
+                    }
+                }
+                System.Diagnostics.Debug.WriteLine("-> " + path + " : "+ data);
+                string reply = GetReply(server.MessageMap, user, server, context.Request.HttpMethod, path, data);
+                context.Response.ContentType = "json";
+                context.Response.ContentLength64 = reply.Length;
+                System.Diagnostics.Debug.WriteLine("<- " + reply);
+                using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
+                {
+                    bs.Write(ASCIIEncoding.ASCII.GetBytes(reply), 0, reply.Length);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Parse query DTO and return response DTO as string.
+        /// </summary>
+        /// <param name="method">Http method.</param>
+        /// <param name="path">Command to execute.</param>
+        /// <param name="data">Command data.</param>
+        /// <returns>DTO result as string.</returns>
+        static string GetReply(Hashtable messageMap, IPrincipal user, GXServer server, string method, string path, string data)
+        {
+            InvokeHandler handler;
+            string command;
+            lock (messageMap)
+            {
+                GXRestMethodInfo mi = GXGeneral.GetTypes(messageMap, path, out command);
+                if (mi == null)
+                {
+                    throw new HttpException(405, string.Format("Rest method '{0}' not implemented.", command));
+                }
+                switch (method.ToUpper())
+                {
+                    case "GET":
+                        handler = mi.Get;
+                        break;
+                    case "POST":
+                        handler = mi.Post;
+                        break;
+                    case "PUT":
+                        handler = mi.Put;
+                        break;
+                    case "DELETE":
+                        handler = mi.Delete;
+                        break;
+                    default:
+                        handler = null;
+                        break;
+                }
+                if (handler == null)
+                {
+                    throw new HttpException(405, string.Format("Method '{0}' not allowed for {1}", method, command));
+                }
+                object req = server.Parser.Deserialize("{" + data + "}", mi.RequestType);
+                //Get Rest class from cache.
+                GXRestService target = server.RestMap[mi.RestClassType] as GXRestService;
+                if (target == null)
+                {
+                    target = GXJsonParser.CreateInstance(mi.RestClassType) as GXRestService;
+                    server.RestMap[mi.RestClassType] = target;
+                }
+                target.User = user;
+                target.Db = server.Connection;
+                object tmp = handler(target, req);
+                if (tmp == null)
+                {
+                    throw new HttpException(405, string.Format("Command '{0}' returned null.", command));
+                }
+                return server.Parser.SerializeToHttp(tmp);
+            }            
+        }
+
+
+        /// <summary>
+        /// Try authenticate if authentication is used.
+        /// </summary>
+        /// <remarks>
+        /// Override this method and implement own authentication.
+        /// In default authentication fails.
+        /// </remarks>
+        /// <param name="userName">User name.</param>
+        /// <param name="password">User password.</param>
+        /// <returns>Returns user identity.</returns>
+        public virtual GenericPrincipal TryAuthenticate(string userName, string password)
+        {
+            return null;
+        }
+
+        public void Close()
+        {
+            Listener.Close();
+        }      
+    }
+}
