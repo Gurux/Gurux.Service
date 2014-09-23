@@ -11,7 +11,7 @@ Using Gurux ORM component you can serialize your data to different databases. Yo
 
 Best part is that in debug mode you can see generated SQL sentence if you move your mouse over argument.
 
-![alt tag](https://github.com/Gurux/Gurux.service/debug.png)
+![alt tag](debug.png)
 
 You can use [Lambda Expressions](http://msdn.microsoft.com/en-us/library/bb397687.aspx Lambda Expressions) with Gurux ORM to tell what kind of queries you want to do.
 
