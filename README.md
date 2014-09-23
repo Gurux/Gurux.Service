@@ -17,11 +17,11 @@ You can use [Lambda Expressions](http://msdn.microsoft.com/en-us/library/bb39768
 
 At the moment we are supporting following databases:
 
-* MySql
-* Maria BD
-* Microsoft SQL
-* Oracle
-* SQLite
+* [MySql](http://www.MySql.com/ "MySql")
+* [Maria BD](http://www.mariadb.com/ "Maria BD")
+* [Microsoft SQL Server](http://www.microsoft.com/ "Microsoft SQL Server")
+* [Oracle](http://www.oracle.com/ "Oracle")
+* [SQLite](http://www.sqlite.com/ "SQLite)
 
 Gurux ORM supports following relations between tables:
 
@@ -258,7 +258,7 @@ Connection.CreateTable<GXParent>();
 Connection.CreateTable<GXCompany>();
 ```
 
-Insert data.
+Insert data
 =========================== 
 
 Data is inserted by GXInsertArgs.
@@ -273,7 +273,7 @@ GXInsertArgs arg = GXInsertArgs.Insert(user);
 Connection.Insert(arg);
 ```
 
-Select data.
+Select data
 =========================== 
 Data is selected by GXSelectArgs. 
 
@@ -305,7 +305,7 @@ arg.
 List<GXUser> users = Connection.Select<GXUser>(arg);
 ```
 
-Update data.
+Update data
 =========================== 
 
 Data is updated by GXUpdateArgs.
@@ -319,7 +319,7 @@ GXUpdateArgs arg = GXUpdateArgs.Update(user, q => q.Name);
 Connection.Update(arg);
 ```
 
-Delete data.
+Delete data
 =========================== 
 
 Data is Deleted by GXDeleteArgs.
