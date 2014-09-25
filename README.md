@@ -15,6 +15,8 @@ Best part is that in debug mode you can see generated SQL sentence if you move y
 
 You can use [Lambda Expressions](http://msdn.microsoft.com/en-us/library/bb397687.aspx Lambda Expressions) with Gurux ORM to tell what kind of queries you want to do.
 
+We have added some test cases where you can get idea how to use Lambda expressions. You will find test cases from Gurux.Service_Simple_UnitTests directory.
+
 At the moment we are supporting following databases:
 
 * [MySql](http://www.MySql.com/ "MySql")
@@ -22,6 +24,21 @@ At the moment we are supporting following databases:
 * [Microsoft SQL Server](http://www.microsoft.com/ "Microsoft SQL Server")
 * [Oracle](http://www.oracle.com/ "Oracle")
 * [SQLite](http://www.sqlite.com/ "SQLite)
+
+General information
+=========================== 
+
+* DataMember attribute will tell is field saved to the database.
+* AutoIncrement attribute will tell if field value is automatically increased on add. Value is updated automatically to the class value on insert.
+* ForeignKey attribute tells is foreign key used.
+* Relation attribute tells that there is a relation to the other table.
+* Enum values are saved as integer value as default. If you want to save enum value as string set Builder.Settings.UseEnumStringValue to true.
+* If you want to use unix datetime set Builder.Settings.UseEpochTimeFormat to true.
+* Alias Attribute tells name that is used to the table with SQL queries. It works like AS in SQL.
+
+Relations between tables.
+=========================== 
+
 
 Gurux ORM supports following relations between tables:
 
@@ -304,6 +321,17 @@ arg.
 //Find data from the DB.
 List<GXUser> users = Connection.Select<GXUser>(arg);
 ```
+
+Subqueries
+=========================== 
+
+It's faster to get all data with one query than execute several queries. You can make subqueries like this:
+
+//Generate SQL sentence where select User IDs.
+GXSelectArgs subQuery = GXSelectArgs.Select<GXUser>(q => q.Id, q => q.Id > 100);
+//Select all columns from user group where User Group ID in subquery.
+GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => q.Id > GXSql.In(q => q.Users, subQuery));
+
 
 Update data
 =========================== 

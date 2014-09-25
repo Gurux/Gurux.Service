@@ -221,18 +221,7 @@ namespace Gurux.Service.Db
         /// <param name="columns">Selected columns.</param>
         public static GXSelectArgs SelectById<T>(long id, Expression<Func<T, object>> columns)
         {
-            return SelectByIdInternal<T, long>(id, q => "*");
-            /*
-            if (typeof(IUnique<>).IsAssignableFrom(typeof(T)))
-            {
-                throw new ArgumentException("Select by ID failed. Target class must be derived from IUnique.");
-            }            
-            GXSelectArgs arg = GXSelectArgs.Select<T>(columns);            
-            GXSerializedItem si = GXSqlBuilder.FindUnique(typeof(T));
-            string name = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-            arg.Where.Or<T>(q => name.Equals(id));
-            return arg;
-             * */
+            return SelectByIdInternal<T, long>(id, columns);
         }
 
         public static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)

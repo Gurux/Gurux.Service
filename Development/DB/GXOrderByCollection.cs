@@ -126,7 +126,7 @@ namespace Gurux.Service.Db
                     {
                         sb.Append(", ");
                     }
-                    //Add table name always until there is a way to check are multible tables used. if (joinList.Count != 0)
+                    //Add table name always until there is a way to check are multiple tables used. if (joinList.Count != 0)
                     {
                         sb.Append(it.Table);
                         sb.Append('.');

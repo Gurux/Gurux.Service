@@ -15,7 +15,6 @@ local.properties
 .classpath
 .settings/
 .loadpath
-Gurux.Service_Simple_UnitTests/
 Gurux.Service.TestWebService/
 Gurux.Service_UnitTests/
 

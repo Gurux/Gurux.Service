@@ -1,0 +1,41 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gurux.Service_Simple_Unit_Test", "Gurux.Service_Simple_Unit_Test.csproj", "{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0CE3AF51-7103-4D41-A59F-6C8F1AF8B7C6}"
+	ProjectSection(SolutionItems) = preProject
+		Gurux.Service_Simple_Unit_Test.vsmdi = Gurux.Service_Simple_Unit_Test.vsmdi
+		Local.testsettings = Local.testsettings
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gurux.Service", "..\Development\Gurux.Service.csproj", "{55CDF86A-FB1D-4210-8C64-76645010990B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gurux.Common_2010", "..\..\Gurux.Common\Development\Gurux.Common_2010.csproj", "{749652D4-4779-4869-AD81-5211A661CD1B}"
+EndProject
+Global
+	GlobalSection(TestCaseManagementSettings) = postSolution
+		CategoryFile = Gurux.Service_Simple_Unit_Test.vsmdi
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{55CDF86A-FB1D-4210-8C64-76645010990B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{55CDF86A-FB1D-4210-8C64-76645010990B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{55CDF86A-FB1D-4210-8C64-76645010990B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{55CDF86A-FB1D-4210-8C64-76645010990B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{749652D4-4779-4869-AD81-5211A661CD1B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{749652D4-4779-4869-AD81-5211A661CD1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{749652D4-4779-4869-AD81-5211A661CD1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{749652D4-4779-4869-AD81-5211A661CD1B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
