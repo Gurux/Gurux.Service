@@ -33,7 +33,7 @@ General information
 * ForeignKey attribute tells is foreign key used.
 * Relation attribute tells that there is a relation to the other table.
 * Enum values are saved as integer value as default. If you want to save enum value as string set Builder.Settings.UseEnumStringValue to true.
-* If you want to use unix datetime set Builder.Settings.UseEpochTimeFormat to true.
+* If you want to use Unix date time set Builder.Settings.UseEpochTimeFormat to true.
 * Alias Attribute tells name that is used to the table with SQL queries. It works like AS in SQL.
 
 Relations between tables.
@@ -322,16 +322,16 @@ arg.
 List<GXUser> users = Connection.Select<GXUser>(arg);
 ```
 
-Subqueries
+Sub queries
 =========================== 
 
-It's faster to get all data with one query than execute several queries. You can make subqueries like this:
-
+It's faster to get all data with one query than execute several queries. You can make sub queries like this:
+```csharp
 //Generate SQL sentence where select User IDs.
 GXSelectArgs subQuery = GXSelectArgs.Select<GXUser>(q => q.Id, q => q.Id > 100);
-//Select all columns from user group where User Group ID in subquery.
+//Select all columns from user group where User Group ID in sub query.
 GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => q.Id > GXSql.In(q => q.Users, subQuery));
-
+```
 
 Update data
 =========================== 
