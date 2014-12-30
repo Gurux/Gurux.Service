@@ -46,10 +46,8 @@ namespace Gurux.Service.Db
 {
     static class GXDbHelpers
     {
-//        static private readonly Dictionary<Type, Dictionary<string, GXSerializedItem>> SerializedObjects = new Dictionary<Type, Dictionary<string, GXSerializedItem>>();
-
         /// <summary>
-        /// Add quetes around the value.
+        /// Add quotes around the value.
         /// </summary>
         /// <param name="value"></param>
         /// <param name="quoteSeparator"></param>
@@ -84,6 +82,10 @@ namespace Gurux.Service.Db
 
         internal static string OriginalTableName(Type type)
         {
+            if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
+            {
+                return OriginalTableName(type.BaseType);
+            }
             AliasAttribute[] alias = (AliasAttribute[])type.GetCustomAttributes(typeof(AliasAttribute), true);
             if (alias.Length != 0 && alias[0].Name != null)
             {
@@ -106,12 +108,17 @@ namespace Gurux.Service.Db
         {
             return type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0;
         }
-
+        
         internal static string GetTableName(Type type, bool addQuotation, char tableQuotation, string tablePrefix)
         {
-            if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
+            return GetTableName(type, addQuotation, tableQuotation, tablePrefix, true);
+        }
+        
+        internal static string GetTableName(Type type, bool addQuotation, char tableQuotation, string tablePrefix, bool allowSharedTables)
+        {
+            if (allowSharedTables && type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
             {
-                return GetTableName(type.BaseType, addQuotation, tableQuotation, tablePrefix);
+                return GetTableName(type.BaseType, addQuotation, tableQuotation, tablePrefix, allowSharedTables);
             }
             DataContractAttribute[] attr = (DataContractAttribute[])type.GetCustomAttributes(typeof(DataContractAttribute), true);
             if (attr.Length == 0 || attr[0].Name == null)
@@ -148,6 +155,10 @@ namespace Gurux.Service.Db
                 str = value as string;
                 str = str.Replace("\\", "\\\\").Replace("'", @"\'");
                 str = GetQuetedValue(str);
+            }
+            else if (value is Type)
+            {
+                str = GetQuetedValue(((Type)value).FullName);
             }
             else if (value is float || value is double || value is System.Decimal)
             {
@@ -205,6 +216,20 @@ namespace Gurux.Service.Db
             {
                 str = settings.ConvertToString(((DateTimeOffset)value).ToUniversalTime());
             }
+            else if (value is System.Collections.IEnumerable)//If collection
+            {
+                StringBuilder sb = new StringBuilder();
+                foreach (object it in (System.Collections.IEnumerable)value)
+                {
+                    sb.Append(it.ToString());
+                    sb.Append(';');
+                }
+                if (sb.Length != 0)
+                {
+                    sb.Length = sb.Length - 1;
+                }
+                str = GetQuetedValue(sb.ToString());
+            }
             else
             {
                 str = Convert.ToString(value);
@@ -255,12 +280,12 @@ namespace Gurux.Service.Db
                 object value;
                 sb.Length = 0;
                 string tableName = GXDbHelpers.GetTableName(table.Key, true, settings);
-                sb.Append("UPDATE ");
-                sb.Append(tableName);
-                sb.Append(" SET ");
                 bool first = true;
                 foreach (var col in table.Value.Rows)
                 {
+                    sb.Append("UPDATE ");
+                    sb.Append(tableName);
+                    sb.Append(" SET ");
                     index = 0;
                     first = true;
                     foreach (var it in col)
@@ -286,7 +311,7 @@ namespace Gurux.Service.Db
                             {
                                 value = GXInternal.GetValue(it.Key, row.Target);
                             }
-                            if (row.Relation != null)
+                            if (row.Relation != null && value != null)
                             {
                                 if (!GXInternal.IsGenericDataType(row.Type))
                                 {
@@ -443,7 +468,7 @@ namespace Gurux.Service.Db
             GXSerializedItem si = null;            
             if (value != null)
             {
-                Type type = value.GetType();
+                Type type = value.GetType();                
                 si = GXSqlBuilder.FindUnique(type);
                 object target;
                 GXUpdateItem u = null;
@@ -547,7 +572,18 @@ namespace Gurux.Service.Db
                                 {
                                     target = GXInternal.GetValue(value, it.Value.Target);
                                 }
-                                GetValues(target, value, null, itemsList, insert, mapTable, columnQuotation, updating);
+                                if (GXInternal.IsGenericDataType(it.Value.Type))
+                                {
+                                    if (!update)
+                                    {
+                                        u.Columns.Add(it.Key);
+                                    }
+                                }
+                                //Relations are not inserted. They are expected to be in DB already.
+                                else if (it.Value.Relation.RelationType != RelationType.Relation)
+                                {
+                                    GetValues(target, value, null, itemsList, insert, mapTable, columnQuotation, updating);
+                                }
                             }
                             else if (!update)
                             {
@@ -588,7 +624,10 @@ namespace Gurux.Service.Db
                 foreach (string it in u.Columns)
                 {
                     GXSerializedItem item = properties[it];
-                    if (item.Relation != null && item.Relation.ForeignTable != type && item.Relation.RelationMapTable == null)
+                    if (item.Relation != null && item.Relation.ForeignTable != type && 
+                        item.Relation.RelationMapTable == null && 
+                        //If relation is to the class not Id.
+                        !GXInternal.IsGenericDataType(item.Type))
                     {
                         if (parent != null && parent.GetType() == item.Relation.ForeignTable)
                         {
@@ -604,7 +643,7 @@ namespace Gurux.Service.Db
                             row.Add(new KeyValuePair<object, GXSerializedItem>(parent, item));
                         }
                         else if (item.Relation.RelationType == RelationType.OneToOne)
-                        {
+                        {                           
                             if (item.Get != null)
                             {
                                 target = item.Get(value);
@@ -665,6 +704,10 @@ namespace Gurux.Service.Db
                             }
                             row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
                         }
+                        else if (item.Relation.RelationType == RelationType.Relation)
+                        {
+                            row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));                            
+                        }
                     }
                     else if (!inserted)
                     {
@@ -677,7 +720,7 @@ namespace Gurux.Service.Db
         internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where)
         {
             return GetMembers(settings, expression, quoteSeparator, where, false);
-        }
+        }       
 
         internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where, bool getValue)
         {
@@ -709,10 +752,15 @@ namespace Gurux.Service.Db
                 if (e.NodeType == ExpressionType.Parameter)
                 {
                     //In where get table type and column name.
-                    if (where && memberExpression.Member.ReflectedType.IsClass)
+                    if (where && memberExpression.Member.DeclaringType.IsClass)
                     {
-                        return new string[] { GXDbHelpers.OriginalTableName(memberExpression.Member.ReflectedType) + 
-                                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };                        
+                        if (GXDbHelpers.IsAliasName(memberExpression.Expression.Type))
+                        {
+                            return new string[] { GXDbHelpers.OriginalTableName(memberExpression.Expression.Type) + 
+                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };                        
+                        }
+                        return new string[] { GXDbHelpers.GetTableName(memberExpression.Expression.Type, true, settings) + 
+                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };                        
                     }
                     else
                     {
@@ -730,11 +778,21 @@ namespace Gurux.Service.Db
                     var lambda = Expression.Lambda<Func<object>>(member);
                     var getter = lambda.Compile();
                     object value = getter();
-                    return new string[] { Convert.ToString(value) };
+                    if (value != null && value.GetType().IsEnum)
+                    {
+                        //Convert enum value to integer value.
+                        if (!settings.UseEnumStringValue)
+                        {
+                            value = Convert.ToInt64(value);
+                        }
+                    }
+                    return new string[] { ConvertToString(value, settings)};
+                    //return new string[] { Convert.ToString(value) };
                 }
                 if (e.NodeType == ExpressionType.Call)
                 {
-                    return new string[] { Convert.ToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke()) };
+                    return new string[] { ConvertToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke(), settings) };
+                    //return new string[] { Convert.ToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke()) };
                 }
                 if (memberExpression.NodeType == ExpressionType.MemberAccess && e.NodeType == ExpressionType.Constant)
                 {
@@ -752,6 +810,10 @@ namespace Gurux.Service.Db
                         if (where && getValue && target is string)
                         {
                             return new string[] { "'" + Convert.ToString(target) + "'"};
+                        }
+                        if (where && getValue && target is Guid)
+                        {
+                            return new string[] { "'" + Convert.ToString(target).Replace("-", "") + "'" };
                         }
                         return new string[] { Convert.ToString(target) };
                     }
@@ -908,7 +970,16 @@ namespace Gurux.Service.Db
             {
                 // Reference type method
                 var methodCallExpression = (MethodCallExpression)expression;
-                return new string[] { Convert.ToString(Expression.Lambda(methodCallExpression).Compile().DynamicInvoke()) };
+                object value = Expression.Lambda(methodCallExpression).Compile().DynamicInvoke();
+                if (where && getValue && value is string)
+                {
+                    return new string[] { AddQuotes((string)value, '\'')};
+                }
+                else if (where && getValue && value is Guid)
+                {
+                    return new string[] { AddQuotes(value.ToString().Replace("-", ""), '\'') };
+                }
+                return new string[] { Convert.ToString(value) };
             }
 
             if (expression is UnaryExpression)
@@ -937,18 +1008,7 @@ namespace Gurux.Service.Db
                         if (m.Method.Name == "In")
                         {                            
                             return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + " IN (" + 
-                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};
-                            
-                            string value = null;
-                            if (m.Arguments[0].NodeType != ExpressionType.Parameter)
-                            {
-                                value = GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0];
-                            }
-                            if (value == null || value == AddQuotes("*", quoteSeparator))
-                            {
-                                return new string[] { "COUNT(*)" };
-                            }
-                            return new string[] { "COUNT(" + value + ")" };
+                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};                            
                         }                        
                     }
                     if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
@@ -980,8 +1040,13 @@ namespace Gurux.Service.Db
                                 return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" + 
                                 GetMembers(settings, m.Arguments[0], '\0', where, true)[0] + "'))"};
                             }
-                            return new string[] {"(UPPER(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + ") LIKE('" + 
-                                GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper() + "'))"};
+                            string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper();
+                            if (tmp[0] != '\'')
+                            {
+                                tmp = "'" + tmp + "'";
+                            }
+                            return new string[] {"(UPPER(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + ") LIKE(" + 
+                                 tmp + "))"};
                         }
                         else
                         {

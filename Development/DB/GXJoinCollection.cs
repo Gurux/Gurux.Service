@@ -48,7 +48,25 @@ namespace Gurux.Service.Db
         {
             Parent = parent;
         }
-        
+
+        private static UnaryExpression GetExpression(Expression e)
+        {
+            if (e is UnaryExpression)
+            {
+                return (UnaryExpression)e;
+            }
+            if (e is MemberExpression)
+            {
+                MemberExpression m = (MemberExpression)e;
+                object u = Expression.Convert(m, typeof(UnaryExpression));
+                return (UnaryExpression)u;
+            }
+            if (e is ParameterExpression)
+            {
+                throw new Exception("Invalid expression.");
+            }
+            throw new Exception("Invalid expression.");
+        }
 
         /// <summary>
         /// Add inner join.
@@ -65,9 +83,16 @@ namespace Gurux.Service.Db
                 throw new ArgumentNullException("destinationColumn");
             }
             Parent.Updated = true;
-            UnaryExpression s = sourceColumn.Body as UnaryExpression;
-            UnaryExpression d = destinationColumn.Body as UnaryExpression;
-            Expression t = Expression.Equal(s.Operand, d.Operand);
+            //UnaryExpression s = sourceColumn.Body
+            //UnaryExpression d = destinationColumn.Body;
+            Expression t = Expression.Equal(sourceColumn.Body, destinationColumn.Body);
+
+            /*
+            UnaryExpression s = sourceColumn.Body; GetExpression(sourceColumn.Body);
+            UnaryExpression d = GetExpression(destinationColumn.Body);
+             Expression t = Expression.Equal(s.Operand, Expression.Convert(d.Operand, s.Operand.Type));
+             * */
+
             List.Add(new KeyValuePair<JoinType, BinaryExpression>(type, t as BinaryExpression));
         }
 

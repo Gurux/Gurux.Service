@@ -91,20 +91,51 @@ namespace Gurux.Service.Db
             }
         }
 
+        internal static MemberExpression GetMemberExpression(Expression expression, out bool allowNull)
+        {
+            if (expression is MemberExpression)
+            {
+                MemberInfo m = (expression as MemberExpression).Member;
+                Type tp = (m as PropertyInfo).PropertyType;
+                allowNull = tp.IsGenericType && tp.GetGenericTypeDefinition() == typeof(Nullable<>);                    
+                return (expression as MemberExpression);
+            }
+            if (expression is UnaryExpression)
+            {
+                MemberExpression e = GetMemberExpression((expression as UnaryExpression).Operand, out allowNull);
+                //If value is nullable.
+                if (e.Expression.Type.IsGenericType && e.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                {
+                    e = GetMemberExpression(e.Expression, out allowNull);
+                    if (e.NodeType == ExpressionType.MemberAccess)
+                    {
+                        allowNull = false;
+                    }
+                }
+                return e;
+            }
+            throw new ArgumentOutOfRangeException("Invalid join.");
+        }
+
         internal static void UpdateJoins(GXDBSettings settings, GXJoinCollection list, List<GXJoin> joins)
         {
             char separtor = settings.ColumnQuotation;
             string prefix = settings.TablePrefix;
+            bool allowNull;
+            MemberExpression me;
             foreach (var it in list.List)
-            {
+            {                
                 GXJoin join = new GXJoin();
                 join.Type = it.Key;
-                MemberInfo m = (it.Value.Left as MemberExpression).Member;
-                join.Table1 = GXDbHelpers.GetTableName(m.DeclaringType, false, separtor, prefix);
+                me = GetMemberExpression(it.Value.Left, out allowNull);
+                MemberInfo m = me.Member;
+                Expression e = me.Expression;                
                 join.Column1 = GXDbHelpers.GetColumnName(m, separtor);
-                m = (it.Value.Right as MemberExpression).Member;
-                join.Table2 = GXDbHelpers.GetTableName(m.DeclaringType, false, separtor, prefix);
+                join.AllowNull1 = allowNull;
+                m = GetMemberExpression(it.Value.Right, out allowNull).Member;                
                 join.Column2 = GXDbHelpers.GetColumnName(m, separtor);
+                join.AllowNull2 = allowNull;
+                join.UpdateTables(e.Type, m.DeclaringType);              
                 joins.Add(join);
             }
         }

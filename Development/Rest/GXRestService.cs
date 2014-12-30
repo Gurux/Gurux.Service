@@ -44,6 +44,24 @@ namespace Gurux.Service.Rest
     public abstract class GXRestService
     {
         /// <summary>
+        /// User host address.
+        /// </summary>
+        public string UserHostAddress
+        {
+            get;
+            internal set;
+        }
+
+        /// <summary>
+        /// Application host.
+        /// </summary>
+        public GXAppHost Host
+        {
+            get;
+            internal set;
+        }
+
+        /// <summary>
         /// User information.
         /// </summary>
         public IPrincipal User
@@ -80,6 +98,13 @@ namespace Gurux.Service.Rest
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns, where);
             arg.Relations = false;
             return Db.Select<T>(arg);
+        }
+
+        public T SingleOrDefault<T>(Expression<Func<T, object>> columns, Expression<Func<T, object>> where)
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<T>(columns, where);
+            arg.Relations = false;
+            return Db.SingleOrDefault<T>(arg);
         }
     }
 }

@@ -45,6 +45,14 @@ namespace Gurux.Service.Db
         {
         }
 
+        public void UpdateTables(System.Type table1, System.Type table2)
+        {
+            Table1Type = table1;
+            Table2Type = table2;
+            Table1 = GXDbHelpers.GetTableName(table1, false, null);
+            Table2 = GXDbHelpers.GetTableName(table2, false, null);
+        }
+
         /// <summary>
         /// Join type.
         /// </summary>
@@ -52,15 +60,24 @@ namespace Gurux.Service.Db
         /// <summary>
         /// Table 1 name.
         /// </summary>
-        public string Table1;
+        public string Table1
+        {
+            get;
+            private set;
+        }
         /// <summary>
         /// Table 2 name.
         /// </summary>
-        public string Table2;
+        public string Table2
+        {
+            get;
+            private set;
+        }
         /// <summary>
         /// Column 1 name.
         /// </summary>       
         public string Column1;
+
         /// <summary>
         /// Column 2 name.
         /// </summary>        
@@ -75,6 +92,25 @@ namespace Gurux.Service.Db
         /// Column 2 alias name.
         /// </summary>        
         public string Alias2;
+
+        /// <summary>
+        /// Is null allowed in relation.
+        /// </summary>
+        public bool AllowNull1;
+
+        /// <summary>
+        /// Is null allowed in relation.
+        /// </summary>
+        public bool AllowNull2;
+
+        /// <summary>
+        /// Table 1 name.
+        /// </summary>
+        public System.Type Table1Type;
+        /// <summary>
+        /// Table 2 name.
+        /// </summary>
+        public System.Type Table2Type;
 
         /// <summary>
         /// If we have multiple references to same table.

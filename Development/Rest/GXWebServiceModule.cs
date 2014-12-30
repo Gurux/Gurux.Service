@@ -60,11 +60,17 @@ namespace Gurux.Service.Rest
             set;
         }
 
+        GXAppHost Host
+        {
+            get;
+            set;
+        }
+
         /// <summary>
         /// Constructor.
         /// </summary>
         public GXWebServiceModule()
-            : this(null)
+            : this(null, null)
         {
         }
 
@@ -72,13 +78,17 @@ namespace Gurux.Service.Rest
         /// Constructor.
         /// </summary>
         /// <param name="connection">used database connection.</param>
-        public GXWebServiceModule(GXDbConnection connection)
+        public GXWebServiceModule(GXDbConnection connection, GXAppHost host)
         {
             Connection = connection;
-            if (MessageMap == null)
+            Host = host;
+            if (MessageMap == null || MessageMap.Count == 0)
             {
-                MessageMap = new Hashtable();
-                GXGeneral.UpdateRestMessageTypes(MessageMap);
+                if (MessageMap == null)
+                {
+                    MessageMap = new Hashtable();
+                }
+                GXGeneral.UpdateRestMessageTypes(MessageMap, host);
             }
         }
 
@@ -99,7 +109,7 @@ namespace Gurux.Service.Rest
         /// Try authenticate if authentication is used.
         /// </summary>
         /// <remarks>
-        /// Overide this method and implement own authentication.
+        /// Override this method and implement own authentication.
         /// </remarks>
         /// <param name="userName">User name.</param>
         /// <param name="password">Password.</param>
@@ -180,7 +190,7 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="httpMethod">Http method to execute.</param>
+        /// <param name="httpMethod">HTTP method to execute.</param>
         /// <param name="contentType"></param>
         /// <param name="path"></param>
         /// <param name="authHeader">Authentication header.</param>
@@ -188,8 +198,8 @@ namespace Gurux.Service.Rest
         /// <param name="password">Password.</param>
         /// <returns>True, if authentication was successful.</returns>
         /// <remarks>
-        /// If authentication failed username and password are empty strings.
-        /// If authentication is not used username and password are null.
+        /// If authentication failed user name and password are empty strings.
+        /// If authentication is not used user name and password are null.
         /// </remarks>
         internal static bool TryAuthenticate(Hashtable messageMap, string httpMethod, string contentType, string path, string authHeader, out string username, out string password)
         {
@@ -322,6 +332,31 @@ namespace Gurux.Service.Rest
                     s.Connection = Connection;
                 }
             }
+            else
+            {
+                context.Response.ContentType = "text/html";                
+                StringBuilder sb = new StringBuilder();
+                sb.Append("<http><body>");
+                sb.Append("<h1>Gurux.Service</h1>");
+                sb.Append("The following operations are supported:<p/>");
+                sb.Append("<h2>Operations:</h2><p/>");
+                if (MessageMap == null || MessageMap.Count == 0)
+                {
+                    if (MessageMap == null)
+                    {
+                        MessageMap = new Hashtable();
+                    }
+                    GXGeneral.UpdateRestMessageTypes(MessageMap, Host);
+                }
+                foreach (DictionaryEntry it in MessageMap)
+                {
+                    sb.Append(it.Key);
+                    sb.Append("<p/>");
+                }
+
+                sb.Append("</body></http>");
+                context.Response.Write(sb.ToString());
+            }
         }
 
         public void Dispose()
@@ -355,9 +390,12 @@ namespace Gurux.Service.Rest
             else
             {
                 // Get the time of the begin request event.
-                DateTime beginRequestTime = (DateTime)httpApp.Context.Items["beginRequestTime"];
-                TimeSpan ts = DateTime.Now - beginRequestTime;
-                httpApp.Context.Response.AppendHeader("TimeSpan", ts.ToString());
+                if (httpApp.Context.Items.Contains("beginRequestTime"))
+                {
+                    DateTime beginRequestTime = (DateTime)httpApp.Context.Items["beginRequestTime"];
+                    TimeSpan ts = DateTime.Now - beginRequestTime;
+                    httpApp.Context.Response.AppendHeader("TimeSpan", ts.ToString());
+                }
             }
         }
 

@@ -400,6 +400,11 @@ namespace Gurux.Service.Db
         internal string GetTableName(Type type, bool addQuoteSeparator)
         {
             return GXDbHelpers.GetTableName(type, addQuoteSeparator, Settings.TableQuotation, Settings.TablePrefix);
-        }       
+        }
+
+        internal string GetTableName(Type type, bool addQuoteSeparator, bool allowSharedTables)
+        {
+            return GXDbHelpers.GetTableName(type, addQuoteSeparator, Settings.TableQuotation, Settings.TablePrefix, allowSharedTables);
+        }
     }    
 }

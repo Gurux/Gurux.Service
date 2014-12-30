@@ -132,10 +132,10 @@ namespace Gurux.Service_Test
         public void WhereByReferenceTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<DeviceGroup3>(q => q.Id);
-            arg.Where.And<Device3>(q => q.Id == 1);
+            arg.Where.And<DeviceGroup3>(q => q.Id == 1);
             arg.Excluded.Add<DeviceProperty>();
             arg.Excluded.Add<DeviceGroupProperty>();
-            Assert.AreEqual("SELECT `Id` AS `DG.Id` FROM DeviceGroup3 WHERE D.`Id` = 1", arg.ToString());
+            Assert.AreEqual("SELECT `Id` AS `DG.Id` FROM DeviceGroup3 `DG` WHERE DG.`Id` = 1", arg.ToString());
         }
 
         /// <summary>

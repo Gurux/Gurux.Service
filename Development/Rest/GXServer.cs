@@ -47,6 +47,8 @@ namespace Gurux.Service.Rest
 {         
     public class GXServer
     {
+        AutoResetEvent Closing = new AutoResetEvent(false);
+        AutoResetEvent Closed = new AutoResetEvent(false);
         /// <summary>
         /// REST message map.
         /// </summary>
@@ -67,24 +69,39 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// Constructor.
         /// </summary>
-        public GXServer(string prefixes, GXDbConnection connection) :
-            this(new string[] { prefixes }, connection)
+        public GXServer(string prefixes, GXDbConnection connection, GXAppHost host) :
+            this(new string[] { prefixes }, connection, host)
         {
             
+        }
+
+        private CreateObjectEventhandler m_CreateObject;
+
+        public event CreateObjectEventhandler OnCreateObject
+        {
+            add
+            {
+                m_CreateObject += value;
+            }
+            remove
+            {
+                m_CreateObject -= value;
+            }
         }
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        public GXServer(string[] prefixes, GXDbConnection connection)
+        public GXServer(string[] prefixes, GXDbConnection connection, GXAppHost host)
         {
             RestMap = new Hashtable();
             Parser = new GXJsonParser();
+            Parser.OnCreateObject += new CreateObjectEventhandler(ParserOnCreateObject);
             Connection = connection;            
             if (MessageMap == null)
             {
                 MessageMap = new Hashtable();
-                GXGeneral.UpdateRestMessageTypes(MessageMap);
+                GXGeneral.UpdateRestMessageTypes(MessageMap, host);
             }
             Listener = new HttpListener();
             foreach (string it in prefixes)
@@ -94,6 +111,14 @@ namespace Gurux.Service.Rest
             Listener.Start();
             Thread thread = new Thread(new ParameterizedThreadStart(ListenThread));
             thread.Start(this);
+        }
+
+        private void ParserOnCreateObject(object sender, GXCreateObjectEventArgs e)
+        {
+            if (m_CreateObject != null)
+            {
+                m_CreateObject(sender, e);
+            }
         }
         /// <summary>
         /// Listen clients as long as server is up and running.
@@ -116,7 +141,15 @@ namespace Gurux.Service.Rest
                     //If server is not closed.
                     if (listener.IsListening)
                     {
-                        c = listener.EndGetContext(ListenerCallback);
+                        try
+                        {
+                            c = listener.EndGetContext(ListenerCallback);
+                        }
+                        catch (Exception)
+                        {
+                            h.Set();
+                            return;
+                        }
                         GXWebServiceModule.TryAuthenticate(tmp.MessageMap, c.Request, out username, out password);
                         //Anonymous access is allowed.
                         if (username == null && password == null)
@@ -152,10 +185,12 @@ namespace Gurux.Service.Rest
                         }
                         h.Set();
                     }
-                }, Listener);
-                h.WaitOne();
+                }, Listener);                
+                EventWaitHandle.WaitAny(new EventWaitHandle[] {h, Closing});
                 if (!accept || !Listener.IsListening)
                 {
+                    result.AsyncWaitHandle.WaitOne(1000);
+                    Closed.Set();
                     break;
                 }
             }
@@ -185,19 +220,42 @@ namespace Gurux.Service.Rest
             }
         }
 
-        static void ProcessRequest(GXServer server, HttpListenerContext context, IPrincipal user)
+        static void ProcessRequest(GXServer server, HttpListenerContext context, 
+                IPrincipal user)
         {
+            string path, data;
             if (context.Request.ContentType.Contains("json"))
             {
                 string method = context.Request.HttpMethod.ToUpper();
-                bool content = method == "POST" || method == "PUT";
-                string path, data;
+                bool content = method == "POST" || method == "PUT";                
                 if (content)
                 {
-                    int cnt = (int)context.Request.ContentLength64;
-                    byte[] buff = new byte[cnt];
-                    context.Request.InputStream.Read(buff, 0, cnt);
-                    data = ASCIIEncoding.ASCII.GetString(buff, 0, cnt);
+                    int length = (int)context.Request.ContentLength64;
+                    MemoryStream ms = new MemoryStream(length);
+                    Stream stream = context.Request.InputStream;
+                    byte[] buffer = new byte[length == 0 || length > 1024 ? 1024 : length];
+                    IAsyncResult read = stream.BeginRead(buffer, 0, buffer.Length, null, null);
+                    while (true)
+                    {
+                        // wait for the read operation to complete
+                        if (!read.AsyncWaitHandle.WaitOne())
+                        {
+                            break;
+                        }
+                        int count = stream.EndRead(read);
+                        ms.Write(buffer, 0, count);
+                        // If read is done.
+                        if (ms.Position == length || count == 0)
+                        {
+                            break;
+                        }
+                        read = stream.BeginRead(buffer, 0, buffer.Length, null, null);
+                    }
+                    ms.Position = 0;
+                    using (StreamReader sr = new StreamReader(ms))
+                    {
+                        data = sr.ReadToEnd();
+                    }                   
                     path = context.Request.RawUrl;
                 }
                 else
@@ -215,9 +273,20 @@ namespace Gurux.Service.Rest
                     }
                 }
                 System.Diagnostics.Debug.WriteLine("-> " + path + " : "+ data);
-                string reply = GetReply(server.MessageMap, user, server, context.Request.HttpMethod, path, data);
+
+                //If proxy is used.
+                string add = null;
+                if (HttpContext.Current != null)
+                {
+                    add = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"].ToString();
+                }
+                if (add == null)
+                {
+                    add = context.Request.UserHostAddress;
+                }                
+                string reply = GetReply(server.MessageMap, user, server, add, context.Request.HttpMethod, path, data);
                 context.Response.ContentType = "json";
-                context.Response.ContentLength64 = reply.Length;
+                context.Response.ContentLength64 = reply.Length;                
                 System.Diagnostics.Debug.WriteLine("<- " + reply);
                 using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
                 {
@@ -233,56 +302,59 @@ namespace Gurux.Service.Rest
         /// <param name="path">Command to execute.</param>
         /// <param name="data">Command data.</param>
         /// <returns>DTO result as string.</returns>
-        static string GetReply(Hashtable messageMap, IPrincipal user, GXServer server, string method, string path, string data)
+        static string GetReply(Hashtable messageMap, IPrincipal user, GXServer server, string hostAddress, string method, string path, string data)
         {
             InvokeHandler handler;
             string command;
+            GXRestMethodInfo mi;
             lock (messageMap)
             {
-                GXRestMethodInfo mi = GXGeneral.GetTypes(messageMap, path, out command);
-                if (mi == null)
-                {
-                    throw new HttpException(405, string.Format("Rest method '{0}' not implemented.", command));
-                }
-                switch (method.ToUpper())
-                {
-                    case "GET":
-                        handler = mi.Get;
-                        break;
-                    case "POST":
-                        handler = mi.Post;
-                        break;
-                    case "PUT":
-                        handler = mi.Put;
-                        break;
-                    case "DELETE":
-                        handler = mi.Delete;
-                        break;
-                    default:
-                        handler = null;
-                        break;
-                }
-                if (handler == null)
-                {
-                    throw new HttpException(405, string.Format("Method '{0}' not allowed for {1}", method, command));
-                }
-                object req = server.Parser.Deserialize("{" + data + "}", mi.RequestType);
-                //Get Rest class from cache.
-                GXRestService target = server.RestMap[mi.RestClassType] as GXRestService;
-                if (target == null)
-                {
-                    target = GXJsonParser.CreateInstance(mi.RestClassType) as GXRestService;
-                    server.RestMap[mi.RestClassType] = target;
-                }
-                target.User = user;
-                target.Db = server.Connection;
-                object tmp = handler(target, req);
-                if (tmp == null)
-                {
-                    throw new HttpException(405, string.Format("Command '{0}' returned null.", command));
-                }
-                return server.Parser.SerializeToHttp(tmp);
-            }            
+                mi = GXGeneral.GetTypes(messageMap, path, out command);
+            }
+            if (mi == null)
+            {
+                throw new HttpException(405, string.Format("Rest method '{0}' not implemented.", command));
+            }
+            switch (method.ToUpper())
+            {
+                case "GET":
+                    handler = mi.Get;
+                    break;
+                case "POST":
+                    handler = mi.Post;
+                    break;
+                case "PUT":
+                    handler = mi.Put;
+                    break;
+                case "DELETE":
+                    handler = mi.Delete;
+                    break;
+                default:
+                    handler = null;
+                    break;
+            }
+            if (handler == null)
+            {
+                throw new HttpException(405, string.Format("Method '{0}' not allowed for {1}", method, command));
+            }
+            object req = server.Parser.Deserialize("{" + data + "}", mi.RequestType);
+            //Get Rest class from cache.
+            GXRestService target = server.RestMap[mi.RestClassType] as GXRestService;
+            if (target == null)
+            {
+                target = GXJsonParser.CreateInstance(mi.RestClassType) as GXRestService;
+                server.RestMap[mi.RestClassType] = target;
+            }
+            target.Host = GXAppHost.Instance();
+            target.User = user;
+            target.Db = server.Connection;
+            target.UserHostAddress = hostAddress;
+            object tmp = handler(target, req);
+            if (tmp == null)
+            {
+                throw new HttpException(405, string.Format("Command '{0}' returned null.", command));
+            }
+            return server.Parser.SerializeToHttp(tmp);
         }
 
 
@@ -300,9 +372,14 @@ namespace Gurux.Service.Rest
         {
             return null;
         }
-
+        
+        /// <summary>
+        /// Close server.
+        /// </summary>
         public void Close()
         {
+            Closing.Set();
+            Closed.WaitOne(1000);
             Listener.Close();
         }      
     }

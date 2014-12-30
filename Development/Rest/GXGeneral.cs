@@ -45,32 +45,14 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// Find available Rest messages.
         /// </summary>
-        public static void UpdateRestMessageTypes(Hashtable messageMap)
+        public static void UpdateRestMessageTypes(Hashtable messageMap, GXAppHost host)
         {
             AuthenticateAttribute[] auths;
             Type tp;
             ParameterInfo[] parameters;
-            List<Guid> skipped = new List<Guid>();
-            skipped.Add(new Guid("d0df9ca6-b65b-4ffb-869d-2dbc42cc00fa"));//System.Windows.Forms.
-            skipped.Add(new Guid("8f5e3cae-3c7a-4750-b280-71828933bb6c"));//System.Dll
-            skipped.Add(new Guid("b46af7fe-f908-49cb-8f6b-df42664164c2"));//System.Drawing
-            skipped.Add(new Guid("82fb3f30-43db-42a8-9992-226042ad96e5"));//System.Configuration
-            skipped.Add(new Guid("8f4ad706-9e29-4df0-9004-4220a2c66a47"));//System.Xml
-            skipped.Add(new Guid("5b91143f-4abb-4980-a4bb-eac5ee6c451f"));//Microsoft.VisualStudio.Debugger.Runtime
-            skipped.Add(new Guid("26922389-81b1-4617-a702-cdbb11572673"));//Common.Logging
-            skipped.Add(new Guid("69dab073-0d24-46d2-a7c0-b6e370f4029d"));//System.Security
-            skipped.Add(new Guid("2c34f48b-c05f-470b-8abf-d6cb4dabc839"));//Accessibility
-            skipped.Add(new Guid("ce36a65f-23ff-440a-b97c-a8b8854f21d8"));//System.Data.SqlXml
-            skipped.Add(new Guid("6dd3b4a4-0fea-4450-ab8b-15a096196f59"));//System.Design
-            skipped.Add(new Guid("ee0634e3-cb32-41c6-94b9-5177445ec82d"));//System.Windows.Forms.resources
-            string skipPath = Path.GetDirectoryName(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory());
-            
             foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
             {
-                if (asm.GetName().Name == "Anonymously Hosted DynamicMethods Assembly" ||
-                    string.IsNullOrEmpty(asm.Location) ||
-                    string.Compare(skipPath, Path.GetDirectoryName(asm.Location)) == 0 ||
-                    skipped.Contains(asm.ManifestModule.ModuleVersionId))
+                if (GXCommon.IsDefaultAssembly(asm))
                 {
                     continue;
                 }

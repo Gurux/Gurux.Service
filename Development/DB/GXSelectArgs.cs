@@ -65,6 +65,13 @@ namespace Gurux.Service.Db
         public override string ToString()
         {            
             StringBuilder sb = new StringBuilder();
+            if (this.ExecutionTime != 0)
+            {
+                sb.Append("Execution time: ");
+                sb.Append(ExecutionTime);
+                sb.Append(" ms. ");
+                sb.Append(Environment.NewLine);
+            }
             sb.Append(Columns.ToString());
             string str, where = Where.ToString();
             if (!string.IsNullOrEmpty(where))
@@ -162,6 +169,7 @@ namespace Gurux.Service.Db
             Columns.Clear();
             Where.Clear();
             OrderBy.Clear();
+            ExecutionTime = 0;
         }
 
         public static GXSelectArgs SelectAll<T>()
@@ -244,6 +252,15 @@ namespace Gurux.Service.Db
         {
             get;
             private set;
+        }
+
+        /// <summary>
+        /// Last execution time in ms.
+        /// </summary>
+        public int ExecutionTime
+        {
+            get;
+            internal set;
         }
 
         /// <summary>

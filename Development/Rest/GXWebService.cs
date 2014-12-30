@@ -125,6 +125,14 @@ namespace Gurux.Service.Rest
                     RestMap[RestMethodInfo.RestClassType] = target;
                 }
                 //Update user and DB info.
+                
+                //If proxy is used.                
+                string add = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"].ToString();
+                if (add == null)
+                {
+                    add = context.Request.UserHostAddress;
+                }
+                target.Host = GXAppHost.Instance();
                 target.User = context.User;
                 target.Db = Connection;
                 object tmp = handler(target, req);

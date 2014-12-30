@@ -167,6 +167,10 @@ namespace Gurux.Service.Db
 
         public static GXDeleteArgs DeleteRange<T>(IEnumerable<T> collection)
         {
+            if (!collection.GetEnumerator().MoveNext())
+            {
+                throw new ArgumentOutOfRangeException("DeleteRange failed. Collection is empty.");
+            }
             GXDeleteArgs args = Delete(typeof(T));
             args.Parent.Updated = true;
             args.Where.Or<T>(q => collection);          
