@@ -23,7 +23,7 @@ At the moment we are supporting following databases:
 * [Maria BD](http://www.mariadb.com/ "Maria BD")
 * [Microsoft SQL Server](http://www.microsoft.com/ "Microsoft SQL Server")
 * [Oracle](http://www.oracle.com/ "Oracle")
-* [SQLite](http://www.sqlite.com/ "SQLite)
+* [SQLite](http://www.sqlite.com/ "SQLite")
 
 General information
 =========================== 
