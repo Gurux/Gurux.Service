@@ -143,6 +143,22 @@ namespace Gurux.Service.Db
             args.Where.And<T>(q => value);
             return args;
         }
+
+        public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection)
+        {
+            return UpdateRange(collection, null);
+        }
+
+        public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection, Expression<Func<T, object>> columns)
+        {
+            GXUpdateArgs args = new GXUpdateArgs();
+            args.Parent.Updated = true;
+            foreach (var it in collection)
+            {
+                args.Values.Add(new KeyValuePair<object, LambdaExpression>(it, columns));
+            }
+            return args;
+        }
                
         /// <summary>
         /// Add new item to update.
