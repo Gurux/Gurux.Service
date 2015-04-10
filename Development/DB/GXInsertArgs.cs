@@ -33,7 +33,7 @@
 using System;
 using System.Linq.Expressions;
 using System.Text;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using System.Reflection;
 using Gurux.Common.Internal;
 using System.Collections.Generic;
@@ -41,7 +41,7 @@ using System.Collections;
 using System.Diagnostics;
 using System.Data;
 using Gurux.Common.JSon;
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     class GXUpdateItem
     {

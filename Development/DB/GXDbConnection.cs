@@ -39,17 +39,17 @@ using System.Linq.Expressions;
 using System.Text;
 using Gurux.Common;
 using System.Data.Common;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using System.Reflection;
 using System.Collections;
 using Gurux.Common.Internal;
 using System.Runtime.Serialization;
 using System.Data.OleDb;
 using System.Data.Odbc;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using System.IO;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {    
     /// <summary>
     /// This class is used to communicate with database.
@@ -1129,7 +1129,7 @@ namespace Gurux.Service.Db
                 case DatabaseType.MySQL:
                     return ExecuteScalarInternal(transaction, "SELECT LAST_INSERT_ID()" + name, valueType);
                 case DatabaseType.Oracle:
-                    return ExecuteScalarInternal(transaction, "SELECT " + Gurux.Service.Db.Settings.GXOracleSqlSettings.GetSequenceName(table, columnName) + ".CURRVAL FROM dual", valueType);                
+                    return ExecuteScalarInternal(transaction, "SELECT " + Gurux.Service.Orm.Settings.GXOracleSqlSettings.GetSequenceName(table, columnName) + ".CURRVAL FROM dual", valueType);                
                 case DatabaseType.MSSQL:
                     return ExecuteScalarInternal(transaction, "SELECT @@IDENTITY" + name, valueType);
                 case DatabaseType.SqLite:
@@ -2545,6 +2545,7 @@ namespace Gurux.Service.Db
             int pos = 0;
             string columnName;
             ulong id;
+            int total = 0;
             Type type;
             IDbTransaction transaction = Transaction;
             bool autoTransaction = transaction == null;
@@ -2562,7 +2563,7 @@ namespace Gurux.Service.Db
                         queries.Clear();
                         if (insert)
                         {
-                            GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
+                            total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
                             q.Value.Inserted = true;
                         }
                         else
@@ -2580,18 +2581,63 @@ namespace Gurux.Service.Db
                             }
                             ++pos;
                         }
+                        if (Builder.Settings.MaximumRowUpdate != 1 && total > Builder.Settings.MaximumRowUpdate)
+                        {
+                            if (transaction != null && autoTransaction)
+                            {
+                                transaction.Commit();
+                                transaction = Connection.BeginTransaction();
+                            }
+                            total = 0;
+                        }
                         GXSerializedItem si = GXSqlBuilder.FindAutoIncrement(type);
                         int index = 0;
                         foreach (string query in queries)
                         {
                             ExecuteNonQuery(transaction, query);
-                            //Update auto increment value if it's used.
-                            if (si != null && pos != -1)
+                            //Update auto increment value if it's used and transaction is not updated.
+                            if (total != 0 && si != null && pos != -1)
                             {
                                 columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
                                 id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
                                 //If each value is added separately.
-                                if (!this.Builder.Settings.MultibleUpdate)
+                                if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                {
+                                    if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                    {
+                                        si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
+                                    }
+                                    ++index;
+                                }
+                                else
+                                {
+                                    if (!Builder.Settings.AutoIncrementFirst)
+                                    {
+                                        id -= (ulong)(q.Value.Rows.Count - 1);                                        
+                                    }
+                                    foreach (var it in q.Value.Rows)
+                                    {
+                                        if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                        {
+                                            si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
+                                        }
+                                        ++id;
+                                    }
+                                }
+                            }
+                        }
+
+                        /////////////////////////////////////////////////////////////////////////////////////////////////
+                        //Update ID's after transaction is made and all the rows are updated.
+                        //Update auto increment value if it's used.
+                        if (total == 0 && si != null && pos != -1)
+                        {
+                            foreach (string query in queries)
+                            {                                                     
+                                columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
+                                id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
+                                //If each value is added separately.
+                                if (this.Builder.Settings.MaximumRowUpdate == 1)
                                 {
                                     if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
                                     {

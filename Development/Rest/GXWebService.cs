@@ -42,7 +42,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using Gurux.Common;
 using System.Data.Common;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using Gurux.Common.Internal;
 
 namespace Gurux.Service.Rest

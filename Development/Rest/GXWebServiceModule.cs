@@ -39,7 +39,7 @@ using System.Web;
 using System.Data.Common;
 using System.Security.Principal;
 using System.Net;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using System.Web.Security;
 
 namespace Gurux.Service.Rest

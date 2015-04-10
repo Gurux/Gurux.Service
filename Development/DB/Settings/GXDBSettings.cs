@@ -34,10 +34,10 @@ using System;
 using System.Globalization;
 using System.ComponentModel;
 
-namespace Gurux.Service.Db.Settings
+namespace Gurux.Service.Orm.Settings
 {
     /// <summary>
-    /// Database spesific settings.
+    /// Database specific settings.
     /// </summary>
     public abstract class GXDBSettings
     {
@@ -95,7 +95,7 @@ namespace Gurux.Service.Db.Settings
         }
 
         /// <summary>
-        /// Select table colums using form "AS ColumnName.TableName". Oracle needs this.
+        /// Select table columns using form "AS ColumnName.TableName". Oracle needs this.
         /// </summary>
         public virtual bool SelectUsingAs
         {
@@ -169,9 +169,9 @@ namespace Gurux.Service.Db.Settings
         }
 
         /// <summary>
-        /// Is multible rows insert and update allowed.
+        /// Returns maximum row count that is allowed with one insert or update query.
         /// </summary>
-        abstract public bool MultibleUpdate
+        abstract public int MaximumRowUpdate
         {
             get;
         }

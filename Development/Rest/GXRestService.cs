@@ -31,7 +31,7 @@
 //---------------------------------------------------------------------------
 
 using System.Security.Principal;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using System.Linq.Expressions;
 using System;
 using System.Collections.Generic;

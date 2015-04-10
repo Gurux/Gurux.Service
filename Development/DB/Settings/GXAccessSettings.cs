@@ -33,7 +33,7 @@
 using System;
 using System.Globalization;
 using System.Text;
-namespace Gurux.Service.Db.Settings
+namespace Gurux.Service.Orm.Settings
 {
     /// <summary>
     /// MS Access database settings.
@@ -84,12 +84,12 @@ namespace Gurux.Service.Db.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.MultibleUpdate"/>
-        override public bool MultibleUpdate
+        /// <inheritdoc cref="GXDBSettings.MaximumRowUpdate"/>
+        override public int MaximumRowUpdate
         {
             get
             {
-                return false;
+                return 1;
             }
         }
 

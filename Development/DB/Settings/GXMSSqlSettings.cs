@@ -30,7 +30,7 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Db.Settings
+namespace Gurux.Service.Orm.Settings
 {
     /// <summary>
     /// Microsoft SQL database settings.
@@ -72,12 +72,12 @@ namespace Gurux.Service.Db.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.MultibleUpdate"/>
-        override public bool MultibleUpdate
+        /// <inheritdoc cref="GXDBSettings.MaximumRowUpdate"/>
+        override public int MaximumRowUpdate
         {
             get
             {
-                return true;
+                return 999;
             }
         }
 

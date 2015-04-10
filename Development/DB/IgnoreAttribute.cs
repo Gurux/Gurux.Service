@@ -32,7 +32,7 @@
 
 using System;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {     
     /// <summary>
     /// Properties with this IgnoreAttribute are ignored when building sql sentences 

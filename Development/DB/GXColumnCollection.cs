@@ -34,11 +34,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using System.Reflection;
 using Gurux.Common.Internal;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     /// <summary>
     /// Collection of columns in select expression.
@@ -534,10 +534,10 @@ namespace Gurux.Service.Db
         /// 2. Several classes are using same class.
         /// 3. User is defined it using Alias attribute.
         /// </remarks>
-        private static string GetAsName(List<GXJoin> joinList, Type type)
+        private static string GetAsName(List<GXJoin> joinList, Type type, bool selectUsingAs)
         {
             //Data from different classes is saved to same table.
-            if (GXDbHelpers.IsSharedTable(type))
+            if (selectUsingAs || GXDbHelpers.IsSharedTable(type))
             {
                 string name = GXDbHelpers.OriginalTableName(type);                    
                 int cnt = 0;
@@ -567,6 +567,10 @@ namespace Gurux.Service.Db
                     }
                     return name;
                 }
+                if (selectUsingAs)
+                {
+                    return name;
+                }
             }
             if (GXDbHelpers.IsAliasName(type))
             {
@@ -582,7 +586,7 @@ namespace Gurux.Service.Db
             string name;
             foreach (var it in columnList)
             {
-                name = GetAsName(joinList, it.Key);
+                name = GetAsName(joinList, it.Key, settings.SelectUsingAs);
                 if (name != null)
                 {
                     asTable.Add(it.Key, name);

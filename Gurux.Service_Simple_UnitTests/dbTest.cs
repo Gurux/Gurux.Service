@@ -33,7 +33,7 @@
 using System;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using System.Linq.Expressions;
 
 namespace Gurux.Service_Test

@@ -32,7 +32,7 @@
 
 using System;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     /// <summary>
     /// Is table column indexed to DB.

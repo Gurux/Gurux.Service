@@ -31,7 +31,7 @@
 //---------------------------------------------------------------------------
 
 using System.Text;
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     /// <summary>
     /// Join helper class for internal use only.

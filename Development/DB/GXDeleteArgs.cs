@@ -36,13 +36,13 @@ using System.Linq;
 using System.Text;
 using System.Linq.Expressions;
 using System.Reflection;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using System.Collections;
 using Gurux.Common.Internal;
 using System.Diagnostics;
 using Gurux.Common.JSon;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     public class GXDeleteArgs
     {

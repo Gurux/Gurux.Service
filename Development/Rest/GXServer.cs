@@ -40,7 +40,7 @@ using System.Security.Principal;
 using System.Data.Common;
 using System.Text;
 using System.Collections;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using Gurux.Common.Internal;
 
 namespace Gurux.Service.Rest

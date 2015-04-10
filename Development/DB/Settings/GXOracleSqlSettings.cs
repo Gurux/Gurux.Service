@@ -33,7 +33,7 @@
 using System;
 using System.Globalization;
 
-namespace Gurux.Service.Db.Settings
+namespace Gurux.Service.Orm.Settings
 {
     /// <summary>
     /// Oracle SQL database settings.
@@ -76,7 +76,7 @@ namespace Gurux.Service.Db.Settings
             }
         }
 
-        ///<inheritdoc cref="GXDBSettings.MultibleUpdate"/>
+        ///<inheritdoc cref="GXDBSettings.UpperCase"/>
         ///<remarks>
         ///Oracle columns are upper case.
         ///</remarks>
@@ -97,7 +97,7 @@ namespace Gurux.Service.Db.Settings
             }
         }
 
-        ///<inheritdoc cref="GXDBSettings.MultibleUpdate"/>
+        ///<inheritdoc cref="GXDBSettings.UseQuotationWhereColumns"/>
         ///<remarks>
         ///Oracle needs separator to where column names.
         ///</remarks>
@@ -109,12 +109,12 @@ namespace Gurux.Service.Db.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.MultibleUpdate"/>
-        override public bool MultibleUpdate
+        /// <inheritdoc cref="GXDBSettings.MaximumRowUpdate"/>
+        override public int MaximumRowUpdate
         {
             get
             {
-                return false;
+                return 1;
             }
         }
 

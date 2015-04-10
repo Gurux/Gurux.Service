@@ -33,7 +33,7 @@
 using System;
 using System.ComponentModel;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     /// <summary>
     /// Foreign key update actions.

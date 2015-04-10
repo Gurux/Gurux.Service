@@ -34,7 +34,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using System.Linq.Expressions;
 using Gurux.Common;
 using Gurux.Common.Internal;
@@ -42,7 +42,7 @@ using System.Runtime.Serialization;
 using System.Reflection;
 using System.Collections;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     static class GXDbHelpers
     {
@@ -345,7 +345,7 @@ namespace Gurux.Service.Db
             }
         }
 
-        internal static void GetInsertQuery(KeyValuePair<Type, GXUpdateItem> table, GXDBSettings settings, List<string> queries)
+        internal static int GetInsertQuery(KeyValuePair<Type, GXUpdateItem> table, GXDBSettings settings, List<string> queries)
         {
             StringBuilder sb = new StringBuilder();
             object value;
@@ -367,16 +367,19 @@ namespace Gurux.Service.Db
                 }
                 sb.Append(GXDbHelpers.AddQuotes(col, settings.ColumnQuotation));
             }
-            sb.Append(") VALUES(");                
+            sb.Append(") VALUES(");
+            int rowCnt = 1;   
             foreach (var col in table.Value.Rows)
             {
                 if (firstRow)
                 {
                     firstRow = false;
+                    rowCnt = 1;
                 }
                 else
                 {
                     sb.Append(", (");
+                    ++rowCnt;
                 }
                 first = true;
                 foreach (var it in col)
@@ -424,7 +427,7 @@ namespace Gurux.Service.Db
                 }
                 sb.Append(")");
                 //If all rows can't insert with one query.
-                if (!settings.MultibleUpdate)
+                if (rowCnt > settings.MaximumRowUpdate)
                 {
                     queries.Add(sb.ToString());
                     sb.Length = 0;
@@ -452,6 +455,7 @@ namespace Gurux.Service.Db
             {
                 queries.Add(sb.ToString());
             }
+            return table.Value.Rows.Count;
         }
 
         /// <summary>

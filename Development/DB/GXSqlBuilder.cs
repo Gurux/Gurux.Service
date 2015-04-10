@@ -39,11 +39,11 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using Gurux.Common;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using Gurux.Common.Internal;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {         
     /// <summary>
     /// This class is used to make SQL query.

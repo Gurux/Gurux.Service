@@ -34,10 +34,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 using System.Reflection;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     public class GXOrderByCollection
     {

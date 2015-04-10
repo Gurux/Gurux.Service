@@ -36,7 +36,7 @@ using System.ComponentModel;
 using Gurux.Common;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Rest;
-using Gurux.Service.Db;
+using Gurux.Service.Orm;
 using System.Collections.Generic;
 
 namespace Gurux.Service_Test
@@ -492,7 +492,7 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [DataMember(), Gurux.Service.Db.Ignore]        
+        [DataMember(), Gurux.Service.Orm.Ignore]        
         public TestItem[] Items
         {
             get;

@@ -34,9 +34,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq.Expressions;
-using Gurux.Service.Db.Settings;
+using Gurux.Service.Orm.Settings;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     internal enum WhereType
     {

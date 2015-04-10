@@ -34,7 +34,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 
-namespace Gurux.Service.Db
+namespace Gurux.Service.Orm
 {
     public class GXJoinCollection
     {
