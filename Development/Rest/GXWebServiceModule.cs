@@ -60,7 +60,10 @@ namespace Gurux.Service.Rest
             set;
         }
 
-        GXAppHost Host
+        /// <summary>
+        /// Host application.
+        /// </summary>
+        object Host
         {
             get;
             set;
@@ -78,7 +81,7 @@ namespace Gurux.Service.Rest
         /// Constructor.
         /// </summary>
         /// <param name="connection">used database connection.</param>
-        public GXWebServiceModule(GXDbConnection connection, GXAppHost host)
+        public GXWebServiceModule(GXDbConnection connection, object host)
         {
             Connection = connection;
             Host = host;
@@ -88,7 +91,7 @@ namespace Gurux.Service.Rest
                 {
                     MessageMap = new Hashtable();
                 }
-                GXGeneral.UpdateRestMessageTypes(MessageMap, host);
+                GXGeneral.UpdateRestMessageTypes(MessageMap);
             }
         }
 
@@ -126,7 +129,7 @@ namespace Gurux.Service.Rest
         /// <returns></returns>
         private static bool NeedAuthentication(Hashtable messageMap, string httpMethod, string contentType, string path)
         {
-            if (!contentType.Contains("json"))
+            if (contentType == null || !contentType.Contains("json"))
             {
                 return false;
             }
@@ -246,7 +249,7 @@ namespace Gurux.Service.Rest
             // Get the identity cookie
             HttpCookie identityCookie = app.Context.Request.Cookies[identityCookieName];
             if (identityCookie == null || !Users.ContainsKey(identityCookie.Value.GetHashCode()))
-            {                
+            {
                 bool anonymous;
                 gp = TryAuthenticate(app.Request, out anonymous);
                 if (!anonymous)
@@ -255,13 +258,13 @@ namespace Gurux.Service.Rest
                     {
                         string userName = gp.Identity.Name;
                         var context = HttpContext.Current;
-                        identityTicket = new FormsAuthenticationTicket(1, userName, 
+                        identityTicket = new FormsAuthenticationTicket(1, userName,
                                                                     DateTime.Now, DateTime.Now.AddHours(1), true, "");
                         string encryptedIdentityTicket = FormsAuthentication.Encrypt(identityTicket);
                         identityCookie = new HttpCookie(identityCookieName, encryptedIdentityTicket);
                         identityCookie.Expires = DateTime.Now.AddHours(1);
                         HttpContext.Current.Response.Cookies.Add(identityCookie);
-                        FormsAuthentication.SetAuthCookie(userName,false);
+                        FormsAuthentication.SetAuthCookie(userName, false);
                         app.Context.User = gp;
                         Users.Add(identityCookie.Value.GetHashCode(), gp);
                     }
@@ -272,12 +275,12 @@ namespace Gurux.Service.Rest
                     }
                 }
                 else
-                {                    
+                {
                     app.Context.User = null;
                     return;
                 }
-            }                
-            
+            }
+
             gp = Users[identityCookie.Value.GetHashCode()];
             // decrypt identity ticket
             identityTicket = (FormsAuthenticationTicket)null;
@@ -330,11 +333,12 @@ namespace Gurux.Service.Rest
                 {
                     s.RestMethodInfo = GXGeneral.GetTypes(MessageMap, context.Request.Path, out command);
                     s.Connection = Connection;
+                    s.Host = Host;
                 }
             }
             else
             {
-                context.Response.ContentType = "text/html";                
+                context.Response.ContentType = "text/html";
                 StringBuilder sb = new StringBuilder();
                 sb.Append("<http><body>");
                 sb.Append("<h1>Gurux.Service</h1>");
@@ -346,7 +350,7 @@ namespace Gurux.Service.Rest
                     {
                         MessageMap = new Hashtable();
                     }
-                    GXGeneral.UpdateRestMessageTypes(MessageMap, Host);
+                    GXGeneral.UpdateRestMessageTypes(MessageMap);
                 }
                 foreach (DictionaryEntry it in MessageMap)
                 {

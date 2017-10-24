@@ -55,7 +55,7 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// Application host.
         /// </summary>
-        public GXAppHost Host
+        public object Host
         {
             get;
             internal set;

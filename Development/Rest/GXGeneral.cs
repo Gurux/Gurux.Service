@@ -45,7 +45,7 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// Find available Rest messages.
         /// </summary>
-        public static void UpdateRestMessageTypes(Hashtable messageMap, GXAppHost host)
+        public static void UpdateRestMessageTypes(Hashtable messageMap)
         {
             AuthenticateAttribute[] auths;
             Type tp;

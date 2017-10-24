@@ -65,12 +65,21 @@ namespace Gurux.Service.Rest
             private set;
         }
 
+        /// <summary>
+        /// Host application.
+        /// </summary>
+        internal object Host
+        {
+            get;
+            private set;
+        }
+
         private HttpListener Listener;
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        public GXServer(string prefixes, GXDbConnection connection, GXAppHost host) :
+        public GXServer(string prefixes, GXDbConnection connection, object host) :
             this(new string[] { prefixes }, connection, host)
         {
 
@@ -93,15 +102,16 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// Constructor.
         /// </summary>
-        public GXServer(string[] prefixes, GXDbConnection connection, GXAppHost host)
+        public GXServer(string[] prefixes, GXDbConnection connection, object host)
         {
             RestMap = new Hashtable();
             Parser = new GXJsonParser();
             Parser.OnCreateObject += new CreateObjectEventhandler(ParserOnCreateObject);
             Connection = connection;
+            Host = host;
             if (MessageMap.Count == 0)
             {
-                GXGeneral.UpdateRestMessageTypes(MessageMap, host);
+                GXGeneral.UpdateRestMessageTypes(MessageMap);
                 if (MessageMap.Count == 0)
                 {
                     throw new Exception("No REST services available.");
@@ -228,7 +238,7 @@ namespace Gurux.Service.Rest
                 IPrincipal user)
         {
             string path, data;
-            if (context.Request.ContentType.Contains("json"))
+            if (context.Request.ContentType != null && context.Request.ContentType.Contains("json"))
             {
                 string method = context.Request.HttpMethod.ToUpper();
                 bool content = method == "POST" || method == "PUT";
@@ -349,7 +359,7 @@ namespace Gurux.Service.Rest
                 target = GXJsonParser.CreateInstance(mi.RestClassType) as GXRestService;
                 server.RestMap[mi.RestClassType] = target;
             }
-            target.Host = GXAppHost.Instance();
+            target.Host = server.Host;
             target.User = user;
             target.Db = server.Connection;
             target.UserHostAddress = hostAddress;

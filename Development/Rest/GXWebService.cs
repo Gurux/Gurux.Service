@@ -46,21 +46,26 @@ using Gurux.Service.Orm;
 using Gurux.Common.Internal;
 
 namespace Gurux.Service.Rest
-{    
+{
     public class GXWebService : IHttpHandler
     {
         /// <summary>
         /// Used DB connection.
         /// </summary>
         internal GXDbConnection Connection;
-        
+
+        /// <summary>
+        /// Application host.
+        /// </summary>
+        internal object Host;
+
         /// <summary>
         /// Information from method.
         /// </summary>
         internal GXRestMethodInfo RestMethodInfo;
-        
+
         private GXJsonParser Parser;
-        
+
         private Hashtable RestMap;
 
         /// <summary>
@@ -70,7 +75,7 @@ namespace Gurux.Service.Rest
         {
             Parser = new GXJsonParser();
             RestMap = new Hashtable();
-        }       
+        }
 
         public bool IsReusable
         {
@@ -79,7 +84,7 @@ namespace Gurux.Service.Rest
                 return true;
             }
         }
-        
+
         public void ProcessRequest(HttpContext context)
         {
             InvokeHandler handler;
@@ -104,9 +109,9 @@ namespace Gurux.Service.Rest
                         break;
                 }
                 if (handler == null)
-                {                    
+                {
                     throw new HttpException(405, string.Format("Method '{0}' not allowed for {1}", context.Request.HttpMethod, RestMethodInfo.RequestType.Name));
-                }                
+                }
                 object req;
                 if (context.Request.HttpMethod == "POST")
                 {
@@ -116,7 +121,7 @@ namespace Gurux.Service.Rest
                 {
                     string data = "{" + context.Request.QueryString.ToString() + "}";
                     req = Parser.Deserialize(data, RestMethodInfo.RequestType);
-                }                
+                }
                 //Get Rest class from cache.
                 GXRestService target = RestMap[RestMethodInfo.RestClassType] as GXRestService;
                 if (target == null)
@@ -125,14 +130,14 @@ namespace Gurux.Service.Rest
                     RestMap[RestMethodInfo.RestClassType] = target;
                 }
                 //Update user and DB info.
-                
+
                 //If proxy is used.                
                 string add = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"].ToString();
                 if (add == null)
                 {
                     add = context.Request.UserHostAddress;
                 }
-                target.Host = GXAppHost.Instance();
+                target.Host = Host;
                 target.User = context.User;
                 target.Db = Connection;
                 object tmp = handler(target, req);
@@ -140,6 +145,6 @@ namespace Gurux.Service.Rest
                 context.Response.Write(reply);
                 context.Response.ContentType = "json";
             }
-        }       
+        }
     }
 }

@@ -86,7 +86,6 @@
     <Compile Include="Db\Settings\GXOracleSqlSettings.cs" />
     <Compile Include="Db\GXSqlBuilder.cs" />
     <Compile Include="Db\Settings\GXSqLiteSettings.cs" />
-    <Compile Include="Rest\GXAppHost.cs" />
     <Compile Include="Rest\GXGeneral.cs" />
     <Compile Include="Rest\GXRestMethodInfo.cs" />
     <Compile Include="Rest\GXRestService.cs" />
