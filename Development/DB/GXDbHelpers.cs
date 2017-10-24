@@ -205,7 +205,7 @@ namespace Gurux.Service.Orm
                 else
                 {
                     DateTime tm = (DateTime)value;
-                    if (tm != DateTime.MinValue && tm != DateTime.MaxValue)
+                    if (settings.UniversalTime && tm != DateTime.MinValue && tm != DateTime.MaxValue)
                     {
                         tm = tm.ToUniversalTime();
                     }

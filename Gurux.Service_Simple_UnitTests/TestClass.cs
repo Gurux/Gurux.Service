@@ -63,7 +63,7 @@ namespace Gurux.Service_Test
     }
 
     [DataContract]
-    class IndexTestClass
+    class IndexTestClass : IUnique<int>
     {
         [DataMember(Name="ID"), Index]
         public int Id

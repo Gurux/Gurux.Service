@@ -48,6 +48,7 @@ using System.Data.OleDb;
 using System.Data.Odbc;
 using Gurux.Service.Orm.Settings;
 using System.IO;
+using System.ComponentModel;
 
 namespace Gurux.Service.Orm
 {    
@@ -158,7 +159,23 @@ namespace Gurux.Service.Orm
             Builder = new GXSqlBuilder(type, tablePrefix);            
             Builder.Settings.ServerVersion = connection.ServerVersion;
         }
-       
+
+        /// <summary>
+        /// Is datetime saved in universal time.
+        /// </summary>
+        [DefaultValue(false)]
+        public bool UniversalTime
+        {
+            get
+            {
+                return Builder.Settings.UniversalTime;
+            }
+            set
+            {
+                Builder.Settings.UniversalTime = value;
+            }
+        }
+
         /// <summary>
         /// Get tables to create.
         /// </summary>
@@ -1756,7 +1773,7 @@ namespace Gurux.Service.Orm
                                 //If we want to read only basic data types example count(*)
                                 if (GXInternal.IsGenericDataType(type))
                                 {
-                                    list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type));
+                                    list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type, Builder.Settings.UniversalTime));
                                     return list;
                                 }
                                 properties = GXSqlBuilder.GetProperties<T>();
@@ -1801,7 +1818,7 @@ namespace Gurux.Service.Orm
                                                 if (objects.ContainsKey(col.TableType))
                                                 {
                                                     // Check is item already created.                                            
-                                                    if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type)))
+                                                    if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime)))
                                                     {
                                                         isCreated = true;
                                                     }
@@ -1836,7 +1853,7 @@ namespace Gurux.Service.Orm
                                                 //Id is not save directly because class might change it's type example from uint to int.
                                                 if (GXInternal.IsGenericDataType(col.Setter.Type))
                                                 {
-                                                    objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type), item);
+                                                    objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime), item);
                                                 }
                                                 else //If we are saving table.
                                                 {
@@ -1863,7 +1880,7 @@ namespace Gurux.Service.Orm
                                                     int pos2 = -1;
                                                     foreach (string it in tmp)
                                                     {
-                                                        items.SetValue(GXInternal.ChangeType(it, pt), ++pos2);
+                                                        items.SetValue(GXInternal.ChangeType(it, pt, Builder.Settings.UniversalTime), ++pos2);
                                                     }
                                                     value = items;
                                                 }
@@ -1880,7 +1897,7 @@ namespace Gurux.Service.Orm
                                         }
                                         else if (col.Setter != null)
                                         {
-                                            value = GXInternal.ChangeType(values[pos], col.Setter.Type);
+                                            value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
                                         }
                                         else
                                         {
@@ -1919,7 +1936,7 @@ namespace Gurux.Service.Orm
                             foreach (var it in UpdatedColumns)
                             {
                                 GXColumnHelper col = columns[it.Key];
-                                object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type);
+                                object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type, Builder.Settings.UniversalTime);
                                 if (objects.ContainsKey(col.Setter.Type) && objects[col.Setter.Type].ContainsKey(relationId))
                                 {
                                     object relationData = objects[col.Setter.Type][relationId];
@@ -2168,7 +2185,7 @@ namespace Gurux.Service.Orm
                                 //If we want to read only basic data types example count(*)
                                 if (GXInternal.IsGenericDataType(type))
                                 {
-                                    list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type));
+                                    list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type, Builder.Settings.UniversalTime));
                                     return list;
                                 }
                                 properties = GXSqlBuilder.GetProperties<T>();
@@ -2213,7 +2230,7 @@ namespace Gurux.Service.Orm
                                                 if (objects.ContainsKey(col.TableType))
                                                 {
                                                     // Check is item already created.                                            
-                                                    if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type)))
+                                                    if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime)))
                                                     {
                                                         isCreated = true;
                                                     }
@@ -2248,7 +2265,7 @@ namespace Gurux.Service.Orm
                                                 //Id is not save directly because class might change it's type example from uint to int.
                                                 if (GXInternal.IsGenericDataType(col.Setter.Type))
                                                 {
-                                                    objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type), item);
+                                                    objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime), item);
                                                 }
                                                 else //If we are saving table.
                                                 {
@@ -2275,7 +2292,7 @@ namespace Gurux.Service.Orm
                                                     int pos2 = -1;
                                                     foreach (string it in tmp)
                                                     {
-                                                        items.SetValue(GXInternal.ChangeType(it, pt), ++pos2);
+                                                        items.SetValue(GXInternal.ChangeType(it, pt, Builder.Settings.UniversalTime), ++pos2);
                                                     }
                                                     value = items;
                                                 }
@@ -2295,7 +2312,7 @@ namespace Gurux.Service.Orm
                                             //Get value if not class.
                                             if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
                                             {
-                                                value = GXInternal.ChangeType(values[pos], col.Setter.Type);
+                                                value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
                                             }
                                             else //Parameter type is class. Set to null.
                                             {                                                
@@ -2339,7 +2356,7 @@ namespace Gurux.Service.Orm
                             foreach (var it in UpdatedColumns)
                             {
                                 GXColumnHelper col = columns[it.Key];
-                                object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type);
+                                object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type, Builder.Settings.UniversalTime);
                                 if (objects.ContainsKey(col.Setter.Type) && objects[col.Setter.Type].ContainsKey(relationId))
                                 {
                                     object relationData = objects[col.Setter.Type][relationId];
@@ -2630,7 +2647,7 @@ namespace Gurux.Service.Orm
                         /////////////////////////////////////////////////////////////////////////////////////////////////
                         //Update ID's after transaction is made and all the rows are updated.
                         //Update auto increment value if it's used.
-                        if (total == 0 && si != null && pos != -1)
+                        if (insert && total == 0 && si != null && pos != -1)
                         {
                             foreach (string query in queries)
                             {                                                     

@@ -69,6 +69,16 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <summary>
+        /// Is datetime saved in universal time.
+        /// </summary>
+        [DefaultValue(false)]
+        public bool UniversalTime
+        {
+            get;
+            internal set;
+        }
+
+        /// <summary>
         /// Is Unix date format used.
         /// </summary>
         [DefaultValue(false)]

@@ -43,12 +43,12 @@ using System.Resources;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Gurux Ltd")]
 [assembly: AssemblyProduct("Gurux.Service")]
-[assembly: AssemblyCopyright("Copyright (c) 1998-2015 Gurux Ltd. All rights reserved.")]
+[assembly: AssemblyCopyright("Copyright (c) 1998-2017 Gurux Ltd. All rights reserved.")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
 [assembly: Guid("cb8c30e5-74e1-46d6-a5b6-f6b24b3cc51d")]
 
-[assembly: AssemblyVersion("1.0.0.1")]//DO NOT CHANGE!
-[assembly: AssemblyFileVersion("1.0.0.6")]
+[assembly: AssemblyVersion("0.0.0.0")]
+[assembly: AssemblyFileVersion("0.0.0.0")]
 [assembly: NeutralResourcesLanguageAttribute("en")]

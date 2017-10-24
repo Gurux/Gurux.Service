@@ -30,6 +30,8 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using System;
+using System.Globalization;
 namespace Gurux.Service.Orm.Settings
 {
     /// <summary>
@@ -68,7 +70,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return '\"';
+                return '[';
             }
         }
 
@@ -305,6 +307,22 @@ namespace Gurux.Service.Orm.Settings
             {
                 return "TEXT";
             }
+        }
+
+        /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
+        public override string ConvertToString(object value)
+        {
+            if (value is DateTime)
+            {
+                string format = "yyyyMMdd HH:mm:ss";
+                return GetQuetedValue(((DateTime)value).ToString(format, CultureInfo.InvariantCulture));
+            }
+            if (value is DateTimeOffset)
+            {
+                string format = "yyyyMMdd HH:mm:ss";
+                return GetQuetedValue(((DateTime)value).ToString(format, CultureInfo.InvariantCulture));
+            }
+            return base.ConvertToString(value);
         }
     }
 }

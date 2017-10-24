@@ -44,7 +44,7 @@ using Gurux.Service.Orm;
 using Gurux.Common.Internal;
 
 namespace Gurux.Service.Rest
-{         
+{
     public class GXServer
     {
         AutoResetEvent Closing = new AutoResetEvent(false);
@@ -52,10 +52,11 @@ namespace Gurux.Service.Rest
         /// <summary>
         /// REST message map.
         /// </summary>
-        internal Hashtable MessageMap;
+        internal Hashtable MessageMap = new Hashtable();
+
 
         internal GXJsonParser Parser;
-        
+
         private Hashtable RestMap;
 
         public GXDbConnection Connection
@@ -72,7 +73,7 @@ namespace Gurux.Service.Rest
         public GXServer(string prefixes, GXDbConnection connection, GXAppHost host) :
             this(new string[] { prefixes }, connection, host)
         {
-            
+
         }
 
         private CreateObjectEventhandler m_CreateObject;
@@ -97,11 +98,14 @@ namespace Gurux.Service.Rest
             RestMap = new Hashtable();
             Parser = new GXJsonParser();
             Parser.OnCreateObject += new CreateObjectEventhandler(ParserOnCreateObject);
-            Connection = connection;            
-            if (MessageMap == null)
+            Connection = connection;
+            if (MessageMap.Count == 0)
             {
-                MessageMap = new Hashtable();
                 GXGeneral.UpdateRestMessageTypes(MessageMap, host);
+                if (MessageMap.Count == 0)
+                {
+                    throw new Exception("No REST services available.");
+                }
             }
             Listener = new HttpListener();
             foreach (string it in prefixes)
@@ -135,8 +139,8 @@ namespace Gurux.Service.Rest
                 bool accept = false;
                 string username, password;
                 AutoResetEvent h = new AutoResetEvent(false);
-                IAsyncResult result = Listener.BeginGetContext(delegate(IAsyncResult ListenerCallback)
-                {                    
+                IAsyncResult result = Listener.BeginGetContext(delegate (IAsyncResult ListenerCallback)
+                {
                     HttpListener listener = (HttpListener)ListenerCallback.AsyncState;
                     //If server is not closed.
                     if (listener.IsListening)
@@ -160,13 +164,13 @@ namespace Gurux.Service.Rest
                         else
                         {
                             user = TryAuthenticate(username, password);
-                            accept = user != null;                            
+                            accept = user != null;
                         }
-                        
+
                         if (accept)
                         {
                             Thread thread = new Thread(new ParameterizedThreadStart(Process));
-                            thread.Start(new object[] { tmp, c, user});
+                            thread.Start(new object[] { tmp, c, user });
                         }
                         else
                         {
@@ -180,13 +184,13 @@ namespace Gurux.Service.Rest
                                 string data = parser.Serialize(err);
                                 c.Response.ContentLength64 = data.Length;
                                 writer.Write(data);
-                            }                            
+                            }
                             c.Response.Close();
                         }
                         h.Set();
                     }
-                }, Listener);                
-                EventWaitHandle.WaitAny(new EventWaitHandle[] {h, Closing});
+                }, Listener);
+                EventWaitHandle.WaitAny(new EventWaitHandle[] { h, Closing });
                 if (!accept || !Listener.IsListening)
                 {
                     result.AsyncWaitHandle.WaitOne(1000);
@@ -197,7 +201,7 @@ namespace Gurux.Service.Rest
         }
 
         static private void Process(object parameter)
-        {            
+        {
             object[] tmp = parameter as object[];
             GXServer server = tmp[0] as GXServer;
             HttpListenerContext context = tmp[1] as HttpListenerContext;
@@ -216,18 +220,18 @@ namespace Gurux.Service.Rest
                     string data = parser.Serialize(err);
                     context.Response.ContentLength64 = data.Length;
                     writer.Write(data);
-                }                
+                }
             }
         }
 
-        static void ProcessRequest(GXServer server, HttpListenerContext context, 
+        static void ProcessRequest(GXServer server, HttpListenerContext context,
                 IPrincipal user)
         {
             string path, data;
             if (context.Request.ContentType.Contains("json"))
             {
                 string method = context.Request.HttpMethod.ToUpper();
-                bool content = method == "POST" || method == "PUT";                
+                bool content = method == "POST" || method == "PUT";
                 if (content)
                 {
                     int length = (int)context.Request.ContentLength64;
@@ -255,7 +259,7 @@ namespace Gurux.Service.Rest
                     using (StreamReader sr = new StreamReader(ms))
                     {
                         data = sr.ReadToEnd();
-                    }                   
+                    }
                     path = context.Request.RawUrl;
                 }
                 else
@@ -272,7 +276,7 @@ namespace Gurux.Service.Rest
                         data = null;
                     }
                 }
-                System.Diagnostics.Debug.WriteLine("-> " + path + " : "+ data);
+                System.Diagnostics.Debug.WriteLine("-> " + path + " : " + data);
 
                 //If proxy is used.
                 string add = null;
@@ -283,10 +287,10 @@ namespace Gurux.Service.Rest
                 if (add == null)
                 {
                     add = context.Request.UserHostAddress;
-                }                
+                }
                 string reply = GetReply(server.MessageMap, user, server, add, context.Request.HttpMethod, path, data);
                 context.Response.ContentType = "json";
-                context.Response.ContentLength64 = reply.Length;                
+                context.Response.ContentLength64 = reply.Length;
                 System.Diagnostics.Debug.WriteLine("<- " + reply);
                 using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
                 {
@@ -372,7 +376,7 @@ namespace Gurux.Service.Rest
         {
             return null;
         }
-        
+
         /// <summary>
         /// Close server.
         /// </summary>
@@ -381,6 +385,6 @@ namespace Gurux.Service.Rest
             Closing.Set();
             Closed.WaitOne(1000);
             Listener.Close();
-        }      
+        }
     }
 }
