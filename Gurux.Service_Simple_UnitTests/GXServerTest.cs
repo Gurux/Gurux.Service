@@ -109,7 +109,6 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void PostTest()
         {
-            //Mikko
             GXJsonClient cl = new GXJsonClient("http://localhost:6786/");
             GXEchoRequest expected = new GXEchoRequest();
             expected.Id = new Random().Next();

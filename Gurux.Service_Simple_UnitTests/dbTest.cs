@@ -34,7 +34,6 @@ using System;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
-using System.Linq.Expressions;
 
 namespace Gurux.Service_Test
 {
@@ -43,7 +42,7 @@ namespace Gurux.Service_Test
     /// </summary>
     [TestClass]
     public class DBTest
-    {        
+    {
         public DBTest()
         {
             //
@@ -86,7 +85,7 @@ namespace Gurux.Service_Test
         // Use TestInitialize to run code before running each test 
         [TestInitialize()]
         public void MyTestInitialize()
-        {                        
+        {
         }
         //
         // Use TestCleanup to run code after each test has run
@@ -144,7 +143,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void CountTest()
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q));        
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q));
             Assert.AreEqual("SELECT COUNT(*) FROM TestClass", arg.ToString());
         }
 
@@ -185,7 +184,7 @@ namespace Gurux.Service_Test
         public void LimitTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
-            arg.Index = 1; 
+            arg.Index = 1;
             arg.Count = 2;
             Assert.AreEqual("SELECT `Guid` FROM TestClass LIMIT 1,2", arg.ToString());
         }
@@ -210,7 +209,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass2>(q => q.Parent);
             arg.Columns.Clear();
             arg.Columns.Add<TestClass2>(q => q.Name);
-            arg.Columns.Add<TestClass>(q => q.Guid);            
+            arg.Columns.Add<TestClass>(q => q.Guid);
             arg.Joins.AddRightJoin<TestClass2, TestClass>(x => x.Parent, x => x.Id);
             Assert.AreEqual("SELECT TestClass2.`Name`, TestClass.`Guid` FROM TestClass2 RIGHT OUTER JOIN TestClass ON TestClass2.`ParentID`=TestClass.`ID`", arg.ToString());
         }
@@ -235,7 +234,7 @@ namespace Gurux.Service_Test
         {
             Assert.AreEqual("ID,Guid,Time,Text,SimpleText,Text3,Text4,BooleanTest,IntTest,DoubleTest,FloatTest,Span,Object,Status", string.Join(",", GXSqlBuilder.GetFields<TestClass>()));
         }
-        
+
         /// <summary>
         /// Right join test
         /// </summary>
@@ -246,7 +245,7 @@ namespace Gurux.Service_Test
             arg.Joins.AddRightJoin<TestClass2, TestClass>(x => x.Parent, x => x.Id);
             Assert.AreEqual("SELECT TestClass.`ID`, TestClass.`Guid`, TestClass.`Time`, TestClass.`Text`, TestClass.`SimpleText`, TestClass.`Text3`, TestClass.`Text4`, TestClass.`BooleanTest`, TestClass.`IntTest`, TestClass.`DoubleTest`, TestClass.`FloatTest`, TestClass.`Span`, TestClass.`Object`, TestClass.`Status`, TestClass2.`Id`, TestClass2.`ParentID`, TestClass2.`Name` FROM TestClass2 RIGHT OUTER JOIN TestClass ON TestClass2.`ParentID`=TestClass.`ID`", arg.ToString());
         }
-    
+
         /// <summary>
         /// Left join test
         /// </summary>
@@ -277,10 +276,10 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Time);
             arg.Where.And<TestClass>(q => q.Time > DateTime.MinValue && q.Time < DateTime.MaxValue);
-            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00:00:00') AND (TestClass.`Time` < '9999-12-31 23:59:59')", arg.ToString());            
+            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00:00:00') AND (TestClass.`Time` < '9999-12-31 23:59:59')", arg.ToString());
         }
 
-         /// <summary>
+        /// <summary>
         /// Select Text where string is not empty or null.
         /// </summary>
         [TestMethod]
@@ -289,7 +288,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Text);
             arg.Where.And<TestClass>(q => q.Text != string.Empty);
             arg.Where.And<TestClass>(q => q.Text != null);
-            Assert.AreEqual("SELECT `Text` FROM TestClass WHERE ((TestClass.`Text` <> '') AND (TestClass.`Text` IS NOT NULL))", arg.ToString());            
+            Assert.AreEqual("SELECT `Text` FROM TestClass WHERE ((TestClass.`Text` <> '') AND (TestClass.`Text` IS NOT NULL))", arg.ToString());
         }
 
         /// <summary>
@@ -300,7 +299,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Text);
             arg.Where.And<TestClass>(q => string.IsNullOrEmpty(q.Text));
-            Assert.AreEqual("SELECT `Text` FROM TestClass WHERE (TestClass.`Text` IS NULL OR TestClass.`Text` = '')", arg.ToString());            
+            Assert.AreEqual("SELECT `Text` FROM TestClass WHERE (TestClass.`Text` IS NULL OR TestClass.`Text` = '')", arg.ToString());
         }
 
         /// <summary>
@@ -311,7 +310,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Text);
             arg.Where.And<TestClass>(q => !string.IsNullOrEmpty(q.Text));
-            Assert.AreEqual("SELECT `Text` FROM TestClass WHERE (TestClass.`Text` IS NOT NULL AND TestClass.`Text` <> '')", arg.ToString());            
+            Assert.AreEqual("SELECT `Text` FROM TestClass WHERE (TestClass.`Text` IS NOT NULL AND TestClass.`Text` <> '')", arg.ToString());
         }
 
         /// <summary>
@@ -319,11 +318,11 @@ namespace Gurux.Service_Test
         /// </summary>
         [TestMethod]
         public void WhereEnumTest()
-        {           
+        {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Settings.UseEnumStringValue = true;
             arg.Where.And<TestClass>(q => q.Status == State.OK);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Status` = 'OK'", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Status` = 'OK'", arg.ToString());
         }
 
         /// <summary>
@@ -348,7 +347,7 @@ namespace Gurux.Service_Test
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => t);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE `ID` = 1", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE `ID` = 1", arg.ToString());
         }
 
         /// <summary>
@@ -362,7 +361,7 @@ namespace Gurux.Service_Test
             list[1].Id = 2;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
             arg.Where.And<TestClass>(q => list);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE `ID` IN(1, 2)", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE `ID` IN(1, 2)", arg.ToString());
         }
 
         /// <summary>
@@ -375,9 +374,9 @@ namespace Gurux.Service_Test
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
             arg.Where.And<TestClass>(q => q.Id == t.Id);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());
         }
-        
+
         /// <summary>
         /// Select Guid where Text starts with Gurux.
         /// </summary>
@@ -388,7 +387,7 @@ namespace Gurux.Service_Test
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Text.StartsWith("Gurux"));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('Gurux%')", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('Gurux%')", arg.ToString());
         }
 
         /// <summary>
@@ -401,7 +400,7 @@ namespace Gurux.Service_Test
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Text.EndsWith("Gurux"));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%Gurux')", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%Gurux')", arg.ToString());
         }
 
         /// <summary>
@@ -414,7 +413,7 @@ namespace Gurux.Service_Test
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Text.Contains("Gurux"));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%Gurux%')", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%Gurux%')", arg.ToString());
         }
 
         /// <summary>
@@ -427,7 +426,7 @@ namespace Gurux.Service_Test
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
             arg.Where.And<TestClass>(q => q.Text.Equals("Gurux", StringComparison.OrdinalIgnoreCase));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE UPPER(TestClass.`Text`) LIKE('GURUX')", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE UPPER(TestClass.`Text`) LIKE('GURUX')", arg.ToString());
         }
 
         /// <summary>
@@ -438,7 +437,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Id == 1 || q.Id == 2 || q.Id == 3);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` = 1) OR (TestClass.`ID` = 2)) OR (TestClass.`ID` = 3)", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` = 1) OR (TestClass.`ID` = 2)) OR (TestClass.`ID` = 3)", arg.ToString());
         }
 
         /// <summary>
@@ -450,7 +449,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Id == 1 || q.Id == 2);
             arg.Where.Or<TestClass>(q => q.Id == 3);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (((TestClass.`ID` = 1) OR (TestClass.`ID` = 2)) OR (TestClass.`ID` = 3))", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (((TestClass.`ID` = 1) OR (TestClass.`ID` = 2)) OR (TestClass.`ID` = 3))", arg.ToString());
         }
 
         /// <summary>
@@ -462,7 +461,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Id == 1);
             arg.Where.Or<TestClass>(x => x.Text.StartsWith("Gurux"));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` = 1) OR (TestClass.`Text` LIKE('Gurux%')))", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` = 1) OR (TestClass.`Text` LIKE('Gurux%')))", arg.ToString());
         }
 
         /// <summary>
@@ -472,8 +471,8 @@ namespace Gurux.Service_Test
         public void WhereAndTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
-            arg.Where.And<TestClass>(q => q.Id > 1 && q.Id != 2 );
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`ID` > 1) AND (TestClass.`ID` <> 2)", arg.ToString());            
+            arg.Where.And<TestClass>(q => q.Id > 1 && q.Id != 2);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`ID` > 1) AND (TestClass.`ID` <> 2)", arg.ToString());
         }
 
         /// <summary>
@@ -485,7 +484,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Id > 1);
             arg.Where.And<TestClass>(q => q.Id != 2);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` > 1) AND (TestClass.`ID` <> 2))", arg.ToString());            
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` > 1) AND (TestClass.`ID` <> 2))", arg.ToString());
         }
 
         /// <summary>
@@ -544,14 +543,14 @@ namespace Gurux.Service_Test
             t.Text = "Gurux";
             GXInsertArgs args = GXInsertArgs.Insert(t, x => new { x.Text, x.Guid });
             Assert.AreEqual("INSERT INTO TestClass (`Text`, `Guid`) VALUES('Gurux', '00000000000000000000000000000000')", args.ToString());
-        }        
+        }
 
         /// <summary>
         /// Update test.
         /// </summary>
         [TestMethod]
         public void UpdateTest()
-        {            
+        {
             TestClass t = new TestClass();
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
@@ -568,7 +567,7 @@ namespace Gurux.Service_Test
             TestClass t = new TestClass();
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             t.Id = 1;
-            GXUpdateArgs args = GXUpdateArgs.Update(t);            
+            GXUpdateArgs args = GXUpdateArgs.Update(t);
             args.Settings.UseEpochTimeFormat = true;
             args.Add<TestClass>(t, x => x.Time);
             Assert.AreEqual("UPDATE TestClass SET `Time` = 1388620800 WHERE `ID` = 1", args.ToString());
@@ -592,6 +591,6 @@ namespace Gurux.Service_Test
         {
             GXSqlBuilder parser = new GXSqlBuilder(DatabaseType.MySQL, "gx_");
             Assert.AreEqual("gx_TestClass", parser.GetTableName<TestClass>());
-        }       
+        }
     }
 }

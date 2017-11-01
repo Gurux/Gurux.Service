@@ -49,7 +49,7 @@ namespace Gurux.Service.Orm
         /// List of columns.
         /// </summary>
         public List<string> Columns;
-        
+
         /// <summary>
         /// List of columns objects and serialized items.
         /// </summary>
@@ -67,7 +67,7 @@ namespace Gurux.Service.Orm
 
         public GXUpdateItem()
         {
-            Columns = new List<string>();            
+            Columns = new List<string>();
             Rows = new List<List<KeyValuePair<object, GXSerializedItem>>>();
         }
     }
@@ -82,16 +82,16 @@ namespace Gurux.Service.Orm
         /// </summary>
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<KeyValuePair<object, LambdaExpression>> Values = new List<KeyValuePair<object, LambdaExpression>>();
-        
+
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal GXSettingsArgs Parent = new GXSettingsArgs();
-        
+
         /// <summary>
         /// Generated insert SQL string.
         /// </summary>
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         string sql;
-        
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -115,7 +115,7 @@ namespace Gurux.Service.Orm
         public void Clear()
         {
             Values.Clear();
-            Parent.Clear();            
+            Parent.Clear();
         }
 
         /// <summary>
@@ -141,9 +141,9 @@ namespace Gurux.Service.Orm
         {
 
         }
-       
+
         public override string ToString()
-        {            
+        {
             if (Parent.Updated)
             {
                 string[] list;
@@ -165,7 +165,7 @@ namespace Gurux.Service.Orm
                 }
                 List<string> queries = new List<string>();
                 GXDbHelpers.GetQueries(true, Parent.Settings, Values, queries);
-                sql = string.Join(" ", queries.ToArray());                
+                sql = string.Join(" ", queries.ToArray());
             }
             return sql;
         }
@@ -173,7 +173,7 @@ namespace Gurux.Service.Orm
         public static GXInsertArgs Insert<T>(T value)
         {
             return Insert<T>(value, null);
-        }        
+        }
 
         public static GXInsertArgs Insert<T>(T[] value, Expression<Func<T, object>> columns)
         {
@@ -189,11 +189,11 @@ namespace Gurux.Service.Orm
             if (value is IEnumerable)
             {
                 throw new ArgumentException("Use InsertRange to add a collection.");
-            } 
+            }
             GXInsertArgs args = new GXInsertArgs();
             args.Parent.Updated = true;
             args.Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
-            return args;        
+            return args;
         }
 
         public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection)
@@ -207,19 +207,19 @@ namespace Gurux.Service.Orm
             args.Parent.Updated = true;
             foreach (var it in collection)
             {
-                args.Values.Add(new KeyValuePair<object, LambdaExpression>(it, columns));                
+                args.Values.Add(new KeyValuePair<object, LambdaExpression>(it, columns));
             }
             return args;
         }
 
         public static GXInsertArgs Add<TItem, TDestination>(TItem item, TDestination[] collections)
         {
-            return Add<TItem, TDestination>(new TItem[]{item}, collections);            
+            return Add<TItem, TDestination>(new TItem[] { item }, collections);
         }
 
         public static GXInsertArgs Add<TItem, TDestination>(TItem[] items, TDestination collection)
         {
-            return Add<TItem, TDestination>(items, new TDestination[]{collection});
+            return Add<TItem, TDestination>(items, new TDestination[] { collection });
         }
 
         public static GXInsertArgs Add<TItem, TDestination>(TItem[] items, TDestination[] collections)
@@ -240,9 +240,9 @@ namespace Gurux.Service.Orm
             args.Parent.Updated = true;
             GXSerializedItem siItem = GXSqlBuilder.FindRelation(collectionType, itemType);
             foreach (TDestination c in collections)
-            {                
+            {
                 //Get collection id.
-                collectionId = si.Relation.RelationMapTable.Relation.ForeignId.Get(c);                
+                collectionId = si.Relation.RelationMapTable.Relation.ForeignId.Get(c);
                 foreach (TItem it in items)
                 {
                     object target = GXJsonParser.CreateInstance(si.Relation.RelationMapTable.Relation.PrimaryTable);
@@ -252,8 +252,8 @@ namespace Gurux.Service.Orm
                     siItem.Relation.RelationMapTable.Relation.PrimaryId.Set(target, id);
                     args.Values.Add(new KeyValuePair<object, LambdaExpression>(target, null));
                 }
-            }            
-            return args;        
+            }
+            return args;
         }
 
         /// <summary>
@@ -265,8 +265,8 @@ namespace Gurux.Service.Orm
         /// <param name="destination"></param>
         public static GXInsertArgs Add<TItem, TDestination>(TItem item, TDestination collection)
         {
-            return Add<TItem, TDestination>(new TItem[] { item }, new TDestination[]{collection});
-        }    
+            return Add<TItem, TDestination>(new TItem[] { item }, new TDestination[] { collection });
+        }
 
         /// <summary>
         /// Remove item from the n:n collection.

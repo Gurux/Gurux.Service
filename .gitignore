@@ -22,8 +22,8 @@ Gurux.Service_UnitTests/
 .externalToolBuilders/
 packages/
 nuget/
+GuruxAMI.Common/
 Gurux.Common.XML
-
 
 # Locally stored "Eclipse launch configurations"
 *.launch
