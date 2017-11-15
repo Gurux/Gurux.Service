@@ -99,7 +99,15 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Value is relation to parent table. This is used with 1:n relation.
         /// </summary>
-        Relation = 0x80
+        Relation = 0x80,
+        /// <summary>
+        /// String length.
+        /// </summary>
+        StringLength = 0x100,
+        /// <summary>
+        /// Value is required.
+        /// </summary>
+        IsRequired = 0x200
     }
 
     enum RelationType

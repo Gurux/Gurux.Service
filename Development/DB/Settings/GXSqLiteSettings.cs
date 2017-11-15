@@ -37,13 +37,93 @@ namespace Gurux.Service.Orm.Settings
     /// </summary>
     public class GXSqLiteSettings : GXDBSettings
     {
-         /// <summary>
+        /// <summary>
         /// Constructor.
         /// </summary>
         public GXSqLiteSettings()
             : base(DatabaseType.SqLite)
         {
 
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnConstraints"/>
+        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnConstraintsQuery"/>
+        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.IsNullable"/>
+        public override bool IsNullable(object value)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnNullableQuery"/>
+        public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnIndexQuery"/>
+        public override string GetColumnIndexQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.IsPrimaryKey"/>
+        public override bool IsPrimaryKey(object value)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetPrimaryKeyQuery"/>
+        public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetReferenceTablesQuery"/>
+        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+
+        /// <inheritdoc cref="GXDBSettings.IsAutoIncrement"/>
+        public override bool IsAutoIncrement(object value)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetAutoIncrementQuery"/>
+        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnTypeQuery"/>
+        public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnTypeQuery"/>
+        public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnsQuery"/>
+        public override string GetColumnsQuery(string schema, string name, out int index)
+        {
+            index = 1;
+            return string.Format("PRAGMA table_info('{0}')", name);
         }
 
         /// <inheritdoc cref="GXDBSettings.ColumnQuotation"/>

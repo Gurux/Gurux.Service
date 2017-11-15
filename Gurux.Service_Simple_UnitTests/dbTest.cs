@@ -132,8 +132,6 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<DeviceGroup3>(q => q.Id);
             arg.Where.And<DeviceGroup3>(q => q.Id == 1);
-            arg.Excluded.Add<DeviceProperty>();
-            arg.Excluded.Add<DeviceGroupProperty>();
             Assert.AreEqual("SELECT `Id` AS `DG.Id` FROM DeviceGroup3 `DG` WHERE DG.`Id` = 1", arg.ToString());
         }
 
@@ -144,7 +142,7 @@ namespace Gurux.Service_Test
         public void CountTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q));
-            Assert.AreEqual("SELECT COUNT(*) FROM TestClass", arg.ToString());
+            Assert.AreEqual("SELECT COUNT(1) FROM TestClass", arg.ToString());
         }
 
         /// <summary>
@@ -154,7 +152,7 @@ namespace Gurux.Service_Test
         public void CountWhereTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q), q => q.Id == 1);
-            Assert.AreEqual("SELECT COUNT(*) FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());
+            Assert.AreEqual("SELECT COUNT(1) FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());
         }
 
         /// <summary>
@@ -241,7 +239,8 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void RightJoinTest()
         {
-            GXSelectArgs arg = GXSelectArgs.SelectAll<TestClass2>();
+            GXSelectArgs arg = GXSelectArgs.SelectAll<TestClass>();
+            arg.Columns.Add<TestClass2>();
             arg.Joins.AddRightJoin<TestClass2, TestClass>(x => x.Parent, x => x.Id);
             Assert.AreEqual("SELECT TestClass.`ID`, TestClass.`Guid`, TestClass.`Time`, TestClass.`Text`, TestClass.`SimpleText`, TestClass.`Text3`, TestClass.`Text4`, TestClass.`BooleanTest`, TestClass.`IntTest`, TestClass.`DoubleTest`, TestClass.`FloatTest`, TestClass.`Span`, TestClass.`Object`, TestClass.`Status`, TestClass2.`Id`, TestClass2.`ParentID`, TestClass2.`Name` FROM TestClass2 RIGHT OUTER JOIN TestClass ON TestClass2.`ParentID`=TestClass.`ID`", arg.ToString());
         }
@@ -252,7 +251,8 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void LeftJoinTest()
         {
-            GXSelectArgs arg = GXSelectArgs.SelectAll<TestClass2>();
+            GXSelectArgs arg = GXSelectArgs.SelectAll<TestClass>();
+            arg.Columns.Add<TestClass2>();
             arg.Joins.AddLeftJoin<TestClass2, TestClass>(x => x.Parent, x => x.Id);
             Assert.AreEqual("SELECT TestClass.`ID`, TestClass.`Guid`, TestClass.`Time`, TestClass.`Text`, TestClass.`SimpleText`, TestClass.`Text3`, TestClass.`Text4`, TestClass.`BooleanTest`, TestClass.`IntTest`, TestClass.`DoubleTest`, TestClass.`FloatTest`, TestClass.`Span`, TestClass.`Object`, TestClass.`Status`, TestClass2.`Id`, TestClass2.`ParentID`, TestClass2.`Name` FROM TestClass2 LEFT OUTER JOIN TestClass ON TestClass2.`ParentID`=TestClass.`ID`", arg.ToString());
         }
@@ -276,7 +276,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Time);
             arg.Where.And<TestClass>(q => q.Time > DateTime.MinValue && q.Time < DateTime.MaxValue);
-            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00:00:00') AND (TestClass.`Time` < '9999-12-31 23:59:59')", arg.ToString());
+            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00.00.00') AND (TestClass.`Time` < '9999-12-31 23.59.59')", arg.ToString());
         }
 
         /// <summary>
@@ -555,7 +555,7 @@ namespace Gurux.Service_Test
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
-            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00:00:00' WHERE `ID` = 2", args.ToString());
+            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00.00.00' WHERE `ID` = 2", args.ToString());
         }
 
         /// <summary>

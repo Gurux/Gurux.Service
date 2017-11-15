@@ -97,16 +97,6 @@ namespace Gurux.Service.Orm
         /// </summary>
         private GXInsertArgs()
         {
-            Excluded = new GXColumnCollection(Parent, null);
-        }
-
-        /// <summary>
-        /// Excluded columns.
-        /// </summary>
-        public GXColumnCollection Excluded
-        {
-            get;
-            private set;
         }
 
         /// <summary>
@@ -145,24 +135,7 @@ namespace Gurux.Service.Orm
         public override string ToString()
         {
             if (Parent.Updated)
-            {
-                string[] list;
-                //Get excluded columns.
-                Dictionary<Type, List<string>> excluded = new Dictionary<Type, List<string>>();
-                foreach (var it in Excluded.List)
-                {
-                    list = GXDbHelpers.GetMembers(Parent.Settings, it, '\0', false);
-                    if (excluded.ContainsKey(it.Parameters[0].Type))
-                    {
-                        excluded[it.Parameters[0].Type].AddRange(list);
-                    }
-                    else
-                    {
-                        List<string> tmp = new List<string>(list.Length);
-                        tmp.AddRange(list);
-                        excluded.Add(it.Parameters[0].Type, tmp);
-                    }
-                }
+            {               
                 List<string> queries = new List<string>();
                 GXDbHelpers.GetQueries(true, Parent.Settings, Values, queries);
                 sql = string.Join(" ", queries.ToArray());

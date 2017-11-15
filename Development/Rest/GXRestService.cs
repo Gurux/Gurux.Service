@@ -82,28 +82,24 @@ namespace Gurux.Service.Rest
         public T SelectById<T>(ulong id)
         {
             GXSelectArgs arg = GXSelectArgs.SelectById<T>(id);
-            arg.Relations = false;
             return Db.SingleOrDefault<T>(arg);
         }
 
         public T SelectById<T>(long id)
         {
             GXSelectArgs arg = GXSelectArgs.SelectById<T>(id);
-            arg.Relations = false;
             return Db.SingleOrDefault<T>(arg);
         }
 
         public List<T> Select<T>(Expression<Func<T, object>> columns, Expression<Func<T, object>> where)
         {
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns, where);
-            arg.Relations = false;
             return Db.Select<T>(arg);
         }
 
         public T SingleOrDefault<T>(Expression<Func<T, object>> columns, Expression<Func<T, object>> where)
         {
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns, where);
-            arg.Relations = false;
             return Db.SingleOrDefault<T>(arg);
         }
     }

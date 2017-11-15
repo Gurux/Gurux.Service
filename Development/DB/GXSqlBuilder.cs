@@ -34,39 +34,95 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.Serialization;
-using System.Text;
-using Gurux.Common;
 using Gurux.Service.Orm.Settings;
 using Gurux.Common.Internal;
-using Gurux.Service.Orm;
+using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
 
 namespace Gurux.Service.Orm
-{         
+{
     /// <summary>
     /// This class is used to make SQL query.
     /// </summary>
     public class GXSqlBuilder
     {
-        public Dictionary<Type, string> DbTypeMap = new Dictionary<Type, string>();
+        /// <summary>
+        /// Mapping between C# and DB types.
+        /// </summary>
+        internal Dictionary<Type, string> DbTypeMap = new Dictionary<Type, string>();
+
+
+        private string GetType(string value)
+        {
+            int pos = value.IndexOf('(');
+            if (pos != -1)
+            {
+                return value.Substring(0, pos);
+            }
+            return value;
+        }
 
         /// <summary>
-        /// List of columns.
+        /// Get C# data type from SB data type.
         /// </summary>
-        private readonly List<KeyValuePair<Type, string[]>> ColumnList = new List<KeyValuePair<Type, string[]>>();
-        
+        /// <param name="type"></param>
+        /// <returns></returns>
+        internal Type GetDataType(string type, int len)
+        {
+            if (len == -1 || len == 65535)
+            {
+                if (string.Compare(Settings.StringColumnDefinition(0), type, true) == 0)
+                {
+                    return typeof(string);
+                }
+                if (string.Compare(Settings.StringColumnDefinition(len), type + "(" + len.ToString() + ")", true) == 0)
+                {
+                    return typeof(string);
+                }
+                if (string.Compare(Settings.GuidColumnDefinition, type + "(" + len.ToString() + ")", true) == 0)
+                {
+                    return typeof(Guid);
+                }
+            }
+            string type2 = null;
+            if (len != 0)
+            {
+                type2 = type + "(" + len.ToString() + ")";
+            }
+            foreach (var it in DbTypeMap)
+            {
+                if (string.Compare(it.Value, type, true) == 0 ||
+                    string.Compare(it.Value, type2, true) == 0)
+                {
+                    return it.Key;
+                }
+            }
+            if (string.Compare(type, GetType(Settings.BoolColumnDefinition), true) == 0)
+            {
+                return typeof(bool);
+            }
+            return null;
+        }
+
         static private readonly Dictionary<Type, Dictionary<string, GXSerializedItem>> SerializedObjects = new Dictionary<Type, Dictionary<string, GXSerializedItem>>();
 
+        /// <summary>
+        /// DB settings.
+        /// </summary>
         public GXDBSettings Settings
         {
             get;
             private set;
         }
 
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="type">Used BD.</param>
+        /// <param name="tablePrefix">Used table prefix (optional).</param>
         public GXSqlBuilder(DatabaseType type, string tablePrefix)
-        {            
+        {
             switch (type)
             {
                 case DatabaseType.MySQL:
@@ -107,7 +163,7 @@ namespace Gurux.Service.Orm
             DbTypeMap[typeof(decimal)] = Settings.DesimalColumnDefinition;
             DbTypeMap[typeof(byte[])] = Settings.ByteArrayColumnDefinition;
             DbTypeMap[typeof(object)] = Settings.ObjectColumnDefinition;
-        }        
+        }
 
         /// <summary>
         /// Get table name.
@@ -115,8 +171,8 @@ namespace Gurux.Service.Orm
         /// <returns>Table name.</returns>
         public string GetTableName<T>()
         {
-            return GetTableName(typeof(T), false);            
-        }                 
+            return GetTableName(typeof(T), false);
+        }
 
         /// <summary>
         /// Update DB relations.
@@ -163,7 +219,7 @@ namespace Gurux.Service.Orm
                     }
                     else
                     {
-                        s.Relation.RelationType = RelationType.OneToOne;                        
+                        s.Relation.RelationType = RelationType.OneToOne;
                     }
                 }
                 else if ((s.Attributes & Attributes.Relation) != 0)
@@ -178,7 +234,7 @@ namespace Gurux.Service.Orm
                     {
                         type = GXInternal.GetPropertyType(type);
                     }
-                    s.Relation.ForeignTable = type;                    
+                    s.Relation.ForeignTable = type;
                 }
             }
             else
@@ -198,8 +254,8 @@ namespace Gurux.Service.Orm
                     }
                     GXSerializedItem secondary = FindUnique(type);
                     if (secondary == null)
-                    {                                                
-                        throw new Exception(string.Format("Table {0} Relation create failed. Class must be derived from IUnique or target type must set in ForeignKey or Relation attribute.", 
+                    {
+                        throw new Exception(string.Format("Table {0} Relation create failed. Class must be derived from IUnique or target type must set in ForeignKey or Relation attribute.",
                             GXDbHelpers.GetTableName(mainType, true, '\'', null)));
                     }
                     s.Relation.ForeignId = secondary;
@@ -284,7 +340,6 @@ namespace Gurux.Service.Orm
                     {
                         settings |= (int)Attributes.AutoIncrement;
                     }
-
                     //Primary key value.
                     if (att is PrimaryKeyAttribute)
                     {
@@ -300,6 +355,18 @@ namespace Gurux.Service.Orm
                     {
                         settings |= (int)Attributes.Relation;
                     }
+                    if (att is StringLengthAttribute)
+                    {
+                        settings |= (int)Attributes.StringLength;
+                    }
+                    if (att is DataMemberAttribute)
+                    {
+                        DataMemberAttribute n = att as DataMemberAttribute;
+                        if (n.IsRequired)
+                        {
+                            settings |= (int)Attributes.IsRequired;
+                        }
+                    }
                 }
             }
             s.Attributes = (Attributes)settings;
@@ -308,7 +375,7 @@ namespace Gurux.Service.Orm
         public static string[] GetFields<T>()
         {
             Type type = typeof(T);
-            Dictionary<string, GXSerializedItem> properties = GetProperties(type);            
+            Dictionary<string, GXSerializedItem> properties = GetProperties(type);
             List<string> list = new List<string>();
             foreach (var it in properties)
             {
@@ -379,10 +446,10 @@ namespace Gurux.Service.Orm
             {
                 properties = (Dictionary<string, GXSerializedItem>)GXInternal.GetValues(type, false, UpdateAttributes);
                 SerializedObjects.Add(type, properties);
-                foreach(var it in properties)
+                foreach (var it in properties)
                 {
                     if ((it.Value.Attributes & (Attributes.ForeignKey | Attributes.Relation)) != 0)
-                    {                        
+                    {
                         UpdateRelations(type, properties, it.Value, true);
                     }
                 }
@@ -396,15 +463,28 @@ namespace Gurux.Service.Orm
             }
             return properties;
         }
-        
+
+        /// <summary>
+        /// Get table name.
+        /// </summary>
+        /// <param name="type">Table type.</param>
+        /// <param name="addQuoteSeparator">Is quote separator added.</param>
+        /// <returns>Table name.</returns>
         internal string GetTableName(Type type, bool addQuoteSeparator)
         {
             return GXDbHelpers.GetTableName(type, addQuoteSeparator, Settings.TableQuotation, Settings.TablePrefix);
         }
 
+        /// <summary>
+        ///  Get table name.
+        /// </summary>
+        /// <param name="type">Table type.</param>
+        /// <param name="addQuoteSeparator">Is quote separator added.</param>
+        /// <param name="allowSharedTables"></param>
+        /// <returns>Table name.</returns>
         internal string GetTableName(Type type, bool addQuoteSeparator, bool allowSharedTables)
         {
             return GXDbHelpers.GetTableName(type, addQuoteSeparator, Settings.TableQuotation, Settings.TablePrefix, allowSharedTables);
         }
-    }    
+    }
 }

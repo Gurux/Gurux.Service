@@ -30,6 +30,9 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using System;
+using System.Linq.Expressions;
+
 namespace Gurux.Service.Orm
 {
     public static class GXSql
@@ -99,7 +102,19 @@ namespace Gurux.Service.Orm
             return true;
         }
 
-        public static bool In(object value, GXSelectArgs expression )
+        public static bool In(object value, GXSelectArgs expression)
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Is value exists in the table. 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="expression">Value to search.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool Exists<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> sourceColumn,
+            Expression<Func<TDestinationTable, object>> destinationColumn, GXSelectArgs expression)
         {
             return true;
         }

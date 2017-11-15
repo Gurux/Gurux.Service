@@ -53,8 +53,8 @@ namespace Gurux.Service.Orm
         /// </summary>
         Empty,
         /// <summary>
-        /// Deletion is rejected.
+        /// Deletion is restrict.
         /// </summary>
-        Reject
+        Restrict
     }
 }

@@ -83,16 +83,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentNullException("destinationColumn");
             }
             Parent.Updated = true;
-            //UnaryExpression s = sourceColumn.Body
-            //UnaryExpression d = destinationColumn.Body;
             Expression t = Expression.Equal(sourceColumn.Body, destinationColumn.Body);
-
-            /*
-            UnaryExpression s = sourceColumn.Body; GetExpression(sourceColumn.Body);
-            UnaryExpression d = GetExpression(destinationColumn.Body);
-             Expression t = Expression.Equal(s.Operand, Expression.Convert(d.Operand, s.Operand.Type));
-             * */
-
             List.Add(new KeyValuePair<JoinType, BinaryExpression>(type, t as BinaryExpression));
         }
 

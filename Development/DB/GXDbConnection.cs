@@ -49,9 +49,10 @@ using System.Data.Odbc;
 using Gurux.Service.Orm.Settings;
 using System.IO;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 
 namespace Gurux.Service.Orm
-{    
+{
     /// <summary>
     /// This class is used to communicate with database.
     /// </summary>
@@ -150,13 +151,13 @@ namespace Gurux.Service.Orm
                 {
                     throw new ArgumentOutOfRangeException("Unknown connection.");
                 }
-            }   
+            }
             else
             {
                 throw new ArgumentOutOfRangeException("Unknown connection.");
             }
             Connection = connection;
-            Builder = new GXSqlBuilder(type, tablePrefix);            
+            Builder = new GXSqlBuilder(type, tablePrefix);
             Builder.Settings.ServerVersion = connection.ServerVersion;
         }
 
@@ -202,10 +203,10 @@ namespace Gurux.Service.Orm
                         else if (!GXInternal.IsGenericDataType(it.Value.Type))
                         {
                             GetTables(it.Value.Type, tables);
-                        }    
+                        }
                         //Add 1:1 relation table.                        
                         if (!tables.ContainsKey(it.Value.Relation.ForeignTable))
-                        {                            
+                        {
                             GetTables(it.Value.Relation.ForeignTable, tables);
                             if (!tables.ContainsKey(it.Value.Relation.ForeignTable))
                             {
@@ -219,7 +220,7 @@ namespace Gurux.Service.Orm
                             {
                                 tables.Add(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, it.Value.Relation.RelationMapTable.Relation.PrimaryId);
                             }
-                        }                                           
+                        }
                     }
                 }
             }
@@ -254,7 +255,7 @@ namespace Gurux.Service.Orm
             {
                 tables.Add(type, null);
             }
-            lock(Connection)
+            lock (Connection)
             {
                 if (Connection.State != ConnectionState.Open)
                 {
@@ -272,7 +273,7 @@ namespace Gurux.Service.Orm
                     {
                         list.Add(it.Key);
                     }
-                }                   
+                }
             }
             return list.ToArray();
         }
@@ -310,10 +311,6 @@ namespace Gurux.Service.Orm
                     foreach (var it in tables)
                     {
                         Type tmp = it.Key;
-                        if (tmp.BaseType != typeof(object))
-                        {
-                            tmp = tmp.BaseType;
-                        }
                         if (TableExist(Builder.GetTableName(tmp, false)))
                         {
                             if (!overwrite)
@@ -321,6 +318,18 @@ namespace Gurux.Service.Orm
                                 continue;
                             }
                             dropTables[tmp] = it.Value;
+                        }
+                        if (tmp.BaseType != typeof(object) && tmp.BaseType != typeof(GXTableBase))
+                        {
+                            tmp = tmp.BaseType;
+                            if (TableExist(Builder.GetTableName(tmp, false)))
+                            {
+                                if (!overwrite)
+                                {
+                                    continue;
+                                }
+                                dropTables[tmp] = it.Value;
+                            }
                         }
                     }
                     if (AutoTransaction)
@@ -509,7 +518,7 @@ namespace Gurux.Service.Orm
                                 }
                             }
                         }
-                    }                    
+                    }
                     Type original = type;
                     List<string> serialized = new List<string>();
                     do
@@ -521,7 +530,7 @@ namespace Gurux.Service.Orm
                                 continue;
                             }
                             serialized.Add(it.Key);
-                            tp = it.Value.Type;                           
+                            tp = it.Value.Type;
                             //Create relations.
                             if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type)
                             {
@@ -624,7 +633,7 @@ namespace Gurux.Service.Orm
                                             tp = typeof(int);
                                         }
                                     }
-                                    str = GetDataBaseType(tp);
+                                    str = GetDataBaseType(tp, it.Value.Target);
                                 }
                                 catch (Exception ex)
                                 {
@@ -636,30 +645,38 @@ namespace Gurux.Service.Orm
                             //SQLite allows only int as auto increment type.
                             else if (Builder.Settings.Type == DatabaseType.SqLite)
                             {
-                                str = GetDataBaseType(typeof(int));
+                                str = GetDataBaseType(typeof(int), it.Value);
                                 System.Diagnostics.Debug.Assert(str.Length != 0);
                                 sb.Append(str);
                             }
-                            
-                            //If nullable.
-                            if (it.Value.Relation != null ||
-                                (it.Value.Type.IsGenericType && it.Value.Type.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
-                                it.Value.Type.IsArray || it.Value.Type.IsClass || it.Value.Type == typeof(DateTime) ||
-                                it.Value.Type == typeof(Guid))
+                            bool required = false;
+                            if (it.Value.Target is PropertyInfo)
                             {
+                                DataMemberAttribute[] attr = (DataMemberAttribute[])(it.Value.Target as PropertyInfo).GetCustomAttributes(typeof(DataMemberAttribute), true);
+                                if (attr.Length != 0)
+                                {
+                                    required = attr[0].IsRequired;
+                                }
+                            }
+
+                            if ((it.Value.Attributes & Attributes.PrimaryKey) == 0 &&
+                                (!required ||
+                                (it.Value.Type.IsGenericType && it.Value.Type.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
+                                it.Value.Type.IsArray))
+                            {
+                                //If nullable.
                                 sb.Append(" NULL ");
                             }
-                            else if ((it.Value.Attributes & Attributes.PrimaryKey) == 0)
+                            else
                             {
                                 sb.Append(" NOT NULL ");
                             }
-
                             //If field is marked as auto increment or primary key.
                             if ((it.Value.Attributes & (Attributes.AutoIncrement | Attributes.PrimaryKey)) != 0)
                             {
                                 if (Builder.Settings.Type != DatabaseType.Access)
                                 {
-                                    sb.Append(" NOT NULL PRIMARY KEY ");
+                                    sb.Append(" PRIMARY KEY ");
                                     if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                                     {
                                         sb.Append(Builder.Settings.AutoIncrementDefinition);
@@ -674,92 +691,109 @@ namespace Gurux.Service.Orm
                                     sb.Append(" PRIMARY KEY ");
                                 }
                             }
+                            else if (it.Value.DefaultValue != null)
+                            {
+                                //Set default values.
+                                sb.Append(" DEFAULT ");
+                                if (it.Value.DefaultValue is Enum)
+                                {
+                                    sb.Append(Convert.ToString((int)it.Value.DefaultValue));
+                                }
+                                else if (it.Value.DefaultValue is string)
+                                {
+                                    sb.Append("'" + (string)it.Value.DefaultValue + "'");
+                                }
+                                else
+                                {
+                                    sb.Append(Convert.ToString(it.Value.DefaultValue));
+                                }
+                            }
                             if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type &&
                                     it.Value.Relation.RelationType == RelationType.OneToOne)
+                            {
+                                sb.Append(", ");
+                                string pk;
+                                if (it.Value.Relation.RelationType == RelationType.ManyToMany)
                                 {
-                                    sb.Append(", ");
-                                    string pk;
-                                    if (it.Value.Relation.RelationType == RelationType.ManyToMany)
-                                    {
-                                        GXSerializedItem u = it.Value.Relation.RelationMapTable.Relation.PrimaryId;
-                                        pk = GXDbHelpers.GetColumnName(u.Target as PropertyInfo, Builder.Settings.ColumnQuotation);
-                                    }
-                                    else
-                                    {
-                                        pk = GXDbHelpers.GetColumnName(it.Value.Relation.ForeignId.Target as PropertyInfo, Builder.Settings.ColumnQuotation);
-                                    }
-                                    string table = Builder.GetTableName(it.Value.Relation.PrimaryTable, false);
-                                    name = it.Key;
-                                    if (pk == null)
-                                    {
-                                        throw new ArgumentOutOfRangeException(string.Format("Table {0} do not have primary key.",
-                                                table));
-                                    }
-                                    if (this.Builder.Settings.UpperCase)
-                                    {
-                                        table = table.ToUpper();
-                                        name = name.ToUpper();
-                                        pk = pk.ToUpper();
-                                    }
-                                    string table2;
-                                    if (it.Value.Relation.RelationType == RelationType.ManyToMany)
-                                    {
-                                        table2 = Builder.GetTableName(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, false);
-                                    }
-                                    else
-                                    {
-                                        table2 = Builder.GetTableName(it.Value.Relation.ForeignTable, false);
-                                    }
-                                    ForeignKeyAttribute fk = ((ForeignKeyAttribute[])(it.Value.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), true))[0];
-
-                                    //Name is generated automatically at the moment. Use CONSTRAINT to give name to the Foreign key.                                
-                                    sb.Append(" FOREIGN KEY (");
-                                    sb.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
-                                    sb.Append(") REFERENCES ");
-                                    sb.Append(GXDbHelpers.AddQuotes(table2, Builder.Settings.TableQuotation));
-                                    sb.Append("(");
-                                    sb.Append(pk);
-                                    sb.Append(")");
-                                    switch (fk.OnDelete)
-                                    {
-                                        case ForeignKeyDelete.None:
-                                            //Foreign key on delete is not used.
-                                            break;
-                                        case ForeignKeyDelete.Cascade:
-                                            sb.Append(" ON DELETE CASCADE");
-                                            break;
-                                        case ForeignKeyDelete.Empty:
-                                            //Emit will cause this.
-                                            break;
-                                        case ForeignKeyDelete.Reject:
-                                            //ON DELETE NO ACTION will also work.
-                                            sb.Append(" ON DELETE RESTRICT");
-                                            break;
-                                        default:
-                                            break;
-                                    }
-                                    switch (fk.OnUpdate)
-                                    {
-                                        case ForeignKeyUpdate.None:
-                                            //Foreign key on update is not used.
-                                            break;
-                                        case ForeignKeyUpdate.Cascade:
-                                            sb.Append(" ON UPDATE CASCADE");
-                                            break;
-                                        case ForeignKeyUpdate.Reject:
-                                            //Emit will cause this.
-                                            break;
-                                        case ForeignKeyUpdate.NoAction:
-                                            //ON UPDATE NO ACTION will also work.
-                                            sb.Append(" ON UPDATE RESTRICT");
-                                            break;
-                                        case ForeignKeyUpdate.Null:
-                                            sb.Append(" ON UPDATE SET NULL");
-                                            break;
-                                        default:
-                                            break;
-                                    }
+                                    GXSerializedItem u = it.Value.Relation.RelationMapTable.Relation.PrimaryId;
+                                    pk = GXDbHelpers.GetColumnName(u.Target as PropertyInfo, Builder.Settings.ColumnQuotation);
                                 }
+                                else
+                                {
+                                    pk = GXDbHelpers.GetColumnName(it.Value.Relation.ForeignId.Target as PropertyInfo, Builder.Settings.ColumnQuotation);
+                                }
+                                string table = Builder.GetTableName(it.Value.Relation.PrimaryTable, false);
+                                name = it.Key;
+                                if (pk == null)
+                                {
+                                    throw new ArgumentOutOfRangeException(string.Format("Table {0} do not have primary key.",
+                                            table));
+                                }
+                                if (this.Builder.Settings.UpperCase)
+                                {
+                                    table = table.ToUpper();
+                                    name = name.ToUpper();
+                                    pk = pk.ToUpper();
+                                }
+                                string table2;
+                                if (it.Value.Relation.RelationType == RelationType.ManyToMany)
+                                {
+                                    table2 = Builder.GetTableName(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, false);
+                                }
+                                else
+                                {
+                                    table2 = Builder.GetTableName(it.Value.Relation.ForeignTable, false);
+                                }
+                                ForeignKeyAttribute fk = ((ForeignKeyAttribute[])(it.Value.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), true))[0];
+
+                                //Name is generated automatically at the moment. Use CONSTRAINT to give name to the Foreign key.                                
+                                sb.Append(" FOREIGN KEY (");
+                                sb.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
+                                sb.Append(") REFERENCES ");
+                                sb.Append(GXDbHelpers.AddQuotes(table2, Builder.Settings.TableQuotation));
+                                sb.Append("(");
+                                sb.Append(pk);
+                                sb.Append(")");
+                                switch (fk.OnDelete)
+                                {
+                                    case ForeignKeyDelete.None:
+                                        //Foreign key on delete is not used.
+                                        break;
+                                    case ForeignKeyDelete.Cascade:
+                                        sb.Append(" ON DELETE CASCADE");
+                                        break;
+                                    case ForeignKeyDelete.Empty:
+                                        //Emit will cause this.
+                                        break;
+                                    case ForeignKeyDelete.Restrict:
+                                        //ON DELETE NO ACTION will also work.
+                                        sb.Append(" ON DELETE RESTRICT");
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                switch (fk.OnUpdate)
+                                {
+                                    case ForeignKeyUpdate.None:
+                                        //Foreign key on update is not used.
+                                        break;
+                                    case ForeignKeyUpdate.Cascade:
+                                        sb.Append(" ON UPDATE CASCADE");
+                                        break;
+                                    case ForeignKeyUpdate.Reject:
+                                        //Emit will cause this.
+                                        break;
+                                    case ForeignKeyUpdate.Restrict:
+                                        //ON UPDATE NO ACTION will also work.
+                                        sb.Append(" ON UPDATE RESTRICT");
+                                        break;
+                                    case ForeignKeyUpdate.Null:
+                                        sb.Append(" ON UPDATE SET NULL");
+                                        break;
+                                    default:
+                                        break;
+                                }
+                            }
                         }
                         if (relationTables != null && relationTables.Count != 0)
                         {
@@ -822,7 +856,7 @@ namespace Gurux.Service.Orm
         /// <returns></returns>
         private void CreateIndex(Type type, GXTableCreateQuery tableItem, string tableName, StringBuilder sb)
         {
-            string name;            
+            string name;
             foreach (var it in GXSqlBuilder.GetProperties(type))
             {
                 if ((it.Value.Attributes & Attributes.Index) != 0)
@@ -868,13 +902,13 @@ namespace Gurux.Service.Orm
         /// <param name="transaction"></param>
         /// <param name="table"></param>
         void TableCreation(bool create, IDbTransaction transaction, GXTableCreateQuery table, List<Type> created)
-        {           
+        {
             Type type;
             //Create and drop depended tables first.
             foreach (var t in table.Dependencies)
             {
-                TableCreation(create, transaction, t, created);                
-            }            
+                TableCreation(create, transaction, t, created);
+            }
             if (GXDbHelpers.IsSharedTable(table.Table))
             {
                 type = table.Table.BaseType;
@@ -894,11 +928,11 @@ namespace Gurux.Service.Orm
                 else
                 {
                     System.Diagnostics.Debug.WriteLine("Drop table: " + table.Table.Name);
-                }                
+                }
                 foreach (string q in table.Queries)
                 {
                     ExecuteNonQuery(transaction, q);
-                }                         
+                }
             }
         }
 
@@ -908,7 +942,7 @@ namespace Gurux.Service.Orm
             GetCreateTableQueries(true, type, null, tables, tablesCreationQueries, true);
             List<Type> created = new List<Type>();
             foreach (var it in tablesCreationQueries)
-            {                
+            {
                 TableCreation(true, transaction, it.Value, created);
             }
         }
@@ -920,7 +954,7 @@ namespace Gurux.Service.Orm
             List<Type> created = new List<Type>();
             foreach (var it in tablesCreationQueries)
             {
-                TableCreation(false, transaction, it.Value, created);               
+                TableCreation(false, transaction, it.Value, created);
             }
         }
 
@@ -985,7 +1019,7 @@ namespace Gurux.Service.Orm
         /// <param name="relations">Are relation tables dropped also.</param>
         public void DropTable(Type type, bool relations)
         {
-            lock(Connection)
+            lock (Connection)
             {
                 if (Connection.State != ConnectionState.Open)
                 {
@@ -1021,7 +1055,7 @@ namespace Gurux.Service.Orm
                             transaction = Connection.BeginTransaction();
                         }
                         DropTable(transaction, type, tables);
-                        
+
                         //Drop auto increments that are not supported by DB.
                         foreach (var it in GXSqlBuilder.GetProperties(type))
                         {
@@ -1068,13 +1102,13 @@ namespace Gurux.Service.Orm
         }
 
         public T ExecuteScalar<T>(string query)
-        {            
-            return (T)ExecuteScalarInternal(null, query, typeof(T));            
+        {
+            return (T)ExecuteScalarInternal(null, query, typeof(T));
         }
 
         private object ExecuteScalarInternal(IDbTransaction transaction, string query, Type type)
-        {            
-            lock(Connection)
+        {
+            lock (Connection)
             {
                 if (Connection.State != ConnectionState.Open)
                 {
@@ -1087,9 +1121,9 @@ namespace Gurux.Service.Orm
                     com.CommandText = query;
                     return Convert.ChangeType(com.ExecuteScalar(), type);
                 }
-            }            
+            }
         }
-        
+
         /// <summary>
         /// Execute given query.
         /// </summary>
@@ -1106,12 +1140,12 @@ namespace Gurux.Service.Orm
         /// <param name="query">Query to execute.</param>
         public void ExecuteNonQuery(IDbTransaction transaction, string query)
         {
-            lock(Connection)
+            lock (Connection)
             {
                 if (Connection.State != ConnectionState.Open)
                 {
                     Connection.Open();
-                }                
+                }
                 using (IDbCommand com = Connection.CreateCommand())
                 {
                     com.CommandType = CommandType.Text;
@@ -1146,13 +1180,13 @@ namespace Gurux.Service.Orm
                 case DatabaseType.MySQL:
                     return ExecuteScalarInternal(transaction, "SELECT LAST_INSERT_ID()" + name, valueType);
                 case DatabaseType.Oracle:
-                    return ExecuteScalarInternal(transaction, "SELECT " + Gurux.Service.Orm.Settings.GXOracleSqlSettings.GetSequenceName(table, columnName) + ".CURRVAL FROM dual", valueType);                
+                    return ExecuteScalarInternal(transaction, "SELECT " + Gurux.Service.Orm.Settings.GXOracleSqlSettings.GetSequenceName(table, columnName) + ".CURRVAL FROM dual", valueType);
                 case DatabaseType.MSSQL:
                     return ExecuteScalarInternal(transaction, "SELECT @@IDENTITY" + name, valueType);
                 case DatabaseType.SqLite:
                     return ExecuteScalarInternal(transaction, "SELECT last_insert_rowid()" + name, valueType);
                 case DatabaseType.Access:
-                    return ExecuteScalarInternal(transaction, "SELECT @@IDENTITY" + name, valueType);                    
+                    return ExecuteScalarInternal(transaction, "SELECT @@IDENTITY" + name, valueType);
                 default:
                     throw new ArgumentOutOfRangeException("GetLastInsertId failed. Unknown database connection.");
             }
@@ -1168,7 +1202,7 @@ namespace Gurux.Service.Orm
             return TableExist(Builder.GetTableName(type, false));
         }
 
-        public string[] GetColumns<T>()        
+        public string[] GetColumns<T>()
         {
             string tableName = Builder.GetTableName(typeof(T), false);
             return GetColumns(tableName);
@@ -1176,55 +1210,42 @@ namespace Gurux.Service.Orm
 
         public string[] GetColumns(string tableName)
         {
-            lock(Connection)
+            lock (Connection)
             {
                 if (Connection.State != ConnectionState.Open)
                 {
                     Connection.Open();
                 }
-                return GetColumnsInteral(tableName, Builder.Settings.Type, Connection);                 
-             }
+                return GetColumnsInteral(tableName, Builder.Settings.Type, Connection);
+            }
         }
 
-        private static string[] GetColumnsInteral(string tableName, DatabaseType type, DbConnection connection)
-        {            
+        private string[] GetColumnsInteral(string tableName, DatabaseType type, DbConnection connection)
+        {
             string query;
             int index = 0;
             List<string> list;
-            switch (type)
+            if (type == DatabaseType.Access)
             {
-                case DatabaseType.MySQL:
-                    query = string.Format("SHOW COLUMNS FROM {0}", tableName);
-                    break;
-                case DatabaseType.MSSQL:
-                    query = string.Format("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}'", tableName);
-                    break;
-                case DatabaseType.Oracle:
-                    query = string.Format("SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{0}'", tableName);
-                    break;
-
-                case DatabaseType.SqLite:
-                    query = string.Format("PRAGMA table_info('{0}')", tableName);
-                    index = 1;
-                    break;
-                case DatabaseType.Access:
-                    DataTable dt;
-                    if (connection as System.Data.OleDb.OleDbConnection != null)
-                    {
-                        dt = (connection as System.Data.OleDb.OleDbConnection).GetSchema("Columns", new string[] { null, null, tableName });
-                    }
-                    else
-                    {
-                        dt = (connection as System.Data.Odbc.OdbcConnection).GetSchema("Columns", new string[] { null, null, tableName });
-                    }
-                    list = new List<string>(dt.Rows.Count);
-                    foreach (DataRow it in dt.Rows)
-                    {
-                        list.Add(it[3].ToString());
-                    }
-                    return list.ToArray();
-                default:
-                    throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
+                DataTable dt;
+                if (connection as System.Data.OleDb.OleDbConnection != null)
+                {
+                    dt = (connection as System.Data.OleDb.OleDbConnection).GetSchema("Columns", new string[] { null, null, tableName });
+                }
+                else
+                {
+                    dt = (connection as System.Data.Odbc.OdbcConnection).GetSchema("Columns", new string[] { null, null, tableName });
+                }
+                list = new List<string>(dt.Rows.Count);
+                foreach (DataRow it in dt.Rows)
+                {
+                    list.Add(it[3].ToString());
+                }
+                return list.ToArray();
+            }
+            else
+            {
+                query = Builder.Settings.GetColumnsQuery(connection.Database, tableName, out index);
             }
             list = new List<string>();
             using (IDbCommand com = connection.CreateCommand())
@@ -1243,13 +1264,226 @@ namespace Gurux.Service.Orm
             return list.ToArray();
         }
 
+
+        private bool IsAutoIncrement(string tableName, string columnName, DbConnection connection)
+        {
+            string query = Builder.Settings.GetAutoIncrementQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        object tmp = reader.GetValue(0);
+                        if (tmp != null && !(tmp is DBNull))
+                        {
+                            return Builder.Settings.IsAutoIncrement(reader.GetValue(0));
+                        }
+                    }
+                    reader.Close();
+                }
+            }
+            return false;
+        }
+        private string GetColumnConstraintsQuery(string tableName, string columnName, DbConnection connection, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        {
+            string targetTable = "";
+            onDelete = ForeignKeyDelete.None;
+            onUpdate = ForeignKeyUpdate.None;
+            string query = Builder.Settings.GetColumnConstraintsQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        targetTable = Builder.Settings.GetColumnConstraints(new object[] { reader.GetString(0), reader.GetString(1), reader.GetString(2) }, out onDelete, out onUpdate);
+                    }
+                    reader.Close();
+                }
+            }
+            return targetTable;
+        }
+
+        /// <summary>
+        /// Check is column primary key.
+        /// </summary>
+        /// <param name="tableName"></param>
+        /// <param name="columnName"></param>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        private bool GetPrimaryKeyQuery(string tableName, string columnName, DbConnection connection)
+        {
+            bool ret = false;
+            string query = Builder.Settings.GetPrimaryKeyQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        object tmp = reader.GetValue(0);
+                        if (tmp != null && !(tmp is DBNull))
+                        {
+                            ret = Builder.Settings.IsPrimaryKey(tmp);
+                        }
+                    }
+                    reader.Close();
+                }
+            }
+            return ret;
+        }
+
+        /// <summary>
+        /// Check are there any relations for this column.
+        /// </summary>
+        /// <param name="tableName"></param>
+        /// <param name="columnName"></param>
+        /// <param name="connection"></param>
+        /// <returns></returns>
+        private bool GetRelationsQuery(string tableName, string columnName, DbConnection connection)
+        {
+            bool ret = false;
+            string query = Builder.Settings.GetPrimaryKeyQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        object tmp = reader.GetValue(0);
+                        if (tmp != null && !(tmp is DBNull))
+                        {
+                            ret = Builder.Settings.IsPrimaryKey(tmp);
+                        }
+                    }
+                    reader.Close();
+                }
+            }
+            return ret;
+        }
+
+        private bool GetColumnNullableQuery(string tableName, string columnName, DbConnection connection)
+        {
+            bool ret = false;
+            string query = Builder.Settings.GetColumnNullableQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        ret = Builder.Settings.IsNullable(reader.GetValue(0));
+                    }
+                    reader.Close();
+                }
+            }
+            return ret;
+        }
+
+        private string[] GetReferenceTablesQuery(string tableName, string columnName, DbConnection connection)
+        {
+            List<string> list = new List<string>();
+            string query = Builder.Settings.GetReferenceTablesQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        list.Add(reader.GetString(0));
+                    }
+                    reader.Close();
+                }
+            }
+            return list.ToArray();
+        }
+
+        private string GetColumnDefaultValueQuery(string tableName, string columnName, DbConnection connection)
+        {
+            string query = Builder.Settings.GetColumnDefaultValueQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        object tmp = reader.GetValue(0);
+                        if (tmp != null && !(tmp is DBNull))
+                        {
+                            return Convert.ToString(tmp);
+                        }
+                    }
+                    reader.Close();
+                }
+            }
+            return "";
+        }
+
+        private Type GetColumnType(string tableName, string columnName, DbConnection connection, out int len)
+        {
+            string str = null;
+            len = 0;
+            string query = Builder.Settings.GetColumnTypeQuery(connection.Database, tableName, columnName);
+            using (IDbCommand com = connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                using (IDataReader reader = com.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        str = reader.GetString(0);
+                        if (reader.FieldCount > 1)
+                        {
+                            object tmp = reader.GetValue(1);
+                            if (tmp != null && !(tmp is DBNull))
+                            {
+                                len = Convert.ToInt32(tmp);
+                            }
+                            if (len < 1 && reader.FieldCount > 2)
+                            {
+                                tmp = reader.GetValue(2);
+                                if (tmp != null && !(tmp is DBNull))
+                                {
+                                    len = Convert.ToInt32(tmp);
+                                }
+                            }
+                            break;
+                        }
+                        reader.Close();
+                    }
+                }
+            }
+            Type type = Builder.GetDataType(str, len);
+            if (type == null)
+            {
+                throw new ArgumentException("Invalid data type: " + str);
+            }
+            return type;
+        }
+
         public string[] GetTables()
         {
             string query;
             switch (Builder.Settings.Type)
             {
                 case DatabaseType.MySQL:
-                    query = string.Format("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{0}'", 
+                    query = string.Format("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{0}'",
                         Connection.Database);
                     break;
                 case DatabaseType.MSSQL:
@@ -1283,7 +1517,7 @@ namespace Gurux.Service.Orm
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
-            return ((List<string>) SelectInternal<string>(query)).ToArray();
+            return ((List<string>)SelectInternal<string>(query)).ToArray();
         }
 
         /// <summary>
@@ -1292,24 +1526,24 @@ namespace Gurux.Service.Orm
         /// <param name="tableName">Table name.</param>
         /// <returns>Returns true if table exists.</returns>
         public bool TableExist(string tableName)
-        {            
+        {
             string query;
             switch (Builder.Settings.Type)
-	        {
-		        case DatabaseType.MySQL:                    
+            {
+                case DatabaseType.MySQL:
                     query = string.Format("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{0}' AND TABLE_SCHEMA = '{1}'",
                         tableName, Connection.Database);
-                break;
+                    break;
                 case DatabaseType.MSSQL:
-                query = string.Format("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{0}'",
-                    tableName);
-                break;
+                    query = string.Format("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{0}'",
+                        tableName);
+                    break;
                 case DatabaseType.Oracle:
-                query = string.Format("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = '{0}'", tableName);
-                break;
+                    query = string.Format("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = '{0}'", tableName);
+                    break;
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
-                break;
+                    break;
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1322,12 +1556,12 @@ namespace Gurux.Service.Orm
                     }
                     return dt.Rows.Count != 0;
                 default:
-                    throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");                
-	        }            
+                    throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
+            }
             return ExecuteScalar<int>(query) != 0;
         }
 
-        private string GetDataBaseType(Type type)
+        private string GetDataBaseType(Type type, object target)
         {
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
@@ -1347,7 +1581,7 @@ namespace Gurux.Service.Orm
                     {
                         return this.Builder.Settings.StringColumnDefinition(0);
                     }
-                    return this.Builder.Settings.StringColumnDefinition(attr[0].Length);
+                    return this.Builder.Settings.StringColumnDefinition(attr[0].MaximumLength);
                 }
                 else //In default enumeration values are saved as long values.
                 {
@@ -1356,16 +1590,20 @@ namespace Gurux.Service.Orm
             }
             else if (type == typeof(string) || type == typeof(char[]) || type == typeof(object))
             {
-                StringLengthAttribute[] attr = (StringLengthAttribute[])type.GetCustomAttributes(typeof(StringLengthAttribute), true);
-                if (attr.Length == 0)
+                if (target is PropertyInfo)
                 {
-                    return this.Builder.Settings.StringColumnDefinition(0);
+                    StringLengthAttribute[] attr = (StringLengthAttribute[])(target as PropertyInfo).GetCustomAttributes(typeof(StringLengthAttribute), true);
+                    if (attr.Length == 0)
+                    {
+                        return this.Builder.Settings.StringColumnDefinition(0);
+                    }
+                    return this.Builder.Settings.StringColumnDefinition(attr[0].MaximumLength);
                 }
-                return this.Builder.Settings.StringColumnDefinition(attr[0].Length);
+                return this.Builder.Settings.StringColumnDefinition(0);
             }
             if (type.IsArray && type != typeof(byte[]) && type != typeof(char[]))
             {
-                return GetDataBaseType(GXInternal.GetPropertyType(type));
+                return GetDataBaseType(GXInternal.GetPropertyType(type), null);
             }
             else if (!Builder.DbTypeMap.ContainsKey(type))
             {
@@ -1378,7 +1616,7 @@ namespace Gurux.Service.Orm
                     throw new Exception("Invalid data type: " + type.Name);
                 }
                 throw new Exception("Invalid data type: " + type.Name + ". Make sure that you have added ForeignKey attribute to the property.");
-                
+
             }
             return Builder.DbTypeMap[type];
         }
@@ -1391,7 +1629,7 @@ namespace Gurux.Service.Orm
         {
             IDbTransaction transaction = Transaction;
             bool autoTransaction = transaction == null;
-            lock(Connection)
+            lock (Connection)
             {
                 if (AutoTransaction)
                 {
@@ -1407,7 +1645,7 @@ namespace Gurux.Service.Orm
                 {
                     if (autoTransaction && transaction != null)
                     {
-                        transaction.Rollback();                        
+                        transaction.Rollback();
                     }
                     throw ex;
                 }
@@ -1419,7 +1657,7 @@ namespace Gurux.Service.Orm
                     }
                 }
             }
-        }       
+        }
 
         /// <summary>
         /// Select item by Id.
@@ -1440,7 +1678,7 @@ namespace Gurux.Service.Orm
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = this.Builder.Settings;
-            DateTime tm = DateTime.Now;            
+            DateTime tm = DateTime.Now;
             List<T> list = Select<T>(args);
             args.ExecutionTime = (DateTime.Now - tm).Milliseconds;
             if (list.Count == 0)
@@ -1450,14 +1688,14 @@ namespace Gurux.Service.Orm
             if (list.Count == 1)
             {
                 return list[0];
-            }            
+            }
             throw new Exception("There are multiple items with same ID when id should be unique.");
-        }                
+        }
 
         public List<T> SelectAll<T>()
         {
             return Select<T>((GXSelectArgs)null);
-        }       
+        }
 
         class GXColumnHelper
         {
@@ -1481,7 +1719,7 @@ namespace Gurux.Service.Orm
             {
                 return Table + "." + Name;
             }
-        }       
+        }
 
         /// <summary>
         /// Initialize select. Save table indexes and column setters to make data handling faster.
@@ -1570,13 +1808,13 @@ namespace Gurux.Service.Orm
                         c.Table = name.Substring(0, tmp);
                         c.Name = name.Substring(tmp + 1);
                     }
-                }                
+                }
                 //If table has change.
                 if (lastTable.CompareTo(c.Table) != 0)
                 {
                     si = null;
                     foreach (var it in tables)
-                    {                        
+                    {
                         if (string.Compare(GXDbHelpers.GetTableName(it.Key, false, '\0', null, false), c.Table, true) == 0 ||
                             string.Compare(GXDbHelpers.OriginalTableName(it.Key), c.Table, true) == 0)
                         {
@@ -1597,7 +1835,7 @@ namespace Gurux.Service.Orm
                     {
                         tableType = (si.Target as PropertyInfo).ReflectedType;
                     }
-                    properties = GXSqlBuilder.GetProperties(tableType);                    
+                    properties = GXSqlBuilder.GetProperties(tableType);
                     lastTable = c.Table;
                     if (tables.Count != 1)
                     {
@@ -1657,13 +1895,13 @@ namespace Gurux.Service.Orm
                     {
                         TableIndexes.Add(tableType, pos);
                     }
-                }                 
+                }
                 c.TableType = tableType;
-            }           
+            }
         }
 
         private object SelectInternal<T>(string query)
-        {            
+        {
             object value = null, item, id = null;
             List<object[]> objectList = null;
             List<T> baseList = null;
@@ -1867,7 +2105,7 @@ namespace Gurux.Service.Orm
                                     {
                                         //If 1:1 relation.
                                         if (objects != null && !GXInternal.IsGenericDataType(col.Setter.Type) &&
-                                            !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) && 
+                                            !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) &&
                                             col.Setter.Type.IsClass && col.Setter.Type != typeof(byte[]))
                                         {
                                             Type pt = GXInternal.GetPropertyType(col.Setter.Type);
@@ -1947,7 +2185,7 @@ namespace Gurux.Service.Orm
                         }
                         reader.Close();
                     }
-                }                
+                }
                 if (list != null)
                 {
                     //Update relation data.
@@ -2315,7 +2553,7 @@ namespace Gurux.Service.Orm
                                                 value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
                                             }
                                             else //Parameter type is class. Set to null.
-                                            {                                                
+                                            {
                                                 value = null;
                                             }
                                         }
@@ -2481,7 +2719,7 @@ namespace Gurux.Service.Orm
             {
                 return default(T);
             }
-            return list[0];          
+            return list[0];
         }
 
         /// <summary>
@@ -2502,7 +2740,7 @@ namespace Gurux.Service.Orm
             List<object[]> value = Select<object[]>(arg);
             arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
             return value;
-        }    
+        }
 
         /// <summary>
         /// Insert new object.
@@ -2520,7 +2758,7 @@ namespace Gurux.Service.Orm
             {
                 GXDbHelpers.GetValues(it.Key, null, it.Value, list, true, false, Builder.Settings.ColumnQuotation, false);
             }
-            UpdateOrInsert(list, true);           
+            UpdateOrInsert(list, true);
         }
 
         /// <summary>
@@ -2630,7 +2868,7 @@ namespace Gurux.Service.Orm
                                 {
                                     if (!Builder.Settings.AutoIncrementFirst)
                                     {
-                                        id -= (ulong)(q.Value.Rows.Count - 1);                                        
+                                        id -= (ulong)(q.Value.Rows.Count - 1);
                                     }
                                     foreach (var it in q.Value.Rows)
                                     {
@@ -2650,7 +2888,7 @@ namespace Gurux.Service.Orm
                         if (insert && total == 0 && si != null && pos != -1)
                         {
                             foreach (string query in queries)
-                            {                                                     
+                            {
                                 columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
                                 id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
                                 //If each value is added separately.
@@ -2702,7 +2940,7 @@ namespace Gurux.Service.Orm
                 }
             }
         }
-      
+
         /// <summary>
         /// Get table name.
         /// </summary>
@@ -2724,6 +2962,264 @@ namespace Gurux.Service.Orm
                 finally
                 {
                     Connection = null;
+                }
+            }
+        }
+
+        private void AddSpaces(TextWriter tw, int count)
+        {
+            StringBuilder sb = new StringBuilder();
+            for (int pos = 0; pos != count; ++pos)
+            {
+                sb.Append(' ');
+            }
+            tw.Write(sb);
+        }
+
+        private static bool ContainsTable(string[] list, string value)
+        {
+            if (list == null)
+            {
+                return true;
+            }
+            foreach (string it in list)
+            {
+                if (string.Compare(it, value, true) == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static void Add(StringBuilder sb, GXImportSettings settings, string text, int spaces)
+        {
+            for (int pos = 0; pos != spaces; ++pos)
+            {
+                sb.Append("    ");
+            }
+            sb.Append(text);
+        }
+
+        private static void AddLine(StringBuilder sb, GXImportSettings settings, string text, int spaces)
+        {
+            Add(sb, settings, text, spaces);
+            sb.AppendLine("");
+        }
+        private static string GetName(GXImportSettings settings, string value)
+        {
+            return settings.TablePrefix + Char.ToUpper(value[0]) + value.Substring(1);
+        }
+
+        /// <summary>
+        /// Import Database schema and convert them to C# classes.
+        /// </summary>
+        /// <param name="settings">Import settings.</param>
+        public void GenerateTables(GXImportSettings settings)
+        {
+            if (settings == null || string.IsNullOrEmpty(settings.Path))
+            {
+                throw new ArgumentException("Invalid settings.");
+            }
+            DirectoryInfo di = new DirectoryInfo(settings.Path);
+            if (!di.Exists)
+            {
+                di.Create();
+            }
+            lock (Connection)
+            {
+                try
+                {
+                    if (Connection.State != ConnectionState.Open)
+                    {
+                        Connection.Open();
+                    }
+                    foreach (string table in GetTables())
+                    {
+                        if (ContainsTable(settings.Tables, table))
+                        {
+                            StringBuilder header = new StringBuilder();
+                            StringBuilder data = new StringBuilder();
+                            System.Diagnostics.Debug.WriteLine("Import " + table);
+                            AddLine(header, settings, "using System;", 0);
+                            AddLine(header, settings, "using System.Runtime.Serialization;", 0);
+                            AddLine(header, settings, "using Gurux.Service.Orm;", 0);
+                            header.AppendLine("");
+                            if (!string.IsNullOrEmpty(settings.Namespace))
+                            {
+                                Add(header, settings, "namespace ", 0);
+                                header.AppendLine(settings.Namespace);
+                                AddLine(header, settings, "{", 0);
+                            }
+                            AddLine(header, settings, "[DataContract]", 1);
+                            if (settings.Serializable)
+                            {
+                                AddLine(header, settings, "[Serializable]", 1);
+                            }
+                            Add(header, settings, "class ", 1);
+                            //Convert first letter to Uppercase.
+                            header.Append(GetName(settings, table));
+                            AddLine(data, settings, "{", 1);
+                            int len;
+                            foreach (string col in GetColumns(table))
+                            {
+                                bool isunique = false;
+                                //AutoIncrement                                    
+                                bool ai = IsAutoIncrement(table, col, Connection);
+                                //Data type
+                                string def = GetColumnDefaultValueQuery(table, col, Connection);
+                                Type type = GetColumnType(table, col, Connection, out len);
+                                bool nullable = GetColumnNullableQuery(table, col, Connection);
+
+                                if (GetPrimaryKeyQuery(table, col, Connection))
+                                {
+                                    isunique = true;
+                                    header.Append(" : IUnique<" + type.Name + ">");
+                                    if (col != "Id")
+                                    {
+                                        AddLine(data, settings, "[DataMember(Name = \"" + col + "\")]", 2);
+                                    }
+                                    else
+                                    {
+                                        AddLine(data, settings, "[DataMember()]", 2);
+                                    }
+                                }
+                                else
+                                {
+                                    if (nullable)
+                                    {
+                                        AddLine(data, settings, "[DataMember()]", 2);
+                                    }
+                                    else
+                                    {
+                                        AddLine(data, settings, "[DataMember(IsRequired = true)]", 2);
+                                    }
+                                    string[] refs = GetReferenceTablesQuery(table, col, Connection);
+                                    if (refs.Length != 0)
+                                    {
+                                        ForeignKeyDelete onDelete;
+                                        ForeignKeyUpdate onUpdate;
+                                        string t = GetColumnConstraintsQuery(table, col, Connection, out onDelete, out onUpdate);
+                                        if (onUpdate == ForeignKeyUpdate.Restrict)
+                                        {
+                                            onUpdate = ForeignKeyUpdate.None;
+                                        }
+                                        //Only cascade is allowed on delete.
+                                        if (onDelete != ForeignKeyDelete.Cascade)
+                                        {
+                                            onDelete = ForeignKeyDelete.None;
+                                        }
+                                        if (onDelete == ForeignKeyDelete.None && onUpdate == ForeignKeyUpdate.None)
+                                        {
+                                            foreach (string it in refs)
+                                            {
+                                                AddLine(data, settings, "[ForeignKey(typeof(" +
+                                                    GetName(settings, it) + "))]", 2);
+                                            }
+                                        }
+                                        else if (onDelete != ForeignKeyDelete.None && onUpdate != ForeignKeyUpdate.None)
+                                        {
+                                            foreach (string it in refs)
+                                            {
+                                                AddLine(data, settings, "[ForeignKey(typeof(" +
+                                                GetName(settings, it) + "), OnDelete = ForeignKeyDelete." + onDelete +
+                                                ", OnUpdate = ForeignKeyUpdate." + onUpdate + ")]", 2);
+                                            }
+                                        }
+                                        else if (onDelete != ForeignKeyDelete.None)
+                                        {
+                                            foreach (string it in refs)
+                                            {
+                                                AddLine(data, settings, "[ForeignKey(typeof(" +
+                                                GetName(settings, it) + "), OnDelete = ForeignKeyDelete." + onDelete + ")]", 2);
+                                            }
+                                        }
+                                        else if (onUpdate != ForeignKeyUpdate.None)
+                                        {
+                                            foreach (string it in refs)
+                                            {
+                                                AddLine(data, settings, "[ForeignKey(typeof(" +
+                                                GetName(settings, it) + "), OnUpdate = ForeignKeyUpdate." + onUpdate + ")]", 2);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (ai)
+                                {
+                                    AddLine(data, settings, "[AutoIncrement]", 2);
+                                }
+
+                                if (def != "" && def != "NULL")
+                                {
+                                    if (type == typeof(bool))
+                                    {
+                                        if (def.IndexOfAny(new char[] { 't', 'T', '1' }) != -1)
+                                        {
+                                            AddLine(data, settings, "[DefaultValue(true)]", 2);
+                                        }
+                                        else
+                                        {
+                                            AddLine(data, settings, "[DefaultValue(false)]", 2);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        AddLine(data, settings, "[DefaultValue(" + def + ")]", 2);
+                                    }
+                                }
+                                else if (len != 0 && len != -1 && len != 65535 && type == typeof(string))
+                                {
+                                    AddLine(data, settings, "[StringLength(" + len.ToString() + ")]", 2);
+                                }
+                                Add(data, settings, "public ", 2);
+                                if (type == typeof(bool))
+                                {
+                                    data.Append("bool");
+                                }
+                                else if (type == typeof(string))
+                                {
+                                    data.Append("string");
+                                }
+                                else
+                                {
+                                    data.Append(type.Name);
+                                }
+                                data.Append(' ');
+                                if (isunique)
+                                {
+                                    data.AppendLine("Id");
+                                }
+                                else
+                                {
+                                    data.AppendLine(settings.ColumnPrefix + col);
+                                }
+                                AddLine(data, settings, "{", 2);
+                                AddLine(data, settings, "get;", 3);
+                                AddLine(data, settings, "set;", 3);
+                                AddLine(data, settings, "}", 2);
+                                data.AppendLine("");
+                            }
+                            //Remove last new line.
+                            data.Length -= 2;
+                            AddLine(data, settings, "}", 1);
+                            if (!string.IsNullOrEmpty(settings.Namespace))
+                            {
+                                AddLine(data, settings, "}", 0);
+                            }
+
+                            using (TextWriter tw = File.CreateText(Path.Combine(settings.Path, table + ".cs")))
+                            {
+                                tw.Write(header);
+                                tw.WriteLine("");
+                                tw.Write(data);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    Connection.Close();
                 }
             }
         }

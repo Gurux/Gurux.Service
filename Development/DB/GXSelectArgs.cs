@@ -39,7 +39,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Gurux.Common.Internal;
 namespace Gurux.Service.Orm
-{  
+{
     /// <summary>
     /// Select arguments.
     /// </summary>
@@ -52,18 +52,17 @@ namespace Gurux.Service.Orm
         /// Constructor.
         /// </summary>
         private GXSelectArgs()
-        {            
-            Parent = new GXSettingsArgs();            
-            Excluded = new GXColumnCollection(Parent, null);            
+        {
+            Parent = new GXSettingsArgs();
             Joins = new GXJoinCollection(Parent);
-            Columns = new GXColumnCollection(Parent, Excluded);
+            Columns = new GXColumnCollection(Parent);
             Columns.Joins = Joins;
             Where = new GXWhereCollection(Parent);
             OrderBy = new GXOrderByCollection(this);
         }
-                
+
         public override string ToString()
-        {            
+        {
             StringBuilder sb = new StringBuilder();
             if (this.ExecutionTime != 0)
             {
@@ -95,7 +94,7 @@ namespace Gurux.Service.Orm
                     sb.Append(str);
                 }
             }
-            
+
             if (this.Settings.Type != DatabaseType.Oracle)
             {
                 str = Where.LimitToString();
@@ -105,10 +104,9 @@ namespace Gurux.Service.Orm
                     sb.Append(str);
                 }
             }
-//            Parent.Updated = false; 
             return sb.ToString();
         }
-        
+
         internal void Verify()
         {
             if (this.Descending && OrderBy.List.Count == 0)
@@ -123,10 +121,10 @@ namespace Gurux.Service.Orm
                     if (!tables.Contains(it.Parameters[0].Type))
                     {
                         tables.Add(it.Parameters[0].Type);
-                    }                    
+                    }
                 }
                 bool found = false;
-                foreach(var it in tables)
+                foreach (var it in tables)
                 {
                     if (GXSqlBuilder.FindUnique(it) != null)
                     {
@@ -153,7 +151,7 @@ namespace Gurux.Service.Orm
             }
             internal set
             {
-                Parent.Updated = true; 
+                Parent.Updated = true;
                 Parent.Settings = value;
             }
         }
@@ -264,15 +262,6 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Excluded columns.
-        /// </summary>
-        public GXColumnCollection Excluded
-        {
-            get;
-            private set;
-        }
-
-        /// <summary>
         /// Order items by.
         /// </summary>
         public GXOrderByCollection OrderBy
@@ -299,21 +288,6 @@ namespace Gurux.Service.Orm
             private set;
         }
 
-        /// <summary>
-        /// Are relations data also get.
-        /// </summary>
-        public bool Relations
-        {
-            get
-            {
-                return Parent.Relations;
-            }
-            set
-            {
-                Parent.Relations = value;
-            }
-        }
-        
         /// <summary>
         /// Is select distinct.
         /// </summary>
@@ -342,7 +316,7 @@ namespace Gurux.Service.Orm
             {
                 Parent.Descending = value;
             }
-        }        
+        }
 
         /// <summary>
         /// Start index.
@@ -373,7 +347,7 @@ namespace Gurux.Service.Orm
             }
             set
             {
-                Parent.Count = value;                    
+                Parent.Count = value;
             }
         }
     }

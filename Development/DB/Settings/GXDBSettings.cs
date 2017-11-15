@@ -33,6 +33,7 @@
 using System;
 using System.Globalization;
 using System.ComponentModel;
+using System.Data.Common;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -160,9 +161,124 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <summary>
+        /// Get column constraints.
+        /// </summary>
+        /// <param name="values">Received values.</param>
+        /// <param name="onDelete">Foreign key delete action.</param>
+        /// <param name="onUpdate">Foreign key update action</param>
+        /// <returns>reference class</returns>
+        public abstract string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate);
+
+        /// <summary>
+        /// Get column constraints query.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetColumnConstraintsQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Is column nullable.
+        /// </summary>
+        /// <param name="value">Received string.</param>
+        /// <returns>Key type.</returns>
+        public abstract bool IsNullable(object value);
+
+        /// <summary>
+        /// Is column nullable.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetColumnNullableQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Is column indexed query.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetColumnIndexQuery(string schema, string tableName, string columnName);
+
+
+        /// <summary>
+        /// Get reference tables query.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetReferenceTablesQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Get column query.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="name">Table name.</param>
+        /// <param name="index">Index where column name found.</param>
+        /// <returns>Columns query.</returns>
+        public abstract string GetColumnsQuery(string schema, string name, out int index);
+
+        /// <summary>
+        /// Get key type.
+        /// </summary>
+        /// <param name="value">Received string.</param>
+        /// <returns>Key type.</returns>
+        public abstract bool IsPrimaryKey(object value);
+
+        /// <summary>
+        /// Is primary key.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column key type query.</returns>
+        public abstract string GetPrimaryKeyQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Is column autoincrement.
+        /// </summary>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public abstract bool IsAutoIncrement(object value);
+
+        /// <summary>
+        /// Check is column AutoIncrement.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetAutoIncrementQuery(string schema, string tableName, string columnName);
+
+
+        /// <summary>
+        /// Get default value for column query.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetColumnDefaultValueQuery(string schema, string tableName, string columnName);
+
+
+        /// <summary>
+        /// Get column query.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column data type query.</returns>
+        public abstract string GetColumnTypeQuery(string schema, string tableName, string columnName);
+
+
+        /// <summary>
         /// Used column quotation mark.
         /// </summary>
-        abstract public char ColumnQuotation
+        public abstract char ColumnQuotation
         {
             get;
         }
@@ -353,7 +469,7 @@ namespace Gurux.Service.Orm.Settings
         /// </summary>
         public virtual string[] CreateAutoIncrement(string tableName, string columnName)
         {
-            return null;            
+            return null;
         }
 
         /// <summary>
@@ -384,5 +500,5 @@ namespace Gurux.Service.Orm.Settings
         {
             return null;
         }
-    };   
+    };
 }

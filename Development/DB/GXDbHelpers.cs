@@ -82,10 +82,6 @@ namespace Gurux.Service.Orm
 
         internal static string OriginalTableName(Type type)
         {
-            if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
-            {
-                return OriginalTableName(type.BaseType);
-            }
             AliasAttribute[] alias = (AliasAttribute[])type.GetCustomAttributes(typeof(AliasAttribute), true);
             if (alias.Length != 0 && alias[0].Name != null)
             {
@@ -94,6 +90,10 @@ namespace Gurux.Service.Orm
             DataContractAttribute[] attr = (DataContractAttribute[])type.GetCustomAttributes(typeof(DataContractAttribute), true);
             if (attr.Length == 0 || attr[0].Name == null)
             {
+                if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
+                {
+                    return OriginalTableName(type.BaseType);
+                }
                 return type.Name;
             }
             return attr[0].Name;
@@ -108,12 +108,12 @@ namespace Gurux.Service.Orm
         {
             return type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0;
         }
-        
+
         internal static string GetTableName(Type type, bool addQuotation, char tableQuotation, string tablePrefix)
         {
             return GetTableName(type, addQuotation, tableQuotation, tablePrefix, true);
         }
-        
+
         internal static string GetTableName(Type type, bool addQuotation, char tableQuotation, string tablePrefix, bool allowSharedTables)
         {
             if (allowSharedTables && type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
@@ -134,7 +134,7 @@ namespace Gurux.Service.Orm
                 return tablePrefix + attr[0].Name;
             }
             return GXDbHelpers.AddQuotes(tablePrefix + attr[0].Name, tableQuotation);
-        }   
+        }
 
         /// <summary>
         /// Convert value to string that can be add to DB.
@@ -209,12 +209,20 @@ namespace Gurux.Service.Orm
                     {
                         tm = tm.ToUniversalTime();
                     }
-                    str = settings.ConvertToString(tm);                    
+                    str = settings.ConvertToString(tm);
                 }
             }
             else if (value is DateTimeOffset)
             {
-                str = settings.ConvertToString(((DateTimeOffset)value).ToUniversalTime());
+                DateTimeOffset dt = (DateTimeOffset)value;
+                if (settings.UniversalTime && dt != DateTime.MinValue && dt != DateTime.MaxValue)
+                {
+                    str = settings.ConvertToString(dt.ToUniversalTime());
+                }
+                else
+                {
+                    str = settings.ConvertToString(dt);
+                }
             }
             else if (value is System.Collections.IEnumerable)//If collection
             {
@@ -267,7 +275,7 @@ namespace Gurux.Service.Orm
                 else
                 {
                     GetUpdateQuery(table, settings, queries);
-                }                
+                }
             }
         }
 
@@ -368,7 +376,7 @@ namespace Gurux.Service.Orm
                 sb.Append(GXDbHelpers.AddQuotes(col, settings.ColumnQuotation));
             }
             sb.Append(") VALUES(");
-            int rowCnt = 1;   
+            int rowCnt = 1;
             foreach (var col in table.Value.Rows)
             {
                 if (firstRow)
@@ -447,7 +455,7 @@ namespace Gurux.Service.Orm
                         }
                         sb.Append(GXDbHelpers.AddQuotes(col2, settings.ColumnQuotation));
                     }
-                    sb.Append(") VALUES(");    
+                    sb.Append(") VALUES(");
                     firstRow = true;
                 }
             }
@@ -464,15 +472,15 @@ namespace Gurux.Service.Orm
         /// <param name="value">Value to insert or update.</param>
         /// <param name="columns">Columns to update or insert.</param>
         /// <param name="itemsList">List of items to update.</param>
-        internal static void GetValues(object value, object parent, LambdaExpression columns, List<KeyValuePair<Type, GXUpdateItem>> itemsList, 
+        internal static void GetValues(object value, object parent, LambdaExpression columns, List<KeyValuePair<Type, GXUpdateItem>> itemsList,
             bool insert, bool mapTable, char columnQuotation, bool updating)
         {
             bool inserted = false;
             object tmp;
-            GXSerializedItem si = null;            
+            GXSerializedItem si = null;
             if (value != null)
             {
-                Type type = value.GetType();                
+                Type type = value.GetType();
                 si = GXSqlBuilder.FindUnique(type);
                 object target;
                 GXUpdateItem u = null;
@@ -548,7 +556,7 @@ namespace Gurux.Service.Orm
                     {
                         itemsList.Add(new KeyValuePair<Type, GXUpdateItem>(type, u));
                         u.Rows.Add(row);
-                    }                    
+                    }
                 }
                 if (!insert && !inserted)
                 {
@@ -608,7 +616,7 @@ namespace Gurux.Service.Orm
                                         m.Columns.Add(GetColumnName(it.Value.Relation.RelationMapTable.Relation.PrimaryId.Target as PropertyInfo, '\0'));
                                         m.Columns.Add(GetColumnName(GXSqlBuilder.FindRelation(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, type).Target as PropertyInfo, '\0'));
                                         itemsList.Add(new KeyValuePair<Type, GXUpdateItem>((it.Value.Relation.RelationMapTable.Target as PropertyInfo).DeclaringType, m));
-                                        List<KeyValuePair<object, GXSerializedItem>> mr = new List<KeyValuePair<object, GXSerializedItem>>();                                        
+                                        List<KeyValuePair<object, GXSerializedItem>> mr = new List<KeyValuePair<object, GXSerializedItem>>();
                                         m.Rows.Add(mr);
                                         mr.Add(new KeyValuePair<object, GXSerializedItem>(r, it.Value.Relation.RelationMapTable.Relation.ForeignId));
                                         mr.Add(new KeyValuePair<object, GXSerializedItem>(value, r2));
@@ -628,8 +636,8 @@ namespace Gurux.Service.Orm
                 foreach (string it in u.Columns)
                 {
                     GXSerializedItem item = properties[it];
-                    if (item.Relation != null && item.Relation.ForeignTable != type && 
-                        item.Relation.RelationMapTable == null && 
+                    if (item.Relation != null && item.Relation.ForeignTable != type &&
+                        item.Relation.RelationMapTable == null &&
                         //If relation is to the class not Id.
                         !GXInternal.IsGenericDataType(item.Type))
                     {
@@ -647,7 +655,7 @@ namespace Gurux.Service.Orm
                             row.Add(new KeyValuePair<object, GXSerializedItem>(parent, item));
                         }
                         else if (item.Relation.RelationType == RelationType.OneToOne)
-                        {                           
+                        {
                             if (item.Get != null)
                             {
                                 target = item.Get(value);
@@ -710,7 +718,7 @@ namespace Gurux.Service.Orm
                         }
                         else if (item.Relation.RelationType == RelationType.Relation)
                         {
-                            row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));                            
+                            row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
                         }
                     }
                     else if (!inserted)
@@ -724,7 +732,7 @@ namespace Gurux.Service.Orm
         internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where)
         {
             return GetMembers(settings, expression, quoteSeparator, where, false);
-        }       
+        }
 
         internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where, bool getValue)
         {
@@ -760,11 +768,11 @@ namespace Gurux.Service.Orm
                     {
                         if (GXDbHelpers.IsAliasName(memberExpression.Expression.Type))
                         {
-                            return new string[] { GXDbHelpers.OriginalTableName(memberExpression.Expression.Type) + 
-                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };                        
+                            return new string[] { GXDbHelpers.OriginalTableName(memberExpression.Expression.Type) +
+                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };
                         }
-                        return new string[] { GXDbHelpers.GetTableName(memberExpression.Expression.Type, true, settings) + 
-                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };                        
+                        return new string[] { GXDbHelpers.GetTableName(memberExpression.Expression.Type, true, settings) +
+                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };
                     }
                     else
                     {
@@ -790,13 +798,11 @@ namespace Gurux.Service.Orm
                             value = Convert.ToInt64(value);
                         }
                     }
-                    return new string[] { ConvertToString(value, settings)};
-                    //return new string[] { Convert.ToString(value) };
+                    return new string[] { ConvertToString(value, settings) };
                 }
                 if (e.NodeType == ExpressionType.Call)
                 {
                     return new string[] { ConvertToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke(), settings) };
-                    //return new string[] { Convert.ToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke()) };
                 }
                 if (memberExpression.NodeType == ExpressionType.MemberAccess && e.NodeType == ExpressionType.Constant)
                 {
@@ -811,15 +817,20 @@ namespace Gurux.Service.Orm
                     }
                     else if (target is string || target is GXSelectArgs || !target.GetType().IsClass)//String is class.
                     {
+                        if (target is GXSelectArgs)
+                        {
+                            ((GXSelectArgs)target).Settings = settings;
+                        }
+                        string str = Convert.ToString(target);
                         if (where && getValue && target is string)
                         {
-                            return new string[] { "'" + Convert.ToString(target) + "'"};
+                            return new string[] { "'" + str + "'" };
                         }
                         if (where && getValue && target is Guid)
                         {
-                            return new string[] { "'" + Convert.ToString(target).Replace("-", "") + "'" };
+                            return new string[] { "'" + str.Replace("-", "") + "'" };
                         }
-                        return new string[] { Convert.ToString(target) };
+                        return new string[] { str };
                     }
                     else
                     {
@@ -977,7 +988,7 @@ namespace Gurux.Service.Orm
                 object value = Expression.Lambda(methodCallExpression).Compile().DynamicInvoke();
                 if (where && getValue && value is string)
                 {
-                    return new string[] { AddQuotes((string)value, '\'')};
+                    return new string[] { AddQuotes((string)value, '\'') };
                 }
                 else if (where && getValue && value is Guid)
                 {
@@ -1005,34 +1016,48 @@ namespace Gurux.Service.Orm
                             }
                             if (value == null || value == AddQuotes("*", quoteSeparator))
                             {
-                                return new string[] { "COUNT(*)" };
+                                return new string[] { "COUNT(1)" };
                             }
                             return new string[] { "COUNT(" + value + ")" };
                         }
                         if (m.Method.Name == "In")
-                        {                            
-                            return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + " IN (" + 
-                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};                            
-                        }                        
+                        {
+                            return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + " IN (" +
+                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};
+                        }
+                        if (m.Method.Name == "Exists")
+                        {
+                            if (m.Arguments.Count == 3)
+                            {
+                                return new string[] { "(EXISTS (" +
+                                 GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " AND " +
+                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false)[0] + " = " +
+                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))" };
+                            }
+                            else
+                            {
+                                throw new ArgumentOutOfRangeException("Exist failed.");
+                            }
+                        }
                     }
                     if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
                     {
-                        return new string[] {"(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where)[0] + " IN (" + 
+                        return new string[] {"(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where)[0] + " IN (" +
                             GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0] + "))"};
                     }
                     if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "StartsWith")
                     {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" + 
+                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
                             GetMembers(settings, m.Arguments[0], '\0', where)[0] + "%'))"};
                     }
                     if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "EndsWith")
                     {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" + 
+                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" +
                             GetMembers(settings, m.Arguments[0], '\0', where)[0] + "'))"};
                     }
                     if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "Contains")
                     {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" + 
+                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" +
                             GetMembers(settings, m.Arguments[0], '\0', where)[0] + "%'))"};
                     }
                     if (m.Method.Name == "Equals")
@@ -1041,7 +1066,7 @@ namespace Gurux.Service.Orm
                         {
                             if (settings.Type == DatabaseType.Access)
                             {
-                                return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" + 
+                                return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
                                 GetMembers(settings, m.Arguments[0], '\0', where, true)[0] + "'))"};
                             }
                             string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper();
@@ -1049,12 +1074,12 @@ namespace Gurux.Service.Orm
                             {
                                 tmp = "'" + tmp + "'";
                             }
-                            return new string[] {"(UPPER(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + ") LIKE(" + 
+                            return new string[] {"(UPPER(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + ") LIKE(" +
                                  tmp + "))"};
                         }
                         else
                         {
-                            return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + "=" + 
+                            return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + "=" +
                             GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper() + ")"};
                         }
                     }
@@ -1078,8 +1103,7 @@ namespace Gurux.Service.Orm
                             return new string[] { "((" + tmp + " IS NULL OR " + tmp + " = ''))" };
                         }
                     }
-
-                    throw new ArgumentOutOfRangeException("Unknown SQL command.");
+                    throw new ArgumentOutOfRangeException("Unknown SQL command: " + m.Method.Name + ".");
                 }
                 return GetMembers(settings, unaryExpression.Operand, quoteSeparator, where);
             }
@@ -1227,6 +1251,10 @@ namespace Gurux.Service.Orm
                     {
                         throw new ArgumentException("Argument is null.");
                     }
+                }
+                else if (newExpression.Right.NodeType == ExpressionType.Constant && newExpression.Right.Type == typeof(string))
+                {
+                    tmp = "'" + tmp + "'";
                 }
                 list.Add("(" + GetMembers(settings, newExpression.Left, quoteSeparator, where)[0] + op + tmp + ")");
                 return list.ToArray();

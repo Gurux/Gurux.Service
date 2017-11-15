@@ -1,4 +1,5 @@
 ﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,11 +36,7 @@ namespace Gurux.Service.Orm
     public enum DatabaseType
     {
         /// <summary>
-        /// Generic database settings are used.
-        /// </summary>
-        None,
-        /// <summary>
-        /// Target database is MySQL.
+        /// Target database is MySQL or Maria DB.
         /// </summary>
         MySQL,
         /// <summary>

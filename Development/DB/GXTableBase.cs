@@ -35,17 +35,17 @@ namespace Gurux.Service.Orm
     /// <summary>
     /// This class is used add external functionality to the table object.
     /// </summary>
-    public abstract class GXItem
+    public abstract class GXTableBase
     {
         /// <summary>
         /// This method is called before Item is added to database.
         /// </summary>
-        public virtual void BeforeAdd(){}
-        
+        public virtual void BeforeAdd() { }
+
         /// <summary>
         /// This method is called after Item is added to database.
         /// </summary>
-        public virtual void AfterAdd(){}
+        public virtual void AfterAdd() { }
 
         /// <summary>
         /// This method is called before Item is updated to database.

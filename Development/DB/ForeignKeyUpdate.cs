@@ -55,7 +55,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Updates are not allowed.
         /// </summary>
-        NoAction,
+        Restrict,
         /// <summary>
         /// Resets the values in the rows in the child table to NULL.
         /// </summary>

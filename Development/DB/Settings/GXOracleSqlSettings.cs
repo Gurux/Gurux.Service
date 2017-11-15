@@ -49,6 +49,86 @@ namespace Gurux.Service.Orm.Settings
 
         }
 
+        /// <inheritdoc cref="GXDBSettings.GetColumnConstraints"/>
+        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnConstraintsQuery"/>
+        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.IsNullable"/>
+        public override bool IsNullable(object value)
+        {
+            throw new System.NotImplementedException();
+        }
+
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnNullableQuery"/>
+        public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnIndexQuery"/>
+        public override string GetColumnIndexQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.IsPrimaryKey"/>
+        public override bool IsPrimaryKey(object value)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.IsAutoIncrement"/>
+        public override bool IsAutoIncrement(object value)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetAutoIncrementQuery"/>
+        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetReferenceTablesQuery"/>
+        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetPrimaryKeyQuery"/>
+        public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnTypeQuery"/>
+        public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnTypeQuery"/>
+        public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        /// <inheritdoc cref="GXDBSettings.GetColumnsQuery"/>
+        public override string GetColumnsQuery(string schema, string name, out int index)
+        {
+            index = 0;
+            return string.Format("SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{0}'", name);
+        }
+
         /// <inheritdoc cref="GXDBSettings.ColumnQuotation"/>
         override public char ColumnQuotation
         {
@@ -171,7 +251,7 @@ namespace Gurux.Service.Orm.Settings
                 return "NVARCHAR2(2000)";
             }
             return "NVARCHAR2(" + maxLength.ToString() + ")";
-            
+
         }
 
         /// <inheritdoc cref="GXDBSettings.CharColumnDefinition"/>
@@ -356,7 +436,7 @@ namespace Gurux.Service.Orm.Settings
             string name = tableName + "_" + columnName;
             if (name.Length > 30)
             {
-                return name.GetHashCode().ToString().ToUpper();                
+                return name.GetHashCode().ToString().ToUpper();
             }
             return name.ToUpper();
         }
@@ -414,12 +494,12 @@ namespace Gurux.Service.Orm.Settings
             {
                 string trigger = GetTriggerName(tableName, columnName);
                 tableName = GXDbHelpers.AddQuotes(tableName, this.TableQuotation);
-                columnName = GXDbHelpers.AddQuotes(columnName, this.ColumnQuotation);                
+                columnName = GXDbHelpers.AddQuotes(columnName, this.ColumnQuotation);
                 //Create sequence.
-                return new string[]{"DECLARE\n C NUMBER;\nBEGIN\nSELECT COUNT(*) INTO C FROM USER_SEQUENCES WHERE SEQUENCE_NAME = '" + trigger + "';\n" + 
+                return new string[]{"DECLARE\n C NUMBER;\nBEGIN\nSELECT COUNT(*) INTO C FROM USER_SEQUENCES WHERE SEQUENCE_NAME = '" + trigger + "';\n" +
                     "IF (C = 0) THEN\n EXECUTE IMMEDIATE 'CREATE SEQUENCE " + trigger + "';\nEND IF;END;",
                 //Create or replace trigger.
-                "CREATE OR REPLACE TRIGGER " + trigger + " BEFORE INSERT ON " + tableName +" FOR EACH ROW\n" + 
+                "CREATE OR REPLACE TRIGGER " + trigger + " BEFORE INSERT ON " + tableName +" FOR EACH ROW\n" +
                 "BEGIN\n SELECT " + trigger + ".NEXTVAL\n INTO\n :new." + columnName + "\n \nFROM dual;\nEND;"
             };
             }
@@ -437,7 +517,7 @@ namespace Gurux.Service.Orm.Settings
         {
             if (GetVersion() < 12)
             {
-                return new string[] {"DROP SEQUENCE " + GetSequenceName(tableName, columnName)};
+                return new string[] { "DROP SEQUENCE " + GetSequenceName(tableName, columnName) };
             }
             return null;
         }

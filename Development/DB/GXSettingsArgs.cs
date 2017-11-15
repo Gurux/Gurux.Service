@@ -38,13 +38,11 @@ namespace Gurux.Service.Orm
     class GXSettingsArgs
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        GXDBSettings m_Settings;
+        GXDBSettings settings;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         int m_Index, m_Count;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal bool m_Updated, m_Distinct, m_Descending;
-
-        bool m_Relations;
 
         internal bool Updated
         {
@@ -58,41 +56,26 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal bool Relations
-        {
-            get
-            {
-                return m_Relations;
-            }
-            set
-            {
-                Updated = true;
-                m_Relations = value;
-            }
-        }
-        
-
         /// <summary>
         /// Constructor.
         /// </summary>
         public GXSettingsArgs()
         {
             //MySql settings are default settings because of MariaDB (https://mariadb.org/).
-            m_Settings = new GXMySqlSettings();
+            settings = new GXMySqlSettings();
             Updated = true;
-            m_Relations = true;
         }
 
         internal GXDBSettings Settings
         {
             get
             {
-                return m_Settings;
+                return settings;
             }
             set
             {
                 Updated = true;
-                m_Settings = value;
+                settings = value;
             }
         }
 
@@ -171,6 +154,6 @@ namespace Gurux.Service.Orm
                 Updated = true;
                 m_Descending = value;
             }
-        }   
+        }
     }
 }
