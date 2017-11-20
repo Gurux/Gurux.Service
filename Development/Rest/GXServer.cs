@@ -220,6 +220,10 @@ namespace Gurux.Service.Rest
             {
                 ProcessRequest(server, context, user);
             }
+            catch ( HttpListenerException ex)
+            {
+                //Client has close connection. This is ok.
+            }
             catch (Exception ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
