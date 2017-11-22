@@ -34,8 +34,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Gurux.Common, Version=8.1.1711.2001, Culture=neutral, PublicKeyToken=null">
-      <HintPath>packages\Gurux.Common.8.1.1711.2001\lib\portable-win+net40\Gurux.Common.dll</HintPath>
+    <Reference Include="Gurux.Common, Version=8.1.1711.2201, Culture=neutral, PublicKeyToken=null">
+      <HintPath>packages\Gurux.Common.8.1.1711.2201\lib\portable-win+net40\Gurux.Common.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="Microsoft.VisualStudio.QualityTools.UnitTestFramework, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL" />
