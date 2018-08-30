@@ -79,7 +79,7 @@ namespace Gurux.Service.Rest
                                     {
                                         if (it.IsGenericType && it.GetGenericTypeDefinition() == typeof(IGXRequest<>))
                                         {
-                                            GXRestMethodInfo r = messageMap[tp.Name] as GXRestMethodInfo;
+                                            GXRestMethodInfo r = messageMap[tp.Name.ToLower()] as GXRestMethodInfo;
                                             if (r == null)
                                             {
                                                 r = new GXRestMethodInfo();

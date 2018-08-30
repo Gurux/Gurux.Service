@@ -65,7 +65,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class IndexTestClass : IUnique<int>
     {
-        [DataMember(Name="ID"), Index]
+        [DataMember(Name="ID"), Service.Orm.Index]
         public int Id
         {
             get;
@@ -76,7 +76,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class UniqueIndexTestClass : IUnique<int>
     {
-        [DataMember, Index(Unique=true)]
+        [DataMember, Service.Orm.Index(Unique=true)]
         public int Id
         {
             get;
