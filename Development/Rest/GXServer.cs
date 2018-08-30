@@ -305,16 +305,16 @@ namespace Gurux.Service.Rest
                 }
                 writer.Write("<h1>Available REST operations:");
                 writer.WriteLine("</h1>");
-                if (server.RestMap.Count == 0)
+                if (server.MessageMap.Count == 0)
                 {
-                    GXGeneral.UpdateRestMessageTypes(server.RestMap);
-                    if (server.RestMap.Count == 0)
+                    GXGeneral.UpdateRestMessageTypes(server.MessageMap);
+                    if (server.MessageMap.Count == 0)
                     {
                         writer.WriteLine("No REST operations available.");
                     }
                 }
                 DescriptionAttribute[] att;
-                foreach (GXRestMethodInfo it in server.RestMap.Values)
+                foreach (GXRestMethodInfo it in server.MessageMap.Values)
                 {
                     writer.Write("<div class=\"tooltip\">" + it.RequestType.Name);
                     writer.Write("<span class=\"tooltiptext\">");
