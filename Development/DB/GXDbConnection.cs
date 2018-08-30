@@ -50,6 +50,7 @@ using Gurux.Service.Orm.Settings;
 using System.IO;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Data.SqlClient;
 
 namespace Gurux.Service.Orm
 {
@@ -1692,6 +1693,39 @@ namespace Gurux.Service.Orm
             throw new Exception("There are multiple items with same ID when id should be unique.");
         }
 
+        /// <summary>
+        /// Select item by Id.
+        /// </summary>
+        /// <param name="id">Item's ID.</param>
+        public T SelectById<T>(UInt64 id)
+        {
+            return SelectById<T>(id, null);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public T SelectById<T>(UInt64 id, Expression<Func<T, object>> columns)
+        {
+            GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
+            args.Settings = this.Builder.Settings;
+            DateTime tm = DateTime.Now;
+            List<T> list = Select<T>(args);
+            args.ExecutionTime = (DateTime.Now - tm).Milliseconds;
+            if (list.Count == 0)
+            {
+                return default(T);
+            }
+            if (list.Count == 1)
+            {
+                return list[0];
+            }
+            throw new Exception("There are multiple items with same ID when id should be unique.");
+        }
+
         public List<T> SelectAll<T>()
         {
             return Select<T>((GXSelectArgs)null);
@@ -2402,208 +2436,215 @@ namespace Gurux.Service.Orm
                 {
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
-                    using (IDataReader reader = com.ExecuteReader())
+                    try
                     {
-                        while (reader.Read())
+                        using (IDataReader reader = com.ExecuteReader())
                         {
-                            UpdatedColumns.Clear();
-                            if (values == null)
+                            while (reader.Read())
                             {
-                                values = new object[reader.FieldCount];
-                            }
-                            reader.GetValues(values);
-                            if (columns != null && columns.Count == 0)
-                            {
-                                InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                            }
-
-                            targetTable = null;
-                            if (list != null)
-                            {
-                                //If we want to read only basic data types example count(*)
-                                if (GXInternal.IsGenericDataType(type))
+                                UpdatedColumns.Clear();
+                                if (values == null)
                                 {
-                                    list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type, Builder.Settings.UniversalTime));
-                                    return list;
+                                    values = new object[reader.FieldCount];
                                 }
-                                properties = GXSqlBuilder.GetProperties<T>();
-                            }
-                            if (objectList != null)
-                            {
-                                objectList.Add(values);
-                            }
-                            else if (baseList != null)
-                            {
-                                baseList.Add((T)Convert.ChangeType(values[0], type));
-                            }
-                            else
-                            {
-                                item = null;
-                                //If we are reading values from multiple tables each component is created only once.
-                                bool isCreated = false;
-                                //For Oracle reader.FieldCount is too high. For this reason columns.Count is used.
-                                for (int pos = 0; pos != Math.Min(reader.FieldCount, columns.Count); ++pos)
+                                reader.GetValues(values);
+                                if (columns != null && columns.Count == 0)
                                 {
-                                    value = null;
-                                    //If we are asking some data from the DB that is not exist on class.
-                                    //This is removed from the interface etc...
-                                    if (!columns.ContainsKey(pos))
+                                    InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
+                                }
+
+                                targetTable = null;
+                                if (list != null)
+                                {
+                                    //If we want to read only basic data types example count(*)
+                                    if (GXInternal.IsGenericDataType(type))
                                     {
-                                        continue;
+                                        list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type, Builder.Settings.UniversalTime));
+                                        return list;
                                     }
-                                    GXColumnHelper col = columns[pos];
-                                    //If we are reading multiple objects and object has changed.
-                                    if (string.Compare(col.Table, targetTable, true) != 0)
+                                    properties = GXSqlBuilder.GetProperties<T>();
+                                }
+                                if (objectList != null)
+                                {
+                                    objectList.Add(values);
+                                }
+                                else if (baseList != null)
+                                {
+                                    baseList.Add((T)Convert.ChangeType(values[0], type));
+                                }
+                                else
+                                {
+                                    item = null;
+                                    //If we are reading values from multiple tables each component is created only once.
+                                    bool isCreated = false;
+                                    //For Oracle reader.FieldCount is too high. For this reason columns.Count is used.
+                                    for (int pos = 0; pos != Math.Min(reader.FieldCount, columns.Count); ++pos)
                                     {
-                                        isCreated = false;
-                                        if (TableIndexes != null && TableIndexes.ContainsKey(col.TableType))
+                                        value = null;
+                                        //If we are asking some data from the DB that is not exist on class.
+                                        //This is removed from the interface etc...
+                                        if (!columns.ContainsKey(pos))
                                         {
-                                            id = values[TableIndexes[col.TableType]];
-                                            if (id == null || id is DBNull)
+                                            continue;
+                                        }
+                                        GXColumnHelper col = columns[pos];
+                                        //If we are reading multiple objects and object has changed.
+                                        if (string.Compare(col.Table, targetTable, true) != 0)
+                                        {
+                                            isCreated = false;
+                                            if (TableIndexes != null && TableIndexes.ContainsKey(col.TableType))
                                             {
-                                                isCreated = true;
-                                            }
-                                            else
-                                            {
-                                                if (objects.ContainsKey(col.TableType))
+                                                id = values[TableIndexes[col.TableType]];
+                                                if (id == null || id is DBNull)
                                                 {
-                                                    // Check is item already created.                                            
-                                                    if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime)))
-                                                    {
-                                                        isCreated = true;
-                                                    }
+                                                    isCreated = true;
                                                 }
                                                 else
                                                 {
-                                                    objects.Add(col.TableType, new SortedDictionary<object, object>());
+                                                    if (objects.ContainsKey(col.TableType))
+                                                    {
+                                                        // Check is item already created.                                            
+                                                        if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime)))
+                                                        {
+                                                            isCreated = true;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        objects.Add(col.TableType, new SortedDictionary<object, object>());
+                                                    }
                                                 }
                                             }
-                                        }
-                                        else //If Map table.
-                                        {
-                                            id = null;
+                                            else //If Map table.
+                                            {
+                                                id = null;
+                                            }
+                                            if (!isCreated)
+                                            {
+                                                if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
+                                                {
+                                                    item = GXJsonParser.CreateInstance(col.TableType);
+                                                    if (item != null && item.GetType() == typeof(T))
+                                                    {
+                                                        list.Add((T)item);
+                                                    }
+                                                    //If we are adding map table.
+                                                    if (mapTables != null && item != null && id == null && mapTables.ContainsKey(item.GetType()))
+                                                    {
+                                                        mapTables[item.GetType()].Add(item);
+                                                    }
+                                                }
+                                                if (objects != null && id != null)
+                                                {
+                                                    //Id is not save directly because class might change it's type example from uint to int.
+                                                    if (GXInternal.IsGenericDataType(col.Setter.Type))
+                                                    {
+                                                        objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime), item);
+                                                    }
+                                                    else //If we are saving table.
+                                                    {
+                                                        objects[col.TableType].Add(id, item);
+                                                    }
+                                                }
+                                            }
+                                            targetTable = col.Table;
                                         }
                                         if (!isCreated)
                                         {
-                                            if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
+                                            //If 1:1 relation.
+                                            if (objects != null && !GXInternal.IsGenericDataType(col.Setter.Type) &&
+                                                !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) &&
+                                                col.Setter.Type.IsClass && col.Setter.Type != typeof(byte[]))
                                             {
-                                                item = GXJsonParser.CreateInstance(col.TableType);
-                                                if (item != null && item.GetType() == typeof(T))
+                                                Type pt = GXInternal.GetPropertyType(col.Setter.Type);
+                                                if (GXInternal.IsGenericDataType(pt))
                                                 {
-                                                    list.Add((T)item);
-                                                }
-                                                //If we are adding map table.
-                                                if (mapTables != null && item != null && id == null && mapTables.ContainsKey(item.GetType()))
-                                                {
-                                                    mapTables[item.GetType()].Add(item);
-                                                }
-                                            }
-                                            if (objects != null && id != null)
-                                            {
-                                                //Id is not save directly because class might change it's type example from uint to int.
-                                                if (GXInternal.IsGenericDataType(col.Setter.Type))
-                                                {
-                                                    objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime), item);
-                                                }
-                                                else //If we are saving table.
-                                                {
-                                                    objects[col.TableType].Add(id, item);
-                                                }
-                                            }
-                                        }
-                                        targetTable = col.Table;
-                                    }
-                                    if (!isCreated)
-                                    {
-                                        //If 1:1 relation.
-                                        if (objects != null && !GXInternal.IsGenericDataType(col.Setter.Type) &&
-                                            !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) &&
-                                            col.Setter.Type.IsClass && col.Setter.Type != typeof(byte[]))
-                                        {
-                                            Type pt = GXInternal.GetPropertyType(col.Setter.Type);
-                                            if (GXInternal.IsGenericDataType(pt))
-                                            {
-                                                if (!string.IsNullOrEmpty(values[pos].ToString()))
-                                                {
-                                                    string[] tmp = values[pos].ToString().Split(new char[] { ';' });
-                                                    Array items = Array.CreateInstance(pt, tmp.Length);
-                                                    int pos2 = -1;
-                                                    foreach (string it in tmp)
+                                                    if (!string.IsNullOrEmpty(values[pos].ToString()))
                                                     {
-                                                        items.SetValue(GXInternal.ChangeType(it, pt, Builder.Settings.UniversalTime), ++pos2);
+                                                        string[] tmp = values[pos].ToString().Split(new char[] { ';' });
+                                                        Array items = Array.CreateInstance(pt, tmp.Length);
+                                                        int pos2 = -1;
+                                                        foreach (string it in tmp)
+                                                        {
+                                                            items.SetValue(GXInternal.ChangeType(it, pt, Builder.Settings.UniversalTime), ++pos2);
+                                                        }
+                                                        value = items;
                                                     }
-                                                    value = items;
+                                                    else
+                                                    {
+                                                        value = Array.CreateInstance(pt, 0);
+                                                    }
                                                 }
                                                 else
                                                 {
-                                                    value = Array.CreateInstance(pt, 0);
+                                                    //Columns relations are updated when all data from the row is read.
+                                                    UpdatedColumns.Add(new KeyValuePair<int, object>(pos, item));
+                                                }
+                                            }
+                                            else if (col.Setter != null)
+                                            {
+                                                //Get value if not class.
+                                                if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
+                                                {
+                                                    value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
+                                                }
+                                                else //Parameter type is class. Set to null.
+                                                {
+                                                    value = null;
                                                 }
                                             }
                                             else
                                             {
-                                                //Columns relations are updated when all data from the row is read.
-                                                UpdatedColumns.Add(new KeyValuePair<int, object>(pos, item));
+                                                value = values[pos];
                                             }
-                                        }
-                                        else if (col.Setter != null)
-                                        {
-                                            //Get value if not class.
-                                            if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
+                                            if (value != null)
                                             {
-                                                value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
-                                            }
-                                            else //Parameter type is class. Set to null.
-                                            {
-                                                value = null;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            value = values[pos];
-                                        }
-                                        if (value != null)
-                                        {
-                                            //Access minimum date time is 98, 11, 26.
-                                            if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
-                                                ((DateTime)value).Date <= new DateTime(100, 1, 1))
-                                            {
-                                                value = DateTime.MinValue;
-                                            }
-                                            if (col.Setter.Set != null)
-                                            {
-                                                col.Setter.Set(item, value);
-                                            }
-                                            else
-                                            {
-                                                PropertyInfo pi = col.Setter.Target as PropertyInfo;
-                                                if (pi != null)
+                                                //Access minimum date time is 98, 11, 26.
+                                                if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
+                                                    ((DateTime)value).Date <= new DateTime(100, 1, 1))
                                                 {
-                                                    pi.SetValue(item, value, null);
+                                                    value = DateTime.MinValue;
+                                                }
+                                                if (col.Setter.Set != null)
+                                                {
+                                                    col.Setter.Set(item, value);
                                                 }
                                                 else
                                                 {
-                                                    FieldInfo fi = col.Setter.Target as FieldInfo;
-                                                    fi.SetValue(item, value);
+                                                    PropertyInfo pi = col.Setter.Target as PropertyInfo;
+                                                    if (pi != null)
+                                                    {
+                                                        pi.SetValue(item, value, null);
+                                                    }
+                                                    else
+                                                    {
+                                                        FieldInfo fi = col.Setter.Target as FieldInfo;
+                                                        fi.SetValue(item, value);
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-                            //Update columns that was not read yet.
-                            foreach (var it in UpdatedColumns)
-                            {
-                                GXColumnHelper col = columns[it.Key];
-                                object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type, Builder.Settings.UniversalTime);
-                                if (objects.ContainsKey(col.Setter.Type) && objects[col.Setter.Type].ContainsKey(relationId))
+                                //Update columns that was not read yet.
+                                foreach (var it in UpdatedColumns)
                                 {
-                                    object relationData = objects[col.Setter.Type][relationId];
-                                    col.Setter.Set(it.Value, relationData);
+                                    GXColumnHelper col = columns[it.Key];
+                                    object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type, Builder.Settings.UniversalTime);
+                                    if (objects.ContainsKey(col.Setter.Type) && objects[col.Setter.Type].ContainsKey(relationId))
+                                    {
+                                        object relationData = objects[col.Setter.Type][relationId];
+                                        col.Setter.Set(it.Value, relationData);
+                                    }
                                 }
+                                UpdatedColumns.Clear();
                             }
-                            UpdatedColumns.Clear();
+                            reader.Close();
                         }
-                        reader.Close();
+                    }
+                    catch (SqlException ex)
+                    {
+                        throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
                     }
                 }
                 if (list != null)

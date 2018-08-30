@@ -143,6 +143,10 @@ namespace Gurux.Service.Orm
 
         public static GXDeleteArgs Delete<T>(T item)
         {
+            if (item == null)
+            {
+                throw new ArgumentNullException("Removed item can't be null.");
+            }
             if (item is IEnumerable)
             {
                 GXDeleteArgs arg = Delete(GXInternal.GetPropertyType(typeof(T)));

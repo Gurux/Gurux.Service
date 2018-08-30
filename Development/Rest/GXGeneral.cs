@@ -69,6 +69,12 @@ namespace Gurux.Service.Rest
                                     (method.Name == "Post" || method.Name == "Get" || method.Name == "Put" || method.Name == "Delete"))
                                 {
                                     tp = parameters[0].ParameterType;
+                                    string name = tp.Name.ToLower();
+                                    RouteAttribute[] ra= (RouteAttribute[]) tp.GetCustomAttributes(typeof(RouteAttribute), true);
+                                    if (ra.Length == 1)
+                                    {
+                                        name = ra[0].Path.ToLower();
+                                    }
                                     foreach (var it in tp.GetInterfaces())
                                     {
                                         if (it.IsGenericType && it.GetGenericTypeDefinition() == typeof(IGXRequest<>))
@@ -90,14 +96,14 @@ namespace Gurux.Service.Rest
                                                     r.PutAuthentication = auths[0];
                                                     r.DeleteAuthentication = auths[0];
                                                 }
-                                                messageMap.Add(tp.Name, r);
+                                                messageMap.Add(name, r);
                                             }
                                             auths = (AuthenticateAttribute[])method.GetCustomAttributes(typeof(AuthenticateAttribute), true);
                                             if (method.Name == "Post")
                                             {
                                                 if (r.Post != null)
                                                 {
-                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", tp.Name));
+                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", name));
                                                 }
                                                 r.Post = GXInternal.CreateMethodHandler(tp, method);
                                                 //If method uses authentication.
@@ -117,7 +123,7 @@ namespace Gurux.Service.Rest
                                             {
                                                 if (r.Get != null)
                                                 {
-                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", tp.Name));
+                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", name));
                                                 }
                                                 r.Get = GXInternal.CreateMethodHandler(tp, method);
                                                 //If method uses authentication.
@@ -137,7 +143,7 @@ namespace Gurux.Service.Rest
                                             {
                                                 if (r.Put != null)
                                                 {
-                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", tp.Name));
+                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", name));
                                                 }
                                                 r.Put = GXInternal.CreateMethodHandler(tp, method);
                                                 //If method uses authentication.
@@ -157,7 +163,7 @@ namespace Gurux.Service.Rest
                                             {
                                                 if (r.Delete != null)
                                                 {
-                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", tp.Name));
+                                                    throw new Exception(string.Format("Message handler for '{0}' already added.", name));
                                                 }
                                                 r.Delete = GXInternal.CreateMethodHandler(tp, method);
                                                 //If method uses authentication.
@@ -204,7 +210,7 @@ namespace Gurux.Service.Rest
             {
                 method = data.Substring(pos + 1);
             }
-            GXRestMethodInfo r = messageMap[method] as GXRestMethodInfo;
+            GXRestMethodInfo r = messageMap[method.ToLower()] as GXRestMethodInfo;
             if (r != null)
             {
                 return r;

@@ -798,6 +798,29 @@ namespace Gurux.Service.Orm
                             value = Convert.ToInt64(value);
                         }
                     }
+                    else if (value is IEnumerable)
+                    {
+                        StringBuilder sb = new StringBuilder();
+                        bool first = true;
+                        bool stringValue = true;
+                        foreach(object it in value as IEnumerable)
+                        {
+                            if (first)
+                            {
+                                stringValue = it is string;
+                                first = false;
+                            }
+                            else
+                            {
+                                sb.Append(", ");
+                            }
+                            sb.Append(Convert.ToString(it));
+                        }
+                        if (!stringValue)
+                        {
+                            return new string[] { sb.ToString() };
+                        }
+                    }
                     return new string[] { ConvertToString(value, settings) };
                 }
                 if (e.NodeType == ExpressionType.Call)

@@ -94,6 +94,7 @@
     <Compile Include="Internal\Internal.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rest\GXWebServiceModule.cs" />
+    <Compile Include="Rest\RouteAttribute.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

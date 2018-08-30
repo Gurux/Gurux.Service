@@ -134,7 +134,7 @@ namespace Gurux.Service.Rest
                 return false;
             }
             string method;
-            GXRestMethodInfo mi = GXGeneral.GetTypes(messageMap, path, out method);
+            GXRestMethodInfo mi = GXGeneral.GetTypes(messageMap, path.ToLower(), out method);
             if (mi == null)
             {
                 return false;

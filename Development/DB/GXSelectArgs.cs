@@ -175,6 +175,11 @@ namespace Gurux.Service.Orm
             return Select<T>(null, null);
         }
 
+        public static GXSelectArgs SelectAll<T>(Expression<Func<T, object>> where)
+        {
+            return Select<T>(null, where);
+        }
+
         public static GXSelectArgs Select<T>(Expression<Func<T, object>> columns)
         {
             GXSelectArgs arg = new GXSelectArgs();
@@ -204,7 +209,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="id">Item's ID.</param>
-        public static GXSelectArgs SelectById<T>(ulong id)
+        public static GXSelectArgs SelectById<T>(UInt64 id)
         {
             return SelectByIdInternal<T, ulong>(id, q => "*");
         }
@@ -228,6 +233,17 @@ namespace Gurux.Service.Orm
         public static GXSelectArgs SelectById<T>(long id, Expression<Func<T, object>> columns)
         {
             return SelectByIdInternal<T, long>(id, columns);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>> columns)
+        {
+            return SelectByIdInternal<T, UInt64>(id, columns);
         }
 
         public static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)

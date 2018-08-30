@@ -157,7 +157,7 @@ namespace Gurux.Service.Orm
         {
             if (value == null)
             {
-                throw new ArgumentNullException("Invalid value");
+                throw new ArgumentNullException("Inserted item can't be null.");
             }
             if (value is IEnumerable)
             {
@@ -176,6 +176,10 @@ namespace Gurux.Service.Orm
 
         public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection, Expression<Func<T, object>> columns)
         {
+            if (collection == null)
+            {
+                throw new ArgumentNullException("Inserted item can't be null.");
+            }
             GXInsertArgs args = new GXInsertArgs();
             args.Parent.Updated = true;
             foreach (var it in collection)

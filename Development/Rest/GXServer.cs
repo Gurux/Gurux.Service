@@ -37,11 +37,13 @@ using System.IO;
 using Gurux.Common.JSon;
 using System.Web;
 using System.Security.Principal;
-using System.Data.Common;
 using System.Text;
 using System.Collections;
 using Gurux.Service.Orm;
 using Gurux.Common.Internal;
+using System.ComponentModel;
+using System.Reflection;
+using System.Web.UI;
 
 namespace Gurux.Service.Rest
 {
@@ -74,6 +76,9 @@ namespace Gurux.Service.Rest
             private set;
         }
 
+        private CreateObjectEventhandler createObject;
+        private ErrorEventHandler onError;
+
         private HttpListener Listener;
 
         /// <summary>
@@ -85,17 +90,31 @@ namespace Gurux.Service.Rest
 
         }
 
-        private CreateObjectEventhandler m_CreateObject;
 
         public event CreateObjectEventhandler OnCreateObject
         {
             add
             {
-                m_CreateObject += value;
+                createObject += value;
             }
             remove
             {
-                m_CreateObject -= value;
+                createObject -= value;
+            }
+        }
+
+        /// <summary>
+        /// Listen received errors.
+        /// </summary>
+        public event ErrorEventHandler OnError
+        {
+            add
+            {
+                onError += value;
+            }
+            remove
+            {
+                onError -= value;
             }
         }
 
@@ -129,9 +148,9 @@ namespace Gurux.Service.Rest
 
         private void ParserOnCreateObject(object sender, GXCreateObjectEventArgs e)
         {
-            if (m_CreateObject != null)
+            if (createObject != null)
             {
-                m_CreateObject(sender, e);
+                createObject(sender, e);
             }
         }
         /// <summary>
@@ -155,47 +174,75 @@ namespace Gurux.Service.Rest
                     //If server is not closed.
                     if (listener.IsListening)
                     {
+                        bool html = false;
                         try
                         {
                             c = listener.EndGetContext(ListenerCallback);
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
+                            if (onError != null)
+                            {
+                                onError(this, new ErrorEventArgs(ex));
+                            }
                             h.Set();
                             return;
                         }
-                        GXWebServiceModule.TryAuthenticate(tmp.MessageMap, c.Request, out username, out password);
-                        //Anonymous access is allowed.
-                        if (username == null && password == null)
+                        if (c.Request.HttpMethod == "GET" && c.Request.AcceptTypes != null)
                         {
-                            accept = true;
-                            user = null;
-                        }
-                        else
-                        {
-                            user = TryAuthenticate(username, password);
-                            accept = user != null;
-                        }
-
-                        if (accept)
-                        {
-                            Thread thread = new Thread(new ParameterizedThreadStart(Process));
-                            thread.Start(new object[] { tmp, c, user });
-                        }
-                        else
-                        {
-                            c.Response.StatusCode = 401;
-                            c.Response.StatusDescription = "Access Denied";
-                            c.Response.AddHeader("WWW-Authenticate", "Basic Realm");
-                            GXErrorWrapper err = new GXErrorWrapper(new HttpException(401, "Access Denied"));
-                            using (TextWriter writer = new StreamWriter(c.Response.OutputStream, Encoding.ASCII))
+                            foreach (var it in c.Request.AcceptTypes)
                             {
-                                GXJsonParser parser = new GXJsonParser();
-                                string data = parser.Serialize(err);
-                                c.Response.ContentLength64 = data.Length;
-                                writer.Write(data);
+                                if (it == "text/html")
+                                {
+                                    Thread thread = new Thread(new ParameterizedThreadStart(ShowServices));
+                                    thread.Start(new object[] { tmp, c });
+                                    html = true;
+                                    accept = true;
+                                    break;
+                                }
+                                if (it.Contains("image"))
+                                {
+                                    html = true;
+                                    accept = true;
+                                    break;
+                                }
                             }
-                            c.Response.Close();
+                        }
+                        if (!html)
+                        {
+                            GXWebServiceModule.TryAuthenticate(tmp.MessageMap, c.Request, out username, out password);
+                            //Anonymous access is allowed.
+                            if (username == null && password == null)
+                            {
+                                accept = true;
+                                user = null;
+                            }
+                            else
+                            {
+                                user = TryAuthenticate(username, password);
+                                accept = user != null;
+                            }
+
+                            if (accept)
+                            {
+                                Thread thread = new Thread(new ParameterizedThreadStart(Process));
+                                thread.Start(new object[] { tmp, c, user });
+                            }
+                            else
+                            {
+                                c.Response.StatusCode = 401;
+                                c.Response.StatusDescription = "Access Denied";
+                                c.Response.AddHeader("WWW-Authenticate", "Basic Realm");
+                                GXErrorWrapper err = new GXErrorWrapper(new HttpException(401, "Access Denied"));
+                                using (TextWriter writer = new StreamWriter(c.Response.OutputStream, Encoding.ASCII))
+                                {
+                                    GXJsonParser parser = new GXJsonParser();
+                                    string data = parser.Serialize(err);
+                                    c.Response.ContentLength64 = data.Length;
+                                    writer.Write(data);
+                                }
+                                c.Response.Close();
+                            }
                         }
                         h.Set();
                     }
@@ -210,6 +257,203 @@ namespace Gurux.Service.Rest
             }
         }
 
+        /// <summary>
+        /// Show REST services.
+        /// </summary>
+        /// <param name="parameter"></param>
+        static private void ShowServices(object parameter)
+        {
+            object[] tmp = parameter as object[];
+            GXServer server = tmp[0] as GXServer;
+            HttpListenerContext context = tmp[1] as HttpListenerContext;
+            using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
+            {
+                HtmlTextWriter writer = new HtmlTextWriter(new StreamWriter(bs));
+                writer.WriteLine("<!DOCTYPE html >");
+                writer.WriteLine("<html>");
+                writer.WriteLine("<style>");
+                writer.WriteLine(".tooltip {");
+                writer.WriteLine("position: relative;");
+                writer.WriteLine("display: inline-block;");
+                writer.WriteLine("border-bottom: 1px dotted black;");
+                writer.WriteLine("}");
+                writer.WriteLine(".tooltip .tooltiptext {");
+                writer.WriteLine("visibility: hidden;");
+                writer.WriteLine("width: 600px;");
+                writer.WriteLine("background-color: Gray;");
+                writer.WriteLine("color: #fff;");
+                writer.WriteLine("text-align: left;");
+                writer.WriteLine("border-radius: 6px;");
+                writer.WriteLine("padding: 5px 0;");
+                /* Position the tooltip */
+                writer.WriteLine("position: absolute;");
+                writer.WriteLine("z-index: 1;");
+                writer.WriteLine("}");
+
+                writer.WriteLine(".tooltip:hover .tooltiptext {");
+                writer.WriteLine("visibility: visible;");
+                writer.WriteLine("}");
+                writer.WriteLine("</style>");
+                writer.WriteLine("<body>");
+
+                string info = Convert.ToString(server.Host);
+                if (info != "")
+                {
+                    writer.WriteLine("<h1>Server information:</h1>");
+                    writer.WriteLine(info.Replace("\r\n", "<br/>"));
+                    writer.WriteLine("<hr>");
+                }
+                writer.Write("<h1>Available REST operations:");
+                writer.WriteLine("</h1>");
+                if (server.RestMap.Count == 0)
+                {
+                    GXGeneral.UpdateRestMessageTypes(server.RestMap);
+                    if (server.RestMap.Count == 0)
+                    {
+                        writer.WriteLine("No REST operations available.");
+                    }
+                }
+                DescriptionAttribute[] att;
+                foreach (GXRestMethodInfo it in server.RestMap.Values)
+                {
+                    writer.Write("<div class=\"tooltip\">" + it.RequestType.Name);
+                    writer.Write("<span class=\"tooltiptext\">");
+                    writer.Write("Method: ");
+                    if (it.Get != null)
+                    {
+                        writer.Write("Get");
+                    }
+                    else if (it.Post != null)
+                    {
+                        writer.Write("Post");
+                    }
+                    else if (it.Put != null)
+                    {
+                        writer.Write("Put");
+                    }
+                    else if (it.Delete != null)
+                    {
+                        writer.Write("Delete");
+                    }
+                    writer.Write("<p></p>");
+                    att = (DescriptionAttribute[])it.RequestType.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                    if (att.Length != 0)
+                    {
+                        writer.WriteLine(att[0].Description);
+                        writer.WriteLine("<br/>");
+                    }
+                    writer.WriteLine("<b>Request:</b><br/>{<br/>");
+                    foreach (PropertyInfo p in it.RequestType.GetProperties())
+                    {
+                        ShowProperties(p, writer);
+                    }
+                    writer.Write("}<p></p>");
+                    att = (DescriptionAttribute[])it.ResponseType.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                    if (att.Length != 0)
+                    {
+                        writer.WriteLine(att[0].Description);
+                        writer.WriteLine("<br/>");
+                    }
+                    writer.WriteLine("<b>Response:</b><br/>{<br/>");
+                    foreach (PropertyInfo p in it.ResponseType.GetProperties())
+                    {
+                        ShowProperties(p, writer);
+                    }
+                    writer.Write("}<br/>");
+                    writer.Write("</span></div><br/>");
+                    att = (DescriptionAttribute[])it.RequestType.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                    if (att.Length != 0)
+                    {
+                        writer.WriteLine(att[0].Description);
+                    }
+                    writer.WriteLine("<p></p>");
+                }
+                writer.WriteLine("</body>");
+                writer.WriteLine("</html>");
+                writer.Flush();
+            }
+        }
+
+        static private void ShowProperties(PropertyInfo p, HtmlTextWriter writer)
+        {
+            bool first = true;
+            DescriptionAttribute[] att;
+            if (p.PropertyType.IsArray)
+            {
+                att = (DescriptionAttribute[])p.PropertyType.GetElementType().GetCustomAttributes(typeof(DescriptionAttribute), true);
+            }
+            else
+            {
+                att = (DescriptionAttribute[])p.GetCustomAttributes(typeof(DescriptionAttribute), true);
+            }
+            if (att.Length != 0)
+            {
+                writer.WriteLine("&nbsp;&nbsp;" + att[0].Description + "<br/>");
+            }
+            writer.Write("&nbsp;&nbsp;" + p.Name);
+            if (p.PropertyType.IsClass)
+            {
+                if (p.PropertyType.IsArray)
+                {
+                    Type type = p.PropertyType.GetElementType();
+                    if (type.IsClass)
+                    {
+                        writer.Write("[]<br/>&nbsp;&nbsp;{<br/>");
+                        GetProperties(type, writer);
+                        writer.Write("<br/>&nbsp;&nbsp;}");
+                    }
+                    else
+                    {
+                        GetProperties(type, writer);
+                        writer.Write("[]");
+                    }
+                }
+                else
+                {
+                    writer.Write("<br/>&nbsp;&nbsp;{<br/>");
+                    GetProperties(p.PropertyType, writer);
+                    writer.Write("<br/>&nbsp;&nbsp;}");
+                }
+            }
+            else if (p.PropertyType.IsArray)
+            {
+                writer.Write("[]");
+            }
+            if (first)
+            {
+                first = false;
+            }
+            else
+            {
+                writer.Write(",");
+            }
+            writer.WriteLine("<br/>");
+        }
+
+        static private void GetProperties(Type type, HtmlTextWriter writer)
+        {
+            bool first = true;
+            foreach (var p in type.GetProperties())
+            {
+                if (first)
+                {
+                    first = false;
+                }
+                else
+                {
+                    writer.Write(",");
+                    writer.WriteLine("<br/>");
+                }
+                writer.Write("&nbsp;&nbsp;&nbsp;&nbsp;");
+                writer.Write(p.Name);
+                DescriptionAttribute[] att = (DescriptionAttribute[])p.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                if (att.Length != 0)
+                {
+                    writer.Write(":&nbsp;&nbsp;&nbsp;&nbsp;" + att[0].Description);
+                }
+            }
+        }
+
         static private void Process(object parameter)
         {
             object[] tmp = parameter as object[];
@@ -220,12 +464,16 @@ namespace Gurux.Service.Rest
             {
                 ProcessRequest(server, context, user);
             }
-            catch ( HttpListenerException)
+            catch (HttpListenerException)
             {
                 //Client has close connection. This is ok.
             }
             catch (Exception ex)
             {
+                if (server.onError != null)
+                {
+                    server.onError(server, new ErrorEventArgs(ex));
+                }
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 GXErrorWrapper err = new GXErrorWrapper(ex);
                 using (TextWriter writer = new StreamWriter(context.Response.OutputStream, Encoding.ASCII))
@@ -242,74 +490,72 @@ namespace Gurux.Service.Rest
                 IPrincipal user)
         {
             string path, data;
-            if (context.Request.ContentType != null && context.Request.ContentType.Contains("json"))
+            string method = context.Request.HttpMethod.ToUpper();
+            bool content = method == "POST" || method == "PUT";
+            if (content)
             {
-                string method = context.Request.HttpMethod.ToUpper();
-                bool content = method == "POST" || method == "PUT";
-                if (content)
+                int length = (int)context.Request.ContentLength64;
+                MemoryStream ms = new MemoryStream(length);
+                Stream stream = context.Request.InputStream;
+                byte[] buffer = new byte[length == 0 || length > 1024 ? 1024 : length];
+                IAsyncResult read = stream.BeginRead(buffer, 0, buffer.Length, null, null);
+                while (true)
                 {
-                    int length = (int)context.Request.ContentLength64;
-                    MemoryStream ms = new MemoryStream(length);
-                    Stream stream = context.Request.InputStream;
-                    byte[] buffer = new byte[length == 0 || length > 1024 ? 1024 : length];
-                    IAsyncResult read = stream.BeginRead(buffer, 0, buffer.Length, null, null);
-                    while (true)
+                    // wait for the read operation to complete
+                    if (!read.AsyncWaitHandle.WaitOne())
                     {
-                        // wait for the read operation to complete
-                        if (!read.AsyncWaitHandle.WaitOne())
-                        {
-                            break;
-                        }
-                        int count = stream.EndRead(read);
-                        ms.Write(buffer, 0, count);
-                        // If read is done.
-                        if (ms.Position == length || count == 0)
-                        {
-                            break;
-                        }
-                        read = stream.BeginRead(buffer, 0, buffer.Length, null, null);
+                        break;
                     }
-                    ms.Position = 0;
-                    using (StreamReader sr = new StreamReader(ms))
+                    int count = stream.EndRead(read);
+                    ms.Write(buffer, 0, count);
+                    // If read is done.
+                    if (ms.Position == length || count == 0)
                     {
-                        data = sr.ReadToEnd();
+                        break;
                     }
-                    path = context.Request.RawUrl;
+                    read = stream.BeginRead(buffer, 0, buffer.Length, null, null);
+                }
+                ms.Position = 0;
+                using (StreamReader sr = new StreamReader(ms))
+                {
+                    data = sr.ReadToEnd();
+                }
+                path = context.Request.RawUrl;
+            }
+            else
+            {
+                int pos = context.Request.RawUrl.IndexOf('?');
+                if (pos != -1)
+                {
+                    path = context.Request.RawUrl.Substring(0, pos);
+                    data = context.Request.RawUrl.Substring(pos + 1);
+                    data = "{\"" + data.Replace("&", "\",\"").Replace("=", "\":\"") + "\"}";
                 }
                 else
                 {
-                    int pos = context.Request.RawUrl.IndexOf('?');
-                    if (pos != -1)
-                    {
-                        path = context.Request.RawUrl.Substring(0, pos);
-                        data = context.Request.RawUrl.Substring(pos + 1);
-                    }
-                    else
-                    {
-                        path = context.Request.RawUrl;
-                        data = null;
-                    }
+                    path = context.Request.RawUrl;
+                    data = null;
                 }
-                System.Diagnostics.Debug.WriteLine("-> " + path + " : " + data);
+            }
+            System.Diagnostics.Debug.WriteLine("-> " + path + " : " + data);
 
-                //If proxy is used.
-                string add = null;
-                if (HttpContext.Current != null)
-                {
-                    add = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"].ToString();
-                }
-                if (add == null)
-                {
-                    add = context.Request.UserHostAddress;
-                }
-                string reply = GetReply(server.MessageMap, user, server, add, context.Request.HttpMethod, path, data);
-                context.Response.ContentType = "json";
-                context.Response.ContentLength64 = reply.Length;
-                System.Diagnostics.Debug.WriteLine("<- " + reply);
-                using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
-                {
-                    bs.Write(ASCIIEncoding.ASCII.GetBytes(reply), 0, reply.Length);
-                }
+            //If proxy is used.
+            string add = null;
+            if (HttpContext.Current != null)
+            {
+                add = HttpContext.Current.Request.ServerVariables["REMOTE_ADDR"].ToString();
+            }
+            if (add == null)
+            {
+                add = context.Request.UserHostAddress;
+            }
+            string reply = GetReply(server.MessageMap, user, server, add, context.Request.HttpMethod, path, data);
+            context.Response.ContentType = "json";
+            context.Response.ContentLength64 = reply.Length;
+            System.Diagnostics.Debug.WriteLine("<- " + reply);
+            using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
+            {
+                bs.Write(ASCIIEncoding.ASCII.GetBytes(reply), 0, reply.Length);
             }
         }
 
