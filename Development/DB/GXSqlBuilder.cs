@@ -134,9 +134,11 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     Settings = new GXSqLiteSettings();
                     break;
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                 case DatabaseType.Access:
                     Settings = new GXAccessSettings();
                     break;
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 case DatabaseType.Oracle:
                     Settings = new GXOracleSqlSettings();
                     break;

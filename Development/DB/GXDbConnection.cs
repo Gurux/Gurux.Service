@@ -55,10 +55,18 @@ using System.Data.SqlClient;
 namespace Gurux.Service.Orm
 {
     /// <summary>
+    /// Event hanler for executed SQL.
+    /// </summary>
+    /// <param name="instance">Sender.</param>
+    /// <param name="sql">Executed SQL.</param>
+    public delegate void SqlExecutedEventHandler(object instance, string sql);
+
+    /// <summary>
     /// This class is used to communicate with database.
     /// </summary>
     public class GXDbConnection : IDisposable
     {
+        private SqlExecutedEventHandler sql;
         private DbTransaction Transaction;
         /// <summary>
         /// Synchronous object.
@@ -75,6 +83,24 @@ namespace Gurux.Service.Orm
         {
             get;
             private set;
+        }
+
+        /// <summary>
+        /// Event hanler for executed SQL.
+        /// </summary>
+        /// <remarks>
+        /// This can be used for debugging executed SQLs.
+        /// </remarks>
+        public event SqlExecutedEventHandler OnSqlExecuted
+        {
+            add
+            {
+                sql += value;
+            }
+            remove
+            {
+                sql -= value;
+            }
         }
 
         /// <summary>
@@ -122,6 +148,7 @@ namespace Gurux.Service.Orm
             {
                 type = DatabaseType.Oracle;
             }
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
             else if (name == "OdbcConnection")
             {
                 name = tp.GetProperty("DataSource").GetValue(connection, null).ToString();
@@ -153,6 +180,7 @@ namespace Gurux.Service.Orm
                     throw new ArgumentOutOfRangeException("Unknown connection.");
                 }
             }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
             else
             {
                 throw new ArgumentOutOfRangeException("Unknown connection.");
@@ -615,10 +643,15 @@ namespace Gurux.Service.Orm
                             sb.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
                             sb.Append(" ");
                             if (!((it.Value.Attributes & (Attributes.AutoIncrement)) != 0 &&
-                                (Builder.Settings.Type == DatabaseType.Access || Builder.Settings.Type == DatabaseType.SqLite)))
+                                (
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+                                Builder.Settings.Type == DatabaseType.Access ||
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+                                Builder.Settings.Type == DatabaseType.SqLite)))
                             {
                                 try
                                 {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                                     if (Builder.Settings.Type == DatabaseType.Access && ((it.Value.Attributes & (Attributes.PrimaryKey | Attributes.ForeignKey)) != 0))
                                     {
                                         if (it.Value.Relation == null)
@@ -634,6 +667,7 @@ namespace Gurux.Service.Orm
                                             tp = typeof(int);
                                         }
                                     }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                     str = GetDataBaseType(tp, it.Value.Target);
                                 }
                                 catch (Exception ex)
@@ -675,6 +709,7 @@ namespace Gurux.Service.Orm
                             //If field is marked as auto increment or primary key.
                             if ((it.Value.Attributes & (Attributes.AutoIncrement | Attributes.PrimaryKey)) != 0)
                             {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                                 if (Builder.Settings.Type != DatabaseType.Access)
                                 {
                                     sb.Append(" PRIMARY KEY ");
@@ -684,6 +719,7 @@ namespace Gurux.Service.Orm
                                     }
                                 }
                                 else
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                 {
                                     if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                                     {
@@ -1141,11 +1177,15 @@ namespace Gurux.Service.Orm
         /// <param name="query">Query to execute.</param>
         public void ExecuteNonQuery(IDbTransaction transaction, string query)
         {
-            lock (Connection)
+            lock (this)
             {
                 if (Connection.State != ConnectionState.Open)
                 {
                     Connection.Open();
+                }
+                if (sql != null)
+                {
+                    sql(this, query);
                 }
                 using (IDbCommand com = Connection.CreateCommand())
                 {
@@ -1186,8 +1226,10 @@ namespace Gurux.Service.Orm
                     return ExecuteScalarInternal(transaction, "SELECT @@IDENTITY" + name, valueType);
                 case DatabaseType.SqLite:
                     return ExecuteScalarInternal(transaction, "SELECT last_insert_rowid()" + name, valueType);
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                 case DatabaseType.Access:
                     return ExecuteScalarInternal(transaction, "SELECT @@IDENTITY" + name, valueType);
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 default:
                     throw new ArgumentOutOfRangeException("GetLastInsertId failed. Unknown database connection.");
             }
@@ -1226,6 +1268,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
@@ -1245,6 +1288,7 @@ namespace Gurux.Service.Orm
                 return list.ToArray();
             }
             else
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
             {
                 query = Builder.Settings.GetColumnsQuery(connection.Database, tableName, out index);
             }
@@ -1496,6 +1540,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = "SELECT NAME FROM sqlite_master WHERE type='table'";
                     break;
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1515,6 +1560,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                     return list.ToArray();
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
@@ -1545,6 +1591,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
                     break;
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1556,6 +1603,7 @@ namespace Gurux.Service.Orm
                         dt = (Connection as System.Data.Odbc.OdbcConnection).GetSchema("Tables", new string[] { null, null, tableName });
                     }
                     return dt.Rows.Count != 0;
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
@@ -1993,6 +2041,7 @@ namespace Gurux.Service.Orm
                 //Read column headers.
                 if (columns != null)
                 {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                     if (Connection is OdbcConnection)
                     {
                         using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
@@ -2019,6 +2068,8 @@ namespace Gurux.Service.Orm
                             }
                         }
                     }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+
                 }
                 using (IDbCommand com = Connection.CreateCommand())
                 {
@@ -2177,12 +2228,14 @@ namespace Gurux.Service.Orm
                                         }
                                         if (value != null)
                                         {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                                             //Access minimum date time is 98, 11, 26.
                                             if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
                                                 ((DateTime)value).Date <= new DateTime(100, 1, 1))
                                             {
                                                 value = DateTime.MinValue;
                                             }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                             if (col.Setter.Set != null)
                                             {
                                                 col.Setter.Set(item, value);
@@ -2331,9 +2384,12 @@ namespace Gurux.Service.Orm
             arg.Parent.Settings = Builder.Settings;
             arg.ExecutionTime = 0;
             DateTime tm = DateTime.Now;
-            List<T> value = (List<T>)SelectInternal2<T>(arg);
-            arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
-            return value;
+            lock (this)
+            {
+                List<T> value = (List<T>)SelectInternal2<T>(arg);
+                arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
+                return value;
+            }
         }
 
         private object SelectInternal2<T>(GXSelectArgs arg)
@@ -2405,6 +2461,7 @@ namespace Gurux.Service.Orm
                 //Read column headers.
                 if (columns != null)
                 {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                     if (Connection is OdbcConnection)
                     {
                         using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
@@ -2431,6 +2488,7 @@ namespace Gurux.Service.Orm
                             }
                         }
                     }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 }
                 using (IDbCommand com = Connection.CreateCommand())
                 {
@@ -2599,12 +2657,14 @@ namespace Gurux.Service.Orm
                                             }
                                             if (value != null)
                                             {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                                                 //Access minimum date time is 98, 11, 26.
                                                 if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
                                                     ((DateTime)value).Date <= new DateTime(100, 1, 1))
                                                 {
                                                     value = DateTime.MinValue;
                                                 }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                                 if (col.Setter.Set != null)
                                                 {
                                                     col.Setter.Set(item, value);
@@ -2642,7 +2702,11 @@ namespace Gurux.Service.Orm
                             reader.Close();
                         }
                     }
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                     catch (SqlException ex)
+#else
+                    catch (Exception ex)
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                     {
                         throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
                     }
@@ -2838,145 +2902,148 @@ namespace Gurux.Service.Orm
         /// <param name="insert">Insert or update.</param>
         private void UpdateOrInsert(List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
         {
-            int pos = 0;
-            string columnName;
-            ulong id;
-            int total = 0;
-            Type type;
-            IDbTransaction transaction = Transaction;
-            bool autoTransaction = transaction == null;
-            List<string> queries = new List<string>();
-            lock (Connection)
+            lock (this)
             {
-                try
+                int pos = 0;
+                string columnName;
+                ulong id;
+                int total = 0;
+                Type type;
+                IDbTransaction transaction = Transaction;
+                bool autoTransaction = transaction == null;
+                List<string> queries = new List<string>();
+                lock (Connection)
                 {
-                    if (AutoTransaction)
+                    try
                     {
-                        transaction = Connection.BeginTransaction();
-                    }
-                    foreach (var q in list)
-                    {
-                        queries.Clear();
-                        if (insert)
+                        if (AutoTransaction)
                         {
-                            total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
-                            q.Value.Inserted = true;
+                            transaction = Connection.BeginTransaction();
                         }
-                        else
+                        foreach (var q in list)
                         {
-                            GXDbHelpers.GetUpdateQuery(q, Builder.Settings, queries);
-                        }
-                        type = q.Key;
-                        pos = -1;
-                        foreach (var it in q.Value.Rows[0])
-                        {
-                            if (it.Key.GetType() == type)
+                            queries.Clear();
+                            if (insert)
                             {
+                                total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
+                                q.Value.Inserted = true;
+                            }
+                            else
+                            {
+                                GXDbHelpers.GetUpdateQuery(q, Builder.Settings, queries);
+                            }
+                            type = q.Key;
+                            pos = -1;
+                            foreach (var it in q.Value.Rows[0])
+                            {
+                                if (it.Key.GetType() == type)
+                                {
+                                    ++pos;
+                                    break;
+                                }
                                 ++pos;
-                                break;
                             }
-                            ++pos;
-                        }
-                        if (Builder.Settings.MaximumRowUpdate != 1 && total > Builder.Settings.MaximumRowUpdate)
-                        {
-                            if (transaction != null && autoTransaction)
+                            if (Builder.Settings.MaximumRowUpdate != 1 && total > Builder.Settings.MaximumRowUpdate)
                             {
-                                transaction.Commit();
-                                transaction = Connection.BeginTransaction();
-                            }
-                            total = 0;
-                        }
-                        GXSerializedItem si = GXSqlBuilder.FindAutoIncrement(type);
-                        int index = 0;
-                        foreach (string query in queries)
-                        {
-                            ExecuteNonQuery(transaction, query);
-                            //Update auto increment value if it's used and transaction is not updated.
-                            if (total != 0 && si != null && pos != -1)
-                            {
-                                columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-                                id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
-                                //If each value is added separately.
-                                if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                if (transaction != null && autoTransaction)
                                 {
-                                    if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                    {
-                                        si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
-                                    }
-                                    ++index;
+                                    transaction.Commit();
+                                    transaction = Connection.BeginTransaction();
                                 }
-                                else
-                                {
-                                    if (!Builder.Settings.AutoIncrementFirst)
-                                    {
-                                        id -= (ulong)(q.Value.Rows.Count - 1);
-                                    }
-                                    foreach (var it in q.Value.Rows)
-                                    {
-                                        if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                        {
-                                            si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
-                                        }
-                                        ++id;
-                                    }
-                                }
+                                total = 0;
                             }
-                        }
-
-                        /////////////////////////////////////////////////////////////////////////////////////////////////
-                        //Update ID's after transaction is made and all the rows are updated.
-                        //Update auto increment value if it's used.
-                        if (insert && total == 0 && si != null && pos != -1)
-                        {
+                            GXSerializedItem si = GXSqlBuilder.FindAutoIncrement(type);
+                            int index = 0;
                             foreach (string query in queries)
                             {
-                                columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-                                id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
-                                //If each value is added separately.
-                                if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                ExecuteNonQuery(transaction, query);
+                                //Update auto increment value if it's used and transaction is not updated.
+                                if (total != 0 && si != null && pos != -1)
                                 {
-                                    if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                    columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
+                                    id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
+                                    //If each value is added separately.
+                                    if (this.Builder.Settings.MaximumRowUpdate == 1)
                                     {
-                                        si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
-                                    }
-                                    ++index;
-                                }
-                                else
-                                {
-                                    if (!Builder.Settings.AutoIncrementFirst)
-                                    {
-                                        id -= (ulong)(q.Value.Rows.Count - 1);
-                                    }
-                                    foreach (var it in q.Value.Rows)
-                                    {
-                                        if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                        if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
                                         {
-                                            si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
+                                            si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
                                         }
-                                        ++id;
+                                        ++index;
+                                    }
+                                    else
+                                    {
+                                        if (!Builder.Settings.AutoIncrementFirst)
+                                        {
+                                            id -= (ulong)(q.Value.Rows.Count - 1);
+                                        }
+                                        foreach (var it in q.Value.Rows)
+                                        {
+                                            if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                            {
+                                                si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
+                                            }
+                                            ++id;
+                                        }
+                                    }
+                                }
+                            }
+
+                            /////////////////////////////////////////////////////////////////////////////////////////////////
+                            //Update ID's after transaction is made and all the rows are updated.
+                            //Update auto increment value if it's used.
+                            if (insert && total == 0 && si != null && pos != -1)
+                            {
+                                foreach (string query in queries)
+                                {
+                                    columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
+                                    id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
+                                    //If each value is added separately.
+                                    if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                    {
+                                        if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                        {
+                                            si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
+                                        }
+                                        ++index;
+                                    }
+                                    else
+                                    {
+                                        if (!Builder.Settings.AutoIncrementFirst)
+                                        {
+                                            id -= (ulong)(q.Value.Rows.Count - 1);
+                                        }
+                                        foreach (var it in q.Value.Rows)
+                                        {
+                                            if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                            {
+                                                si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
+                                            }
+                                            ++id;
+                                        }
                                     }
                                 }
                             }
                         }
+                        if (transaction != null && autoTransaction)
+                        {
+                            transaction.Commit();
+                        }
                     }
-                    if (transaction != null && autoTransaction)
+                    catch (Exception ex)
                     {
-                        transaction.Commit();
+                        if (transaction != null && autoTransaction)
+                        {
+                            transaction.Rollback();
+                        }
+                        throw ex;
                     }
-                }
-                catch (Exception ex)
-                {
-                    if (transaction != null && autoTransaction)
+                    finally
                     {
-                        transaction.Rollback();
-                    }
-                    throw ex;
-                }
-                finally
-                {
-                    if (transaction != null && autoTransaction)
-                    {
-                        transaction.Dispose();
+                        if (transaction != null && autoTransaction)
+                        {
+                            transaction.Dispose();
+                        }
                     }
                 }
             }

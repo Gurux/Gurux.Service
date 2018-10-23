@@ -427,7 +427,7 @@ namespace Gurux.Common.Internal
                             }
                             value = items;
                         }
-#if !__MOBILE__
+#if !__MOBILE__ &&  !NETCOREAPP2_0 && !NETCOREAPP2_1
                         else if (pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(System.Data.Linq.EntitySet<>))
                         {
                             Type listT = typeof(System.Data.Linq.EntitySet<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
@@ -925,7 +925,7 @@ namespace Gurux.Common.Internal
             {
                 if (dt != DateTime.MinValue && dt != DateTime.MaxValue)
                 {
-                    offset = TimeZone.CurrentTimeZone.GetUtcOffset(dt).TotalMinutes;
+                    offset = TimeZoneInfo.Local.GetUtcOffset(dt).TotalMinutes;
                 }
             }
             long value = (long)(dt.ToUniversalTime() - new DateTime(1970, 1, 1, 0, 0, 0, dt.Kind)).TotalMilliseconds;
@@ -948,8 +948,8 @@ namespace Gurux.Common.Internal
                 {
                     str += "-";
                 }
-                str += TimeZone.CurrentTimeZone.GetUtcOffset(dt).Hours.ToString("00") +
-                       TimeZone.CurrentTimeZone.GetUtcOffset(dt).Minutes.ToString("00");
+                str += TimeZoneInfo.Local.GetUtcOffset(dt).Hours.ToString("00") +
+                       TimeZoneInfo.Local.GetUtcOffset(dt).Minutes.ToString("00");
                 if (get)
                 {
                     str += ")/";

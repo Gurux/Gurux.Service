@@ -153,7 +153,7 @@ namespace Gurux.Service.Orm
             else if (value is string)
             {
                 str = value as string;
-                str = str.Replace("\\", "\\\\").Replace("'", @"\'");
+                str = str.Replace("\\", "\\\\").Replace("'", @"\''");
                 str = GetQuetedValue(str);
             }
             else if (value is Type)
@@ -803,7 +803,7 @@ namespace Gurux.Service.Orm
                         StringBuilder sb = new StringBuilder();
                         bool first = true;
                         bool stringValue = true;
-                        foreach(object it in value as IEnumerable)
+                        foreach (object it in value as IEnumerable)
                         {
                             if (first)
                             {
@@ -1087,11 +1087,13 @@ namespace Gurux.Service.Orm
                     {
                         if (m.Method.DeclaringType == typeof(string))
                         {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
                             if (settings.Type == DatabaseType.Access)
                             {
                                 return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
                                 GetMembers(settings, m.Arguments[0], '\0', where, true)[0] + "'))"};
                             }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                             string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper();
                             if (tmp[0] != '\'')
                             {
@@ -1297,6 +1299,11 @@ namespace Gurux.Service.Orm
                 else if (newExpression.Value == null)
                 {
                     return new string[] { null };
+                }
+                else if (newExpression.Value is bool)
+                {
+                    return new string[] { ((bool)newExpression.Value) ? "1" : "0" };
+                    //return new string[] { AddQuotes(newExpression.Value.ToString(), quoteSeparator) };
                 }
                 else
                 {

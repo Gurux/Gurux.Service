@@ -29,7 +29,7 @@
 // This code is licensed under the GNU General Public License v2. 
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
-
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
 using System;
 using System.Net;
 using System.Threading;
@@ -266,115 +266,117 @@ namespace Gurux.Service.Rest
             object[] tmp = parameter as object[];
             GXServer server = tmp[0] as GXServer;
             HttpListenerContext context = tmp[1] as HttpListenerContext;
-            using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
+            StringBuilder writer = new StringBuilder();
+            writer.AppendLine("<!DOCTYPE html >");
+            writer.AppendLine("<html>");
+            writer.AppendLine("<style>");
+            writer.AppendLine(".tooltip {");
+            writer.AppendLine("position: relative;");
+            writer.AppendLine("display: inline-block;");
+            writer.AppendLine("border-bottom: 1px dotted black;");
+            writer.AppendLine("}");
+            writer.AppendLine(".tooltip .tooltiptext {");
+            writer.AppendLine("visibility: hidden;");
+            writer.AppendLine("width: 600px;");
+            writer.AppendLine("background-color: Gray;");
+            writer.AppendLine("color: #fff;");
+            writer.AppendLine("text-align: left;");
+            writer.AppendLine("border-radius: 6px;");
+            writer.AppendLine("padding: 5px 0;");
+            /* Position the tooltip */
+            writer.AppendLine("position: absolute;");
+            writer.AppendLine("z-index: 1;");
+            writer.AppendLine("}");
+
+            writer.AppendLine(".tooltip:hover .tooltiptext {");
+            writer.AppendLine("visibility: visible;");
+            writer.AppendLine("}");
+            writer.AppendLine("</style>");
+            writer.AppendLine("<body>");
+
+            string info = Convert.ToString(server.Host);
+            if (info != "")
             {
-                HtmlTextWriter writer = new HtmlTextWriter(new StreamWriter(bs));
-                writer.WriteLine("<!DOCTYPE html >");
-                writer.WriteLine("<html>");
-                writer.WriteLine("<style>");
-                writer.WriteLine(".tooltip {");
-                writer.WriteLine("position: relative;");
-                writer.WriteLine("display: inline-block;");
-                writer.WriteLine("border-bottom: 1px dotted black;");
-                writer.WriteLine("}");
-                writer.WriteLine(".tooltip .tooltiptext {");
-                writer.WriteLine("visibility: hidden;");
-                writer.WriteLine("width: 600px;");
-                writer.WriteLine("background-color: Gray;");
-                writer.WriteLine("color: #fff;");
-                writer.WriteLine("text-align: left;");
-                writer.WriteLine("border-radius: 6px;");
-                writer.WriteLine("padding: 5px 0;");
-                /* Position the tooltip */
-                writer.WriteLine("position: absolute;");
-                writer.WriteLine("z-index: 1;");
-                writer.WriteLine("}");
-
-                writer.WriteLine(".tooltip:hover .tooltiptext {");
-                writer.WriteLine("visibility: visible;");
-                writer.WriteLine("}");
-                writer.WriteLine("</style>");
-                writer.WriteLine("<body>");
-
-                string info = Convert.ToString(server.Host);
-                if (info != "")
-                {
-                    writer.WriteLine("<h1>Server information:</h1>");
-                    writer.WriteLine(info.Replace("\r\n", "<br/>"));
-                    writer.WriteLine("<hr>");
-                }
-                writer.Write("<h1>Available REST operations:");
-                writer.WriteLine("</h1>");
+                writer.AppendLine("<h1>Server information:</h1>");
+                writer.AppendLine(info.Replace("\r\n", "<br/>"));
+                writer.AppendLine("<hr>");
+            }
+            writer.Append("<h1>Available REST operations:");
+            writer.AppendLine("</h1>");
+            if (server.MessageMap.Count == 0)
+            {
+                GXGeneral.UpdateRestMessageTypes(server.MessageMap);
                 if (server.MessageMap.Count == 0)
                 {
-                    GXGeneral.UpdateRestMessageTypes(server.MessageMap);
-                    if (server.MessageMap.Count == 0)
-                    {
-                        writer.WriteLine("No REST operations available.");
-                    }
+                    writer.AppendLine("No REST operations available.");
                 }
-                DescriptionAttribute[] att;
-                foreach (GXRestMethodInfo it in server.MessageMap.Values)
+            }
+            DescriptionAttribute[] att;
+            foreach (GXRestMethodInfo it in server.MessageMap.Values)
+            {
+                writer.Append("<div class=\"tooltip\">" + it.RequestType.Name);
+                writer.Append("<span class=\"tooltiptext\">");
+                writer.Append("Method: ");
+                if (it.Get != null)
                 {
-                    writer.Write("<div class=\"tooltip\">" + it.RequestType.Name);
-                    writer.Write("<span class=\"tooltiptext\">");
-                    writer.Write("Method: ");
-                    if (it.Get != null)
-                    {
-                        writer.Write("Get");
-                    }
-                    else if (it.Post != null)
-                    {
-                        writer.Write("Post");
-                    }
-                    else if (it.Put != null)
-                    {
-                        writer.Write("Put");
-                    }
-                    else if (it.Delete != null)
-                    {
-                        writer.Write("Delete");
-                    }
-                    writer.Write("<p></p>");
-                    att = (DescriptionAttribute[])it.RequestType.GetCustomAttributes(typeof(DescriptionAttribute), true);
-                    if (att.Length != 0)
-                    {
-                        writer.WriteLine(att[0].Description);
-                        writer.WriteLine("<br/>");
-                    }
-                    writer.WriteLine("<b>Request:</b><br/>{<br/>");
-                    foreach (PropertyInfo p in it.RequestType.GetProperties())
-                    {
-                        ShowProperties(p, writer);
-                    }
-                    writer.Write("}<p></p>");
-                    att = (DescriptionAttribute[])it.ResponseType.GetCustomAttributes(typeof(DescriptionAttribute), true);
-                    if (att.Length != 0)
-                    {
-                        writer.WriteLine(att[0].Description);
-                        writer.WriteLine("<br/>");
-                    }
-                    writer.WriteLine("<b>Response:</b><br/>{<br/>");
-                    foreach (PropertyInfo p in it.ResponseType.GetProperties())
-                    {
-                        ShowProperties(p, writer);
-                    }
-                    writer.Write("}<br/>");
-                    writer.Write("</span></div><br/>");
-                    att = (DescriptionAttribute[])it.RequestType.GetCustomAttributes(typeof(DescriptionAttribute), true);
-                    if (att.Length != 0)
-                    {
-                        writer.WriteLine(att[0].Description);
-                    }
-                    writer.WriteLine("<p></p>");
+                    writer.Append("Get");
                 }
-                writer.WriteLine("</body>");
-                writer.WriteLine("</html>");
-                writer.Flush();
+                else if (it.Post != null)
+                {
+                    writer.Append("Post");
+                }
+                else if (it.Put != null)
+                {
+                    writer.Append("Put");
+                }
+                else if (it.Delete != null)
+                {
+                    writer.Append("Delete");
+                }
+                writer.Append("<p></p>");
+                att = (DescriptionAttribute[])it.RequestType.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                if (att.Length != 0)
+                {
+                    writer.AppendLine(att[0].Description);
+                    writer.AppendLine("<br/>");
+                }
+                writer.AppendLine("<b>Request:</b><br/>{<br/>");
+                foreach (PropertyInfo p in it.RequestType.GetProperties())
+                {
+                    ShowProperties(p, writer);
+                }
+                writer.Append("}<p></p>");
+                att = (DescriptionAttribute[])it.ResponseType.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                if (att.Length != 0)
+                {
+                    writer.AppendLine(att[0].Description);
+                    writer.AppendLine("<br/>");
+                }
+                writer.AppendLine("<b>Response:</b><br/>{<br/>");
+                foreach (PropertyInfo p in it.ResponseType.GetProperties())
+                {
+                    ShowProperties(p, writer);
+                }
+                writer.Append("}<br/>");
+                writer.Append("</span></div><br/>");
+                att = (DescriptionAttribute[])it.RequestType.GetCustomAttributes(typeof(DescriptionAttribute), true);
+                if (att.Length != 0)
+                {
+                    writer.AppendLine(att[0].Description);
+                }
+                writer.AppendLine("<p></p>");
+            }
+            writer.AppendLine("</body>");
+            writer.AppendLine("</html>");
+            using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
+            {
+                StreamWriter sw = new StreamWriter(bs);
+                sw.Write(writer.ToString());
+                sw.Flush();
             }
         }
 
-        static private void ShowProperties(PropertyInfo p, HtmlTextWriter writer)
+        static private void ShowProperties(PropertyInfo p, StringBuilder writer)
         {
             bool first = true;
             DescriptionAttribute[] att;
@@ -388,9 +390,9 @@ namespace Gurux.Service.Rest
             }
             if (att.Length != 0)
             {
-                writer.WriteLine("&nbsp;&nbsp;" + att[0].Description + "<br/>");
+                writer.AppendLine("&nbsp;&nbsp;" + att[0].Description + "<br/>");
             }
-            writer.Write("&nbsp;&nbsp;" + p.Name);
+            writer.Append("&nbsp;&nbsp;" + p.Name);
             if (p.PropertyType.IsClass)
             {
                 if (p.PropertyType.IsArray)
@@ -398,26 +400,26 @@ namespace Gurux.Service.Rest
                     Type type = p.PropertyType.GetElementType();
                     if (type.IsClass)
                     {
-                        writer.Write("[]<br/>&nbsp;&nbsp;{<br/>");
+                        writer.Append("[]<br/>&nbsp;&nbsp;{<br/>");
                         GetProperties(type, writer);
-                        writer.Write("<br/>&nbsp;&nbsp;}");
+                        writer.Append("<br/>&nbsp;&nbsp;}");
                     }
                     else
                     {
                         GetProperties(type, writer);
-                        writer.Write("[]");
+                        writer.Append("[]");
                     }
                 }
                 else
                 {
-                    writer.Write("<br/>&nbsp;&nbsp;{<br/>");
+                    writer.Append("<br/>&nbsp;&nbsp;{<br/>");
                     GetProperties(p.PropertyType, writer);
-                    writer.Write("<br/>&nbsp;&nbsp;}");
+                    writer.Append("<br/>&nbsp;&nbsp;}");
                 }
             }
             else if (p.PropertyType.IsArray)
             {
-                writer.Write("[]");
+                writer.Append("[]");
             }
             if (first)
             {
@@ -425,12 +427,12 @@ namespace Gurux.Service.Rest
             }
             else
             {
-                writer.Write(",");
+                writer.Append(",");
             }
-            writer.WriteLine("<br/>");
+            writer.AppendLine("<br/>");
         }
 
-        static private void GetProperties(Type type, HtmlTextWriter writer)
+        static private void GetProperties(Type type, StringBuilder writer)
         {
             bool first = true;
             foreach (var p in type.GetProperties())
@@ -441,15 +443,15 @@ namespace Gurux.Service.Rest
                 }
                 else
                 {
-                    writer.Write(",");
-                    writer.WriteLine("<br/>");
+                    writer.Append(",");
+                    writer.AppendLine("<br/>");
                 }
-                writer.Write("&nbsp;&nbsp;&nbsp;&nbsp;");
-                writer.Write(p.Name);
+                writer.Append("&nbsp;&nbsp;&nbsp;&nbsp;");
+                writer.Append(p.Name);
                 DescriptionAttribute[] att = (DescriptionAttribute[])p.GetCustomAttributes(typeof(DescriptionAttribute), true);
                 if (att.Length != 0)
                 {
-                    writer.Write(":&nbsp;&nbsp;&nbsp;&nbsp;" + att[0].Description);
+                    writer.Append(":&nbsp;&nbsp;&nbsp;&nbsp;" + att[0].Description);
                 }
             }
         }
@@ -648,3 +650,4 @@ namespace Gurux.Service.Rest
         }
     }
 }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1

@@ -50,10 +50,12 @@ namespace Gurux.Service.Orm
         /// http://www.sqlite.org
         /// </remarks>
         SqLite,
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
         /// <summary>
         /// Target database is MS Access.
         /// </summary>        
         Access,
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
         /// <summary>
         /// Target database is Oracle.
         /// </summary>        
