@@ -22,7 +22,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <PackageIconUrl>http://www.gurux.org/gurux.ico</PackageIconUrl>
   </PropertyGroup> 
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.1.1808.3002" />
+    <PackageReference Include="Gurux.Common" Version="8.1.1811.401" />
  </ItemGroup>
  
 
