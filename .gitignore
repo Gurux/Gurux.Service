@@ -171,3 +171,4 @@ pip-log.txt
 .DS_Store
 *.lock
 *.ide
+Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache

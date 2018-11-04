@@ -13,14 +13,14 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
   <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <TargetFrameworks>net40;net45;net35;netcoreapp2.1</TargetFrameworks>
+    <TargetFrameworks>net40;net45;net35;netcoreapp2.1;netcoreapp2.0</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
     <PackageTags>Gurux Service framework.</PackageTags>
     <PackageId>Gurux.Service</PackageId>
     <ApplicationIcon></ApplicationIcon>
     <PackageIconUrl>http://www.gurux.org/gurux.ico</PackageIconUrl>
-  </PropertyGroup>
+  </PropertyGroup> 
   <ItemGroup>
     <PackageReference Include="Gurux.Common" Version="8.1.1808.3002" />
  </ItemGroup>
@@ -38,5 +38,5 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
   <ItemGroup>
     <Folder Include="Properties\" />
   </ItemGroup>
-
+ 
 </Project>

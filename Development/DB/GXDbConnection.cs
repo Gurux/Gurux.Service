@@ -402,6 +402,82 @@ namespace Gurux.Service.Orm
             }
         }
 
+        /// <summary>
+        /// Create new table.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        public void UpdateTable<T>()
+        {
+            UpdateTable(typeof(T));
+        }
+
+        /// <summary>
+        /// Update table.
+        /// </summary>
+        /// <param name="type">Table type.</param>
+        public void UpdateTable(Type type)
+        {
+            lock (Connection)
+            {
+                string[] cols = GetColumns(type);
+                string tableName = Builder.GetTableName(type, false);
+                IDbTransaction transaction = Transaction;
+                try
+                {
+                    if (Connection.State != ConnectionState.Open)
+                    {
+                        Connection.Open();
+                    }
+                    if (AutoTransaction)
+                    {
+                        transaction = Connection.BeginTransaction();
+                    }
+                    //Add new columns.
+                    foreach (var it in GXSqlBuilder.GetProperties(type))
+                    {
+                        if (!cols.Contains(it.Key))
+                        {
+                            StringBuilder sb = new StringBuilder();
+                            sb.Append("ALTER TABLE ");
+                            sb.Append(GXDbHelpers.AddQuotes(tableName, Builder.Settings.TableQuotation));
+                            sb.Append(" ADD ");
+                            sb.Append(it.Key);
+                            sb.Append(" ");
+                            sb.Append(GetDataBaseType(it.Value.Type, it.Value.Target));
+                            ExecuteNonQuery(transaction, sb.ToString());
+                        }
+                    }
+                    //TODO: Check is column type changed.
+                    /*
+                    int len;
+                    foreach (string col in cols)
+                    {
+                        Type colType = GetColumnType(tableName, col, Connection, out len);
+                    }
+                    */
+                    if (AutoTransaction && transaction != null)
+                    {
+                        transaction.Commit();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    if (AutoTransaction && transaction != null)
+                    {
+                        transaction.Rollback();
+                    }
+                    throw ex;
+                }
+                finally
+                {
+                    if (AutoTransaction && transaction != null)
+                    {
+                        transaction.Dispose();
+                    }
+                }
+            }
+        }
+
         class GXTableCreateQuery
         {
             public Type Table;
@@ -1247,7 +1323,12 @@ namespace Gurux.Service.Orm
 
         public string[] GetColumns<T>()
         {
-            string tableName = Builder.GetTableName(typeof(T), false);
+            return GetColumns(typeof(T));
+        }
+
+        public string[] GetColumns(Type type)
+        {
+            string tableName = Builder.GetTableName(type, false);
             return GetColumns(tableName);
         }
 
