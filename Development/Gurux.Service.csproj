@@ -31,7 +31,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <Reference Include="System.ComponentModel.DataAnnotations" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35' or '$(TargetFramework)' == 'netcoreapp2.1'">
     <Reference Include="System.Data.Linq" />
   </ItemGroup>
  
