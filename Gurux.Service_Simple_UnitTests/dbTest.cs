@@ -592,5 +592,26 @@ namespace Gurux.Service_Test
             GXSqlBuilder parser = new GXSqlBuilder(DatabaseType.MySQL, "gx_");
             Assert.AreEqual("gx_TestClass", parser.GetTableName<TestClass>());
         }
+
+        /// <summary>
+        /// Where string is null.
+        /// </summary>
+        [TestMethod]
+        public void WhereStringIsNullTest()
+        {
+            string expected = "WHERE TestClass.`Text` IS NULL";
+            string text = null;
+            GXSelectArgs args = GXSelectArgs.SelectAll<TestClass>(q => q.Text == text);
+            string actual = args.Where.ToString();
+            Assert.AreEqual(expected, actual);
+            args = GXSelectArgs.SelectAll<TestClass>(q => q.Text.Equals(text));
+            actual = args.Where.ToString();
+            Assert.AreEqual(expected, actual);
+
+            expected = "WHERE (TestClass.`Text` IS NULL OR TestClass.`Text` = '')";
+            args = GXSelectArgs.SelectAll<TestClass>(q => string.IsNullOrEmpty(q.Text));
+            actual = args.Where.ToString();
+            Assert.AreEqual(expected, actual);
+        }
     }
 }

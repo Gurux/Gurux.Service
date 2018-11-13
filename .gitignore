@@ -175,3 +175,7 @@ Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache
 Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache
 Gurux.Service_Simple_UnitTests/.vs/Gurux.Service_Simple_Unit_Test/DesignTimeBuild/.dtbcache
 Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache
+Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache
+*.ide-shm
+*.ide-wal
+Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache

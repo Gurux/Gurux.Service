@@ -833,6 +833,10 @@ namespace Gurux.Service.Orm
                     StringBuilder sb = new StringBuilder();
                     object value;
                     var target = Expression.Lambda(expression).Compile().DynamicInvoke();
+                    if (target == null)
+                    {
+                        return new string[] { null };
+                    }
                     Dictionary<string, GXSerializedItem> properties;
                     if (target is IList)
                     {
@@ -1094,7 +1098,13 @@ namespace Gurux.Service.Orm
                                 GetMembers(settings, m.Arguments[0], '\0', where, true)[0] + "'))"};
                             }
 #endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
-                            string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper();
+                            string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0];
+                            if (tmp == null)
+                            {
+                                tmp = GetMembers(settings, m.Object, quoteSeparator, where)[0];
+                                return new string[] { "(" + tmp + " IS NULL)" };
+                            }
+                            tmp = tmp.ToUpper();
                             if (tmp[0] != '\'')
                             {
                                 tmp = "'" + tmp + "'";
