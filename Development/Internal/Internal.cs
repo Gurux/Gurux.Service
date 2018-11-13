@@ -215,7 +215,7 @@ namespace Gurux.Common.Internal
     /// </summary>
     class GXInternal
     {
-#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETCOREAPP2_1
+#if !NETSTANDARD2_0
         /// <summary>
         /// Create method handler for Gurux.Service.Rest methods.
         /// </summary>
