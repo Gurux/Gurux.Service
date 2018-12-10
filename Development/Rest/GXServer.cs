@@ -552,7 +552,7 @@ namespace Gurux.Service.Rest
                 add = context.Request.UserHostAddress;
             }
             string reply = GetReply(server.MessageMap, user, server, add, context.Request.HttpMethod, path, data);
-            context.Response.ContentType = "json";
+            context.Response.ContentType = "application/json";
             context.Response.ContentLength64 = reply.Length;
             System.Diagnostics.Debug.WriteLine("<- " + reply);
             using (BufferedStream bs = new BufferedStream(context.Response.OutputStream))
