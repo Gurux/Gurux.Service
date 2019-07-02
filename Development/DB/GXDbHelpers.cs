@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -353,21 +353,38 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static int GetInsertQuery(KeyValuePair<Type, GXUpdateItem> table, GXDBSettings settings, List<string> queries)
+        private static void GetInsert(GXDBSettings settings, bool first, StringBuilder sb)
         {
-            StringBuilder sb = new StringBuilder();
-            object value;
-            sb.Length = 0;
+            switch (settings.Type)
+            {
+                case DatabaseType.Oracle:
+                    if (first)
+                    {
+                        sb.Append("INSERT ALL INTO ");
+                    }
+                    else
+                    {
+                        sb.Append(" INTO ");
+                    }
+                    break;
+                default:
+                    sb.Append("INSERT INTO ");
+                    break;
+            }
+        }
+
+        private static void GetInsertColumns(GXDBSettings settings, bool first, KeyValuePair<Type, GXUpdateItem> table, StringBuilder sb)
+        {
             string tableName = GXDbHelpers.GetTableName(table.Key, true, settings);
-            sb.Append("INSERT INTO ");
+            GetInsert(settings, first, sb);
             sb.Append(tableName);
             sb.Append(" (");
-            bool firstRow = true, first = true;
+            bool empty = true;
             foreach (var col in table.Value.Columns)
             {
-                if (first)
+                if (empty)
                 {
-                    first = false;
+                    empty = false;
                 }
                 else
                 {
@@ -376,6 +393,15 @@ namespace Gurux.Service.Orm
                 sb.Append(GXDbHelpers.AddQuotes(col, settings.ColumnQuotation));
             }
             sb.Append(") VALUES(");
+        }
+
+        internal static int GetInsertQuery(KeyValuePair<Type, GXUpdateItem> table, GXDBSettings settings, List<string> queries)
+        {
+            StringBuilder sb = new StringBuilder();
+            object value;
+            sb.Length = 0;
+            bool firstRow = true, first = true;
+            GetInsertColumns(settings, true, table, sb);
             int rowCnt = 1;
             foreach (var col in table.Value.Rows)
             {
@@ -386,7 +412,14 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    sb.Append(", (");
+                    if (settings.Type == DatabaseType.Oracle)
+                    {
+                        GetInsertColumns(settings, false, table, sb);
+                    }
+                    else
+                    {
+                        sb.Append(", (");
+                    }
                     ++rowCnt;
                 }
                 first = true;
@@ -437,30 +470,22 @@ namespace Gurux.Service.Orm
                 //If all rows can't insert with one query.
                 if (rowCnt > settings.MaximumRowUpdate)
                 {
+                    if (settings.Type == DatabaseType.Oracle)
+                    {
+                        sb.Append(" SELECT 1 FROM DUAL");
+                    }
                     queries.Add(sb.ToString());
                     sb.Length = 0;
-                    sb.Append("INSERT INTO ");
-                    sb.Append(tableName);
-                    sb.Append(" (");
-                    first = true;
-                    foreach (var col2 in table.Value.Columns)
-                    {
-                        if (first)
-                        {
-                            first = false;
-                        }
-                        else
-                        {
-                            sb.Append(", ");
-                        }
-                        sb.Append(GXDbHelpers.AddQuotes(col2, settings.ColumnQuotation));
-                    }
-                    sb.Append(") VALUES(");
+                    GetInsertColumns(settings, true, table, sb);
                     firstRow = true;
                 }
             }
             if (!firstRow)
             {
+                if (settings.Type == DatabaseType.Oracle)
+                {
+                    sb.Append(" SELECT 1 FROM DUAL");
+                }
                 queries.Add(sb.ToString());
             }
             return table.Value.Rows.Count;
@@ -632,7 +657,7 @@ namespace Gurux.Service.Orm
                     }
                 }
 
-                //Get values.            
+                //Get values.
                 foreach (string it in u.Columns)
                 {
                     GXSerializedItem item = properties[it];
@@ -916,7 +941,7 @@ namespace Gurux.Service.Orm
                             }
                         }
                     }
-                    //If primary key is not used.                                            
+                    //If primary key is not used.
                     //If collection
                     if (target is System.Collections.IEnumerable)
                     {

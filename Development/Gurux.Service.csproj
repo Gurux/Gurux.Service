@@ -22,7 +22,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <PackageIconUrl>http://www.gurux.org/gurux.ico</PackageIconUrl>
   </PropertyGroup> 
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.1.1811.1101" />
+    <PackageReference Include="Gurux.Common" Version="8.1.1905.1301" />
  </ItemGroup>
  
 
@@ -31,7 +31,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <Reference Include="System.ComponentModel.DataAnnotations" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35' or '$(TargetFramework)' == 'netcoreapp2.1'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35'">
     <Reference Include="System.Data.Linq" />
   </ItemGroup>
  

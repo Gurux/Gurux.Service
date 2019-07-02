@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -65,9 +65,9 @@ namespace Gurux.Service.Orm
                 foreach (var it in List)
                 {
                     OrderBy(Parent.Settings, it, orderList);
-                }                
+                }
                 StringBuilder sb = new StringBuilder();
-                OrderByToString(sb, orderList, Parent.Descending, joinList);
+                OrderByToString(Parent, sb, orderList, joinList);
                 sql = sb.ToString();
                 Updated = false;
             }
@@ -77,15 +77,14 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Order values by.
         /// </summary>
-        /// <param name="sourceColumn">Columns order by.</param>        
+        /// <param name="sourceColumn">Columns order by.</param>
         internal static void OrderBy(GXDBSettings settings, LambdaExpression sourceColumn, List<GXOrder> OrderList)
         {
             string[] list = GXDbHelpers.GetMembers(settings, sourceColumn.Body, '\0', false);
-            string table = GXDbHelpers.GetTableName(sourceColumn.Parameters[0].Type, true, settings.ColumnQuotation, settings.TablePrefix);
             foreach (string it in list)
             {
                 GXOrder o = new GXOrder();
-                o.Table = table;
+                o.Table = sourceColumn.Parameters[0].Type;
                 o.Column = it;
                 OrderList.Add(o);
             }
@@ -97,7 +96,7 @@ namespace Gurux.Service.Orm
             {
                 MemberInfo m = (expression as MemberExpression).Member;
                 Type tp = (m as PropertyInfo).PropertyType;
-                allowNull = tp.IsGenericType && tp.GetGenericTypeDefinition() == typeof(Nullable<>);                    
+                allowNull = tp.IsGenericType && tp.GetGenericTypeDefinition() == typeof(Nullable<>);
                 return (expression as MemberExpression);
             }
             if (expression is UnaryExpression)
@@ -124,23 +123,23 @@ namespace Gurux.Service.Orm
             bool allowNull;
             MemberExpression me;
             foreach (var it in list.List)
-            {                
+            {
                 GXJoin join = new GXJoin();
                 join.Type = it.Key;
                 me = GetMemberExpression(it.Value.Left, out allowNull);
                 MemberInfo m = me.Member;
-                Expression e = me.Expression;                
+                Expression e = me.Expression;
                 join.Column1 = GXDbHelpers.GetColumnName(m, separtor);
                 join.AllowNull1 = allowNull;
-                m = GetMemberExpression(it.Value.Right, out allowNull).Member;                
+                m = GetMemberExpression(it.Value.Right, out allowNull).Member;
                 join.Column2 = GXDbHelpers.GetColumnName(m, separtor);
                 join.AllowNull2 = allowNull;
-                join.UpdateTables(e.Type, m.DeclaringType);              
+                join.UpdateTables(e.Type, m.DeclaringType);
                 joins.Add(join);
             }
         }
 
-        internal static void OrderByToString(StringBuilder sb, List<GXOrder> OrderList, bool OrderByDesc, List<GXJoin> joinList)
+        internal static void OrderByToString(GXSelectArgs parent, StringBuilder sb, List<GXOrder> OrderList, List<GXJoin> joinList)
         {
             bool first = true;
             if (OrderList.Count != 0)
@@ -157,14 +156,21 @@ namespace Gurux.Service.Orm
                     {
                         sb.Append(", ");
                     }
+                    if (parent.Settings.Type == DatabaseType.MSSQL && parent.Count != 0)
+                    {
+                        string table = GXDbHelpers.GetTableName(it.Table, true, '\0', parent.Settings.TablePrefix);
+                        sb.Append(GXDbHelpers.AddQuotes(table + '.' + it.Column, parent.Settings.ColumnQuotation));
+                        continue;
+                    }
                     //Add table name always until there is a way to check are multiple tables used. if (joinList.Count != 0)
                     {
-                        sb.Append(it.Table);
+                        string table = GXDbHelpers.GetTableName(it.Table, true, parent.Settings.ColumnQuotation, parent.Settings.TablePrefix);
+                        sb.Append(table);
                         sb.Append('.');
                     }
                     sb.Append(it.Column);
                 }
-                if (OrderByDesc)
+                if (parent.Descending)
                 {
                     sb.Append(" DESC");
                 }

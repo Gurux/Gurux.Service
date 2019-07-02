@@ -34,11 +34,8 @@ using System;
 using System.Reflection.Emit;
 using System.Reflection;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.IO;
 using System.Collections;
 using Gurux.Common.JSon;
 
@@ -135,7 +132,6 @@ namespace Gurux.Common.Internal
     {
         public GXRelationTable()
         {
-            return;
         }
 
         /// <summary>

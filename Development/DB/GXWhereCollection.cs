@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -64,7 +64,7 @@ namespace Gurux.Service.Orm
             if (Parent.Updated || Updated)
             {
                 StringBuilder sb = new StringBuilder();
-                string str = WhereToString(Parent.Settings, List);                
+                string str = WhereToString(Parent.Settings, List);
                 if (!string.IsNullOrEmpty(str))
                 {
                     sb.Append("WHERE ");
@@ -72,7 +72,7 @@ namespace Gurux.Service.Orm
                 }
                 sql = sb.ToString();
                 Updated = false;
-            }            
+            }
             return sql;
         }
 
@@ -89,7 +89,7 @@ namespace Gurux.Service.Orm
             Updated = true;
             List.Clear();
         }
-       
+
         /// <summary>
         /// Add And expression to where.
         /// </summary>
@@ -164,7 +164,7 @@ namespace Gurux.Service.Orm
             {
                 if (settings.LimitType == LimitType.Limit)
                 {
-                    sb = new StringBuilder();                    
+                    sb = new StringBuilder();
                     sb.Append("LIMIT ");
                     sb.Append(index);
                     sb.Append(",");
@@ -186,12 +186,12 @@ namespace Gurux.Service.Orm
                         sb.Append(index + count + 1);
                         sb.Append(") WHERE rnum > ");
                         sb.Append(index);
-                        return sb.ToString();                        
+                        return sb.ToString();
                     }
                 }
             }
             return null;
-        } 
+        }
 
         internal static string Where(GXDBSettings Settings, LambdaExpression value, bool removebrackets)
         {
@@ -203,7 +203,7 @@ namespace Gurux.Service.Orm
                     str = GXDbHelpers.GetMembers(Settings, value.Body, Settings.ColumnQuotation, true)[0];
                 }
                 else
-                {                    
+                {
                     str = GXDbHelpers.GetMembers(Settings, value.Body, '\0', true)[0];
                 }
                 //Remove brackets.
@@ -217,6 +217,6 @@ namespace Gurux.Service.Orm
                 }
             }
             return null;
-        }        
+        }
     }
 }

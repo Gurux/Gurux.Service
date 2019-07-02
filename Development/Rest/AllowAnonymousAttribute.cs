@@ -31,12 +31,9 @@
 //---------------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Gurux.Service.Rest
-{   
+{
     [AttributeUsageAttribute(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false, Inherited = true)]
     public sealed class AllowAnonymousAttribute : Attribute
     {

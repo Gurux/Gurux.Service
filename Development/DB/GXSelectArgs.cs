@@ -246,7 +246,7 @@ namespace Gurux.Service.Orm
             return SelectByIdInternal<T, UInt64>(id, columns);
         }
 
-        public static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
+        static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
         {
             if (typeof(IUnique<>).IsAssignableFrom(typeof(T)))
             {

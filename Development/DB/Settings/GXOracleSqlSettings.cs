@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -194,7 +194,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return 1;
+                return 1000;
             }
         }
 
@@ -235,10 +235,15 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
+                //IDENTITY don't work with multiple insert at the same query.
+                //Within a single SQL statement containing a reference to NEXTVAL, Oracle increments the sequence once:
+                //https://docs.oracle.com/cd/E11882_01/server.112/e41084/pseudocolumns002.htm#SQLRF50946
+                /*
                 if (GetVersion() > 11)
                 {
-                    return "IDENTITY";
+                    return " GENERATED ALWAYS AS IDENTITY";
                 }
+                */
                 return null;
             }
         }
@@ -490,20 +495,20 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc cref="GXDBSettings.CreateAutoIncrement"/>
         public override string[] CreateAutoIncrement(string tableName, string columnName)
         {
-            if (GetVersion() < 12)
-            {
-                string trigger = GetTriggerName(tableName, columnName);
-                tableName = GXDbHelpers.AddQuotes(tableName, this.TableQuotation);
-                columnName = GXDbHelpers.AddQuotes(columnName, this.ColumnQuotation);
-                //Create sequence.
-                return new string[]{"DECLARE\n C NUMBER;\nBEGIN\nSELECT COUNT(*) INTO C FROM USER_SEQUENCES WHERE SEQUENCE_NAME = '" + trigger + "';\n" +
+            //IDENTITY don't work with multiple insert at the same query.
+            //Within a single SQL statement containing a reference to NEXTVAL, Oracle increments the sequence once:
+            //https://docs.oracle.com/cd/E11882_01/server.112/e41084/pseudocolumns002.htm#SQLRF50946
+
+            string trigger = GetTriggerName(tableName, columnName);
+            tableName = GXDbHelpers.AddQuotes(tableName, this.TableQuotation);
+            columnName = GXDbHelpers.AddQuotes(columnName, this.ColumnQuotation);
+            //Create sequence.
+            return new string[]{"DECLARE\n C NUMBER;\nBEGIN\nSELECT COUNT(*) INTO C FROM USER_SEQUENCES WHERE SEQUENCE_NAME = '" + trigger + "';\n" +
                     "IF (C = 0) THEN\n EXECUTE IMMEDIATE 'CREATE SEQUENCE " + trigger + "';\nEND IF;END;",
                 //Create or replace trigger.
                 "CREATE OR REPLACE TRIGGER " + trigger + " BEFORE INSERT ON " + tableName +" FOR EACH ROW\n" +
                 "BEGIN\n SELECT " + trigger + ".NEXTVAL\n INTO\n :new." + columnName + "\n \nFROM dual;\nEND;"
             };
-            }
-            return null;
         }
 
         /// <inheritdoc cref="GXDBSettings.OnUpdate"/>
@@ -515,11 +520,10 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc cref="GXDBSettings.DropAutoIncrement"/>
         public override string[] DropAutoIncrement(string tableName, string columnName)
         {
-            if (GetVersion() < 12)
-            {
-                return new string[] { "DROP SEQUENCE " + GetSequenceName(tableName, columnName) };
-            }
-            return null;
+            //IDENTITY don't work with multiple insert at the same query.
+            //Within a single SQL statement containing a reference to NEXTVAL, Oracle increments the sequence once:
+            //https://docs.oracle.com/cd/E11882_01/server.112/e41084/pseudocolumns002.htm#SQLRF50946
+            return new string[] { "DROP SEQUENCE " + GetSequenceName(tableName, columnName) };
         }
     }
 }

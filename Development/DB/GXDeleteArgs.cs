@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -76,10 +76,10 @@ namespace Gurux.Service.Orm
         public override string ToString()
         {
             if (Parent.Updated || Updated)
-            {                
+            {
                 StringBuilder sb = new StringBuilder();
                 sb.Append("DELETE FROM ");
-                sb.Append(GXDbHelpers.GetTableName(Table, true, Parent.Settings.TableQuotation, Parent.Settings.TablePrefix));                
+                sb.Append(GXDbHelpers.GetTableName(Table, true, Parent.Settings.TableQuotation, Parent.Settings.TablePrefix));
                 string str = Where.ToString();
                 if (!string.IsNullOrEmpty(str))
                 {
@@ -160,7 +160,7 @@ namespace Gurux.Service.Orm
         }
 
         public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where)
-        {            
+        {
             GXDeleteArgs arg = DeleteAll<T>();
             if (where != null)
             {
@@ -177,8 +177,8 @@ namespace Gurux.Service.Orm
             }
             GXDeleteArgs args = Delete(typeof(T));
             args.Parent.Updated = true;
-            args.Where.Or<T>(q => collection);          
-            return args;            
+            args.Where.Or<T>(q => collection);
+            return args;
         }
 
         public static GXDeleteArgs DeleteById<T>(object id)
@@ -222,7 +222,7 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("Invalid collection");
             }
-            GXDeleteArgs args = Delete(si.Relation.RelationMapTable.Relation.PrimaryTable);            
+            GXDeleteArgs args = Delete(si.Relation.RelationMapTable.Relation.PrimaryTable);
             args.Parent.Updated = true;
             GXSerializedItem siItem = GXSqlBuilder.FindRelation(collectionType, itemType);
             foreach (TDestination c in collections)
@@ -253,6 +253,6 @@ namespace Gurux.Service.Orm
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem item, TDestination collection)
         {
             return Remove<TItem, TDestination>(new TItem[] { item }, new TDestination[] { collection });
-        }    
+        }
     }
 }

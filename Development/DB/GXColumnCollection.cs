@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -179,7 +179,7 @@ namespace Gurux.Service.Orm
                                 j.Column2 = GXDbHelpers.GetColumnName(GXSqlBuilder.FindRelation(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, tp).Target as PropertyInfo, Parent.Settings.ColumnQuotation);
                                 j.Column1 = GXDbHelpers.GetColumnName(GXSqlBuilder.FindUnique(tp).Target as PropertyInfo, Parent.Settings.ColumnQuotation);
                                 added = false;
-                                //Check that join is not added already.                                        
+                                //Check that join is not added already.
                                 string j1 = j.Table1;
                                 string j2 = j.Table2;
                                 foreach (var it4 in joinList)
@@ -327,13 +327,11 @@ namespace Gurux.Service.Orm
                 StringBuilder sb = new StringBuilder();
                 //Get columns.
                 Dictionary<string, GXSerializedItem> properties;
-                // Dictionary<Type, GXSerializedItem> allTables = new Dictionary<Type, GXSerializedItem>();
                 Dictionary<Type, GXSerializedItem> neededTables = new Dictionary<Type, GXSerializedItem>();
                 //List of tables that are already go through in join.
                 List<Type> joinTables = new List<Type>();
                 foreach (var it in List)
                 {
-                    //GXDbConnection.GetTables(it.Parameters[0].Type, allTables);
                     //No relations.
                     if (!neededTables.ContainsKey(it.Parameters[0].Type))
                     {
@@ -377,7 +375,7 @@ namespace Gurux.Service.Orm
                                     GXSerializedItem si = properties[it2];
                                     if (si.Relation != null)
                                     {
-                                        //Get properties.                                    
+                                        //Get properties.
                                         GetColumns(si.Relation.ForeignTable, ColumnList, neededTables);
                                     }
                                 }
@@ -441,7 +439,7 @@ namespace Gurux.Service.Orm
         /// 2. Several classes are using same class.
         /// 3. User is defined it using Alias attribute.
         /// </remarks>
-        private static string GetAsName(List<GXJoin> joinList, Type type, bool selectUsingAs)
+        internal static string GetAsName(List<GXJoin> joinList, Type type, bool selectUsingAs)
         {
             //Data from different classes is saved to same table.
             if (selectUsingAs || GXDbHelpers.IsSharedTable(type))
