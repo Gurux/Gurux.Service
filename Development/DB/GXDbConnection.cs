@@ -86,6 +86,19 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Null string is handled as empty string.
+        /// </summary>
+        /// <remarks>
+        /// NULL string is saved as empty string or convert to empty string when null string is read from the DB.
+        /// </remarks>
+        [DefaultValue(false)]
+        public bool UseEmptyString
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
         /// Event hanler for executed SQL.
         /// </summary>
         /// <remarks>
@@ -1689,7 +1702,7 @@ namespace Gurux.Service.Orm
                         tableName);
                     break;
                 case DatabaseType.Oracle:
-                    query = string.Format("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = '{0}'", tableName);
+                    query = string.Format("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = '{0}'", tableName.ToUpper());
                     break;
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
@@ -2748,6 +2761,10 @@ namespace Gurux.Service.Orm
                                                 if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
                                                 {
                                                     value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
+                                                    if (value == null && col.Setter.Type == typeof(string) && UseEmptyString)
+                                                    {
+                                                        value = "";
+                                                    }
                                                 }
                                                 else //Parameter type is class. Set to null.
                                                 {

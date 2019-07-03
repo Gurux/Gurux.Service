@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,18 +19,19 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Settings;
+using System;
 using System.Diagnostics;
 
 namespace Gurux.Service.Orm
@@ -40,19 +41,19 @@ namespace Gurux.Service.Orm
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         GXDBSettings settings;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        int m_Index, m_Count;
+        UInt32 index, count;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        internal bool m_Updated, m_Distinct, m_Descending;
+        internal bool updated, distinct, descending;
 
         internal bool Updated
         {
             get
             {
-                return m_Updated;
+                return updated;
             }
             set
             {
-                m_Updated = value;
+                updated = value;
             }
         }
 
@@ -81,27 +82,27 @@ namespace Gurux.Service.Orm
 
         /// <summary>
         /// Clear all default settings.
-        /// </summary>        
+        /// </summary>
         public void Clear()
         {
-            m_Index = m_Count = 0;
-            m_Distinct = m_Descending = false;
+            index = count = 0;
+            distinct = descending = false;
             Updated = true;
         }
 
         /// <summary>
         /// Start index.
         /// </summary>
-        public int Index
+        public UInt32 Index
         {
             get
             {
-                return m_Index;
+                return index;
             }
             set
             {
                 Updated = true;
-                m_Index = value;
+                index = value;
             }
         }
 
@@ -111,16 +112,16 @@ namespace Gurux.Service.Orm
         /// <remarks>
         /// If value is zero there are no limitations.
         /// </remarks>
-        public int Count
+        public UInt32 Count
         {
             get
             {
-                return m_Count;
+                return count;
             }
             set
             {
                 Updated = true;
-                m_Count = value;
+                count = value;
             }
         }
 
@@ -131,12 +132,12 @@ namespace Gurux.Service.Orm
         {
             get
             {
-                return m_Distinct;
+                return distinct;
             }
             set
             {
                 Updated = true;
-                m_Distinct = value;
+                distinct = value;
             }
         }
 
@@ -147,12 +148,12 @@ namespace Gurux.Service.Orm
         {
             get
             {
-                return m_Descending;
+                return descending;
             }
             set
             {
                 Updated = true;
-                m_Descending = value;
+                descending = value;
             }
         }
     }

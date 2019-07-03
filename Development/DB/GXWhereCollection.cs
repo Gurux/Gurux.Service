@@ -157,7 +157,7 @@ namespace Gurux.Service.Orm
             return null;
         }
 
-        internal static string LimitToString(GXDBSettings settings, int index, int count)
+        internal static string LimitToString(GXDBSettings settings, UInt32 index, UInt32 count)
         {
             StringBuilder sb;
             if ((index != 0 || count != 0))

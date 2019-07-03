@@ -1022,7 +1022,14 @@ namespace Gurux.Service.Orm
                         }
                         else
                         {
-                            sb.Append(it.Key);
+                            if (settings.UseQuotationWhereColumns)
+                            {
+                                sb.Append(GXDbHelpers.AddQuotes(it.Key, settings.ColumnQuotation));
+                            }
+                            else
+                            {
+                                sb.Append(it.Key);
+                            }
                             sb.Append(" = ");
                             sb.Append(ConvertToString(value, settings));
                         }

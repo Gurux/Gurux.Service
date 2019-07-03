@@ -126,7 +126,7 @@ namespace Gurux.Service.Orm.Settings
         public override string GetColumnsQuery(string schema, string name, out int index)
         {
             index = 0;
-            return string.Format("SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{0}'", name);
+            return string.Format("SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{0}'", name.ToUpper());
         }
 
         /// <inheritdoc cref="GXDBSettings.ColumnQuotation"/>
@@ -143,7 +143,8 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return '\"';
+                return '\0';
+                //return '\"';
             }
         }
 
@@ -157,9 +158,6 @@ namespace Gurux.Service.Orm.Settings
         }
 
         ///<inheritdoc cref="GXDBSettings.UpperCase"/>
-        ///<remarks>
-        ///Oracle columns are upper case.
-        ///</remarks>
         public override bool UpperCase
         {
             get

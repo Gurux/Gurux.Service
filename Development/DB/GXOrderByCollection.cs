@@ -164,11 +164,11 @@ namespace Gurux.Service.Orm
                     }
                     //Add table name always until there is a way to check are multiple tables used. if (joinList.Count != 0)
                     {
-                        string table = GXDbHelpers.GetTableName(it.Table, true, parent.Settings.ColumnQuotation, parent.Settings.TablePrefix);
+                        string table = GXDbHelpers.GetTableName(it.Table, true, parent.Settings.TableQuotation, parent.Settings.TablePrefix);
                         sb.Append(table);
                         sb.Append('.');
                     }
-                    sb.Append(it.Column);
+                    sb.Append(GXDbHelpers.AddQuotes(it.Column, parent.Settings.ColumnQuotation));
                 }
                 if (parent.Descending)
                 {

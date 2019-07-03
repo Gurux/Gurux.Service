@@ -485,7 +485,7 @@ namespace Gurux.Service.Orm
         }
 
         private static void SelectToString(GXDBSettings settings, StringBuilder sb, bool distinct,
-                Dictionary<Type, List<string>> columnList, List<GXJoin> joinList, int index, int count)
+                Dictionary<Type, List<string>> columnList, List<GXJoin> joinList, UInt32 index, UInt32 count)
         {
             Dictionary<Type, string> asTable = new Dictionary<Type, string>();
             string name;
@@ -572,7 +572,7 @@ namespace Gurux.Service.Orm
                     //Table name is not added if only one table.
                     if (pos == -1 && joinList.Count != 0)
                     {
-                        if (tableAs != null)
+                        if (asTable.Count > 1 && tableAs != null)
                         {
                             sb.Append(tableAs);
                         }
@@ -632,11 +632,11 @@ namespace Gurux.Service.Orm
                     {
                         sb.Append(", ");
                     }
-                    sb.Append(GXDbHelpers.GetTableName(it.Key, settings.UseQuotationWhereColumns, settings.ColumnQuotation, settings.TablePrefix));
+                    sb.Append(GXDbHelpers.GetTableName(it.Key, settings.UseQuotationWhereColumns, settings.TableQuotation, settings.TablePrefix));
                     if (asTable.ContainsKey(it.Key))
                     {
                         sb.Append(" ");
-                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Key], settings.ColumnQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Key], settings.TableQuotation));
                     }
                 }
             }
