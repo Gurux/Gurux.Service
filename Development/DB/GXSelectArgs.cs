@@ -246,16 +246,14 @@ namespace Gurux.Service.Orm
             return SelectByIdInternal<T, UInt64>(id, columns);
         }
 
-        static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
+        private static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
         {
             if (typeof(IUnique<>).IsAssignableFrom(typeof(T)))
             {
                 throw new ArgumentException("Select by ID failed. Target class must be derived from IUnique.");
             }
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns);
-            GXSerializedItem si = GXSqlBuilder.FindUnique(typeof(T));
-            string name = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-            arg.Where.Or<T>(q => name.Equals(id));
+            arg.Where.And<IUnique<T>>(q => q.Id.Equals(id));
             return arg;
         }
 
