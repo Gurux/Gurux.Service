@@ -639,6 +639,7 @@ namespace Gurux.Service.Orm
                     }
                     Type original = type;
                     List<string> serialized = new List<string>();
+                    StringBuilder fkStr = new StringBuilder();
                     do
                     {
                         foreach (var it in GXSqlBuilder.GetProperties(type))
@@ -859,7 +860,7 @@ namespace Gurux.Service.Orm
                             if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type &&
                                     it.Value.Relation.RelationType == RelationType.OneToOne)
                             {
-                                sb.Append(", ");
+                                fkStr.Append(", ");
                                 string pk;
                                 if (it.Value.Relation.RelationType == RelationType.ManyToMany)
                                 {
@@ -895,27 +896,27 @@ namespace Gurux.Service.Orm
                                 ForeignKeyAttribute fk = ((ForeignKeyAttribute[])(it.Value.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), true))[0];
 
                                 //Name is generated automatically at the moment. Use CONSTRAINT to give name to the Foreign key.
-                                sb.Append(" FOREIGN KEY (");
-                                sb.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
-                                sb.Append(") REFERENCES ");
-                                sb.Append(GXDbHelpers.AddQuotes(table2, Builder.Settings.TableQuotation));
-                                sb.Append("(");
-                                sb.Append(pk);
-                                sb.Append(")");
+                                fkStr.Append(" FOREIGN KEY (");
+                                fkStr.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
+                                fkStr.Append(") REFERENCES ");
+                                fkStr.Append(GXDbHelpers.AddQuotes(table2, Builder.Settings.TableQuotation));
+                                fkStr.Append("(");
+                                fkStr.Append(pk);
+                                fkStr.Append(")");
                                 switch (fk.OnDelete)
                                 {
                                     case ForeignKeyDelete.None:
                                         //Foreign key on delete is not used.
                                         break;
                                     case ForeignKeyDelete.Cascade:
-                                        sb.Append(" ON DELETE CASCADE");
+                                        fkStr.Append(" ON DELETE CASCADE");
                                         break;
                                     case ForeignKeyDelete.Empty:
                                         //Emit will cause this.
                                         break;
                                     case ForeignKeyDelete.Restrict:
                                         //ON DELETE NO ACTION will also work.
-                                        sb.Append(" ON DELETE RESTRICT");
+                                        fkStr.Append(" ON DELETE RESTRICT");
                                         break;
                                     default:
                                         break;
@@ -926,17 +927,17 @@ namespace Gurux.Service.Orm
                                         //Foreign key on update is not used.
                                         break;
                                     case ForeignKeyUpdate.Cascade:
-                                        sb.Append(" ON UPDATE CASCADE");
+                                        fkStr.Append(" ON UPDATE CASCADE");
                                         break;
                                     case ForeignKeyUpdate.Reject:
                                         //Emit will cause this.
                                         break;
                                     case ForeignKeyUpdate.Restrict:
                                         //ON UPDATE NO ACTION will also work.
-                                        sb.Append(" ON UPDATE RESTRICT");
+                                        fkStr.Append(" ON UPDATE RESTRICT");
                                         break;
                                     case ForeignKeyUpdate.Null:
-                                        sb.Append(" ON UPDATE SET NULL");
+                                        fkStr.Append(" ON UPDATE SET NULL");
                                         break;
                                     default:
                                         break;
@@ -956,6 +957,7 @@ namespace Gurux.Service.Orm
                     }
                     while (true);
                     type = original;
+                    sb.Append(fkStr);
                     if (create)
                     {
                         sb.Append(')');
