@@ -17,6 +17,7 @@ local.properties
 .loadpath
 Gurux.Service.TestWebService/
 Gurux.Service_UnitTests/
+Development\.vs
 
 # External tool builders
 .externalToolBuilders/
