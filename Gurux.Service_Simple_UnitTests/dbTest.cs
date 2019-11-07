@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -74,15 +74,15 @@ namespace Gurux.Service_Test
         //
         // Use ClassInitialize to run code before running the first test in the class
         //[ClassInitialize()]
-        //public static void MyClassInitialize(TestContext testContext) 
-        //{            
+        //public static void MyClassInitialize(TestContext testContext)
+        //{
         //}
         //
         // Use ClassCleanup to run code after all tests in a class have run
         // [ClassCleanup()]
         // public static void MyClassCleanup() { }
         //
-        // Use TestInitialize to run code before running each test 
+        // Use TestInitialize to run code before running each test
         [TestInitialize()]
         public void MyTestInitialize()
         {
@@ -111,7 +111,17 @@ namespace Gurux.Service_Test
         public void GetByIdTest()
         {
             GXSelectArgs arg = GXSelectArgs.SelectById<TestIDClass>(1);
-            Assert.AreEqual("SELECT `ID`, `Text` FROM TestIDClass WHERE ID=1", arg.ToString());
+            Assert.AreEqual("SELECT `ID`, `Text` FROM TestIDClass WHERE Id=1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select only part of columns.
+        /// </summary>
+        [TestMethod]
+        public void GetPartTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestIDClass>(c => new object[] { c.Id, c.Text }, q => q.Id == 1);
+            Assert.AreEqual("SELECT `ID`, `Text` FROM TestIDClass WHERE TestIDClass.`ID` = 1", arg.ToString());
         }
 
         /// <summary>
@@ -121,7 +131,7 @@ namespace Gurux.Service_Test
         public void GetByIdColumnsTest()
         {
             GXSelectArgs arg = GXSelectArgs.SelectById<TestIDClass>(1, q => q.Id);
-            Assert.AreEqual("SELECT `ID` FROM TestIDClass WHERE ID=1", arg.ToString());
+            Assert.AreEqual("SELECT `ID` FROM TestIDClass WHERE Id=1", arg.ToString());
         }
 
         /// <summary>
@@ -132,7 +142,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<DeviceGroup3>(q => q.Id);
             arg.Where.And<DeviceGroup3>(q => q.Id == 1);
-            Assert.AreEqual("SELECT `Id` AS `DG.Id` FROM DeviceGroup3 `DG` WHERE DG.`Id` = 1", arg.ToString());
+            Assert.AreEqual("SELECT `Id` AS `DG.Id` FROM DeviceGroup3 DG WHERE DG.`Id` = 1", arg.ToString());
         }
 
         /// <summary>
@@ -276,7 +286,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Time);
             arg.Where.And<TestClass>(q => q.Time > DateTime.MinValue && q.Time < DateTime.MaxValue);
-            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00:00:00') AND (TestClass.`Time` < '9999-12-31 23:59:59')", arg.ToString());
+            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00.00.00') AND (TestClass.`Time` < '9999-12-31 23.59.59')", arg.ToString());
         }
 
         /// <summary>
@@ -430,6 +440,64 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select Guid where Text equals with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereEquals2Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            t.Text = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
+            arg.Where.And<TestClass>(q => q.Text.Equals(t.Text, StringComparison.OrdinalIgnoreCase));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE UPPER(TestClass.`Text`) LIKE('GURUX')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where Text equals with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereEquals3Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            t.Text = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
+            arg.Where.And<TestClass>(q => q.Text == t.Text);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` = 'Gurux'", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where Text equals with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereEquals4Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            t.Text = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
+            string mikko = t.Text;
+            arg.Where.And<TestClass>(q => q.Id == t.Id && q.Text.Equals(t.Text));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`ID` = 1) AND (UPPER(TestClass.`Text`) LIKE('GURUX'))", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where Text equals with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereEquals5Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            t.Text = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
+            string mikko = t.Text;
+            arg.Where.And<TestClass>(q => q.Text.Equals(t.Text) && q.Id == t.Id);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (UPPER(TestClass.`Text`) LIKE('GURUX')) AND (TestClass.`ID` = 1)", arg.ToString());
+        }
+
+        /// <summary>
         /// Select Guid where ID = 1 2, or 3.
         /// </summary>
         [TestMethod]
@@ -506,7 +574,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Id);
             arg.OrderBy.Add<TestClass>(q => new { q.Id, q.Guid });
-            Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY `TestClass`.ID, `TestClass`.Guid", arg.ToString());
+            Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY TestClass.`ID`, TestClass.`Guid`", arg.ToString());
         }
 
         /// <summary>
@@ -518,7 +586,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Id);
             arg.OrderBy.Add<TestClass>(q => q.Id);
             arg.OrderBy.Add<TestClass>(q => q.Guid);
-            Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY `TestClass`.ID, `TestClass`.Guid", arg.ToString());
+            Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY TestClass.`ID`, TestClass.`Guid`", arg.ToString());
         }
 
         /// <summary>
@@ -530,7 +598,7 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Id);
             arg.OrderBy.Add<TestClass>(q => q.Id);
             arg.Descending = true;
-            Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY `TestClass`.ID DESC", arg.ToString());
+            Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY TestClass.`ID` DESC", arg.ToString());
         }
 
         /// <summary>
@@ -555,7 +623,7 @@ namespace Gurux.Service_Test
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
-            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00:00:00' WHERE `ID` = 2", args.ToString());
+            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00.00.00' WHERE `ID` = 2", args.ToString());
         }
 
         /// <summary>

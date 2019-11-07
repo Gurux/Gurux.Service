@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 #if !NETCOREAPP2_0 && !NETCOREAPP2_1
@@ -399,12 +399,12 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
-        public override string ConvertToString(object value)
+        public override string ConvertToString(object value, bool where)
         {
             if (value is DateTime)
             {
                 DateTime dt = (DateTime)value;
-                //01/01/100 is the earliest date Access can handle. 
+                //01/01/100 is the earliest date Access can handle.
                 if (dt == DateTime.MinValue)
                 {
                     return "#01/01/100#";
@@ -425,7 +425,7 @@ namespace Gurux.Service.Orm.Settings
                 sb.Append('#');
                 return sb.ToString();
             }
-            return base.ConvertToString(value);
+            return base.ConvertToString(value, where);
         }
     }
 }

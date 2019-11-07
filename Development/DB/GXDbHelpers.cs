@@ -143,7 +143,7 @@ namespace Gurux.Service.Orm
         /// <param name="useEpochTimeFormat">Is epoch time format used.</param>
         /// <param name="useEnumStringValue">Is Enum value saved by name or by integer value.</param>
         /// <returns>Converted value.</returns>
-        static internal string ConvertToString(object value, GXDBSettings settings)
+        static internal string ConvertToString(object value, GXDBSettings settings, bool where)
         {
             string str;
             if (value == null)
@@ -162,7 +162,7 @@ namespace Gurux.Service.Orm
             }
             else if (value is float || value is double || value is System.Decimal)
             {
-                str = settings.ConvertToString(value);
+                str = settings.ConvertToString(value, where);
             }
             else if (value.GetType().IsEnum)
             {
@@ -209,7 +209,7 @@ namespace Gurux.Service.Orm
                     {
                         tm = tm.ToUniversalTime();
                     }
-                    str = settings.ConvertToString(tm);
+                    str = settings.ConvertToString(tm, where);
                 }
             }
             else if (value is DateTimeOffset)
@@ -217,11 +217,11 @@ namespace Gurux.Service.Orm
                 DateTimeOffset dt = (DateTimeOffset)value;
                 if (settings.UniversalTime && dt != DateTime.MinValue && dt != DateTime.MaxValue)
                 {
-                    str = settings.ConvertToString(dt.ToUniversalTime());
+                    str = settings.ConvertToString(dt.ToUniversalTime(), where);
                 }
                 else
                 {
-                    str = settings.ConvertToString(dt);
+                    str = settings.ConvertToString(dt, where);
                 }
             }
             else if (value is System.Collections.IEnumerable)//If collection
@@ -339,7 +339,7 @@ namespace Gurux.Service.Orm
                         {
                             value = it;
                         }
-                        sb.Append(GXDbHelpers.ConvertToString(value, settings));
+                        sb.Append(GXDbHelpers.ConvertToString(value, settings, false));
                         ++index;
                     }
                     if (!string.IsNullOrEmpty(table.Value.Where))
@@ -464,7 +464,7 @@ namespace Gurux.Service.Orm
                     {
                         value = it;
                     }
-                    sb.Append(GXDbHelpers.ConvertToString(value, settings));
+                    sb.Append(GXDbHelpers.ConvertToString(value, settings, false));
                 }
                 sb.Append(")");
                 //If all rows can't insert with one query.
@@ -759,6 +759,125 @@ namespace Gurux.Service.Orm
             return GetMembers(settings, expression, quoteSeparator, where, false);
         }
 
+        internal static string[] HandleMethod(GXDBSettings settings, UnaryExpression unaryExpression, MethodCallExpression m, char quoteSeparator, bool where, bool getValue)
+        {
+            if (m.Method.DeclaringType == typeof(GXSql))
+            {
+                if (m.Method.Name == "Count")
+                {
+                    string value = null;
+                    if (m.Arguments[0].NodeType != ExpressionType.Parameter)
+                    {
+                        value = GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0];
+                    }
+                    if (value == null || value == AddQuotes("*", quoteSeparator))
+                    {
+                        return new string[] { "COUNT(1)" };
+                    }
+                    return new string[] { "COUNT(" + value + ")" };
+                }
+                if (m.Method.Name == "In")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + " IN (" +
+                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};
+                }
+                if (m.Method.Name == "Exists")
+                {
+                    if (m.Arguments.Count == 3)
+                    {
+                        return new string[] { "(EXISTS (" +
+                                 GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " AND " +
+                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false)[0] + " = " +
+                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))" };
+                    }
+                    else
+                    {
+                        throw new ArgumentOutOfRangeException("Exist failed.");
+                    }
+                }
+            }
+            if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append("(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where)[0] + " IN (");
+                foreach (string it in GetMembers(settings, m.Arguments[0], quoteSeparator, where))
+                {
+                    sb.Append(it);
+                    sb.Append(", ");
+                }
+                sb.Length -= 2;
+                sb.Append("))");
+                return new string[] { sb.ToString() };
+            }
+            if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "StartsWith")
+            {
+                return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
+                            GetMembers(settings, m.Arguments[0], '\0', where)[0] + "%'))"};
+            }
+            if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "EndsWith")
+            {
+                return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" +
+                            GetMembers(settings, m.Arguments[0], '\0', where)[0] + "'))"};
+            }
+            if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "Contains")
+            {
+                return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" +
+                            GetMembers(settings, m.Arguments[0], '\0', where)[0] + "%'))"};
+            }
+            if (m.Method.Name == "Equals")
+            {
+                if (m.Method.DeclaringType == typeof(string))
+                {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+                    if (settings.Type == DatabaseType.Access)
+                    {
+                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
+                                GetMembers(settings, m.Arguments[0], '\0', where, true)[0] + "'))"};
+                    }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+                    string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0];
+                    if (tmp == null)
+                    {
+                        tmp = GetMembers(settings, m.Object, quoteSeparator, where)[0];
+                        return new string[] { "(" + tmp + " IS NULL)" };
+                    }
+                    tmp = tmp.ToUpper();
+                    if (tmp[0] != '\'')
+                    {
+                        tmp = "'" + tmp + "'";
+                    }
+                    return new string[] {"(UPPER(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + ") LIKE(" +
+                                 tmp + "))"};
+                }
+                else
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + "=" +
+                            GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper() + ")"};
+                }
+            }
+            if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "IsNullOrEmpty")
+            {
+                string tmp = GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0];
+                if (settings.Type == DatabaseType.Oracle)
+                {
+                    if (unaryExpression.NodeType == ExpressionType.Not)
+                    {
+                        return new string[] { "((" + tmp + " IS NOT NULL))" };
+                    }
+                    return new string[] { "((" + tmp + " IS NULL))" };
+                }
+                else
+                {
+                    if (unaryExpression.NodeType == ExpressionType.Not)
+                    {
+                        return new string[] { "((" + tmp + " IS NOT NULL AND " + tmp + " <> ''))" };
+                    }
+                    return new string[] { "((" + tmp + " IS NULL OR " + tmp + " = ''))" };
+                }
+            }
+            throw new ArgumentOutOfRangeException("Unknown SQL command: " + m.Method.Name + ".");
+        }
+
         internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where, bool getValue)
         {
             if (expression == null)
@@ -783,7 +902,7 @@ namespace Gurux.Service.Orm
                     var lambda = Expression.Lambda<Func<object>>(member);
                     var getter = lambda.Compile();
                     object value = getter();
-                    return new string[] { ConvertToString(value, settings) };
+                    return new string[] { ConvertToString(value, settings, where) };
                 }
                 //Get member name.
                 if (e.NodeType == ExpressionType.Parameter)
@@ -823,6 +942,10 @@ namespace Gurux.Service.Orm
                             value = Convert.ToInt64(value);
                         }
                     }
+                    else if (value is string)
+                    {
+                        //Do nothing.
+                    }
                     else if (value is IEnumerable)
                     {
                         StringBuilder sb = new StringBuilder();
@@ -846,11 +969,11 @@ namespace Gurux.Service.Orm
                             return new string[] { sb.ToString() };
                         }
                     }
-                    return new string[] { ConvertToString(value, settings) };
+                    return new string[] { ConvertToString(value, settings, where) };
                 }
                 if (e.NodeType == ExpressionType.Call)
                 {
-                    return new string[] { ConvertToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke(), settings) };
+                    return new string[] { ConvertToString(Expression.Lambda(memberExpression).Compile().DynamicInvoke(), settings, where) };
                 }
                 if (memberExpression.NodeType == ExpressionType.MemberAccess && e.NodeType == ExpressionType.Constant)
                 {
@@ -987,7 +1110,7 @@ namespace Gurux.Service.Orm
                                 {
                                     sb.Append(it.Key);
                                     sb.Append(" = ");
-                                    sb.Append(ConvertToString(value, settings));
+                                    sb.Append(ConvertToString(value, settings, where));
                                 }
                             }
                             sb.Append(")");
@@ -1031,7 +1154,7 @@ namespace Gurux.Service.Orm
                                 sb.Append(it.Key);
                             }
                             sb.Append(" = ");
-                            sb.Append(ConvertToString(value, settings));
+                            sb.Append(ConvertToString(value, settings, where));
                         }
                     }
                     sb.Append(')');
@@ -1044,6 +1167,10 @@ namespace Gurux.Service.Orm
             {
                 // Reference type method
                 var methodCallExpression = (MethodCallExpression)expression;
+                if (methodCallExpression.Arguments.Count != 0 && methodCallExpression.Arguments[0].NodeType == ExpressionType.MemberAccess)
+                {
+                    return HandleMethod(settings, null, methodCallExpression, quoteSeparator, where, getValue);
+                }
                 object value = Expression.Lambda(methodCallExpression).Compile().DynamicInvoke();
                 if (where && getValue && value is string)
                 {
@@ -1053,6 +1180,10 @@ namespace Gurux.Service.Orm
                 {
                     return new string[] { AddQuotes(value.ToString().Replace("-", ""), '\'') };
                 }
+                else if (where && getValue && value is DateTime)
+                {
+                    return new string[] { settings.ConvertToString(value, where) };
+                }
                 return new string[] { Convert.ToString(value) };
             }
 
@@ -1060,117 +1191,10 @@ namespace Gurux.Service.Orm
             {
                 // Property, field of method returning value type
                 var unaryExpression = (UnaryExpression)expression;
-                if (unaryExpression.Operand.NodeType == ExpressionType.Call)
+                MethodCallExpression m = unaryExpression.Operand as MethodCallExpression;
+                if (m != null)
                 {
-                    var m = (MethodCallExpression)unaryExpression.Operand;
-
-                    if (m.Method.DeclaringType == typeof(GXSql))
-                    {
-                        if (m.Method.Name == "Count")
-                        {
-                            string value = null;
-                            if (m.Arguments[0].NodeType != ExpressionType.Parameter)
-                            {
-                                value = GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0];
-                            }
-                            if (value == null || value == AddQuotes("*", quoteSeparator))
-                            {
-                                return new string[] { "COUNT(1)" };
-                            }
-                            return new string[] { "COUNT(" + value + ")" };
-                        }
-                        if (m.Method.Name == "In")
-                        {
-                            return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + " IN (" +
-                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};
-                        }
-                        if (m.Method.Name == "Exists")
-                        {
-                            if (m.Arguments.Count == 3)
-                            {
-                                return new string[] { "(EXISTS (" +
-                                 GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " AND " +
-                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false)[0] + " = " +
-                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))" };
-                            }
-                            else
-                            {
-                                throw new ArgumentOutOfRangeException("Exist failed.");
-                            }
-                        }
-                    }
-                    if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
-                    {
-                        return new string[] {"(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where)[0] + " IN (" +
-                            GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0] + "))"};
-                    }
-                    if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "StartsWith")
-                    {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
-                            GetMembers(settings, m.Arguments[0], '\0', where)[0] + "%'))"};
-                    }
-                    if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "EndsWith")
-                    {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" +
-                            GetMembers(settings, m.Arguments[0], '\0', where)[0] + "'))"};
-                    }
-                    if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "Contains")
-                    {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('%" +
-                            GetMembers(settings, m.Arguments[0], '\0', where)[0] + "%'))"};
-                    }
-                    if (m.Method.Name == "Equals")
-                    {
-                        if (m.Method.DeclaringType == typeof(string))
-                        {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                            if (settings.Type == DatabaseType.Access)
-                            {
-                                return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " LIKE('" +
-                                GetMembers(settings, m.Arguments[0], '\0', where, true)[0] + "'))"};
-                            }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
-                            string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true)[0];
-                            if (tmp == null)
-                            {
-                                tmp = GetMembers(settings, m.Object, quoteSeparator, where)[0];
-                                return new string[] { "(" + tmp + " IS NULL)" };
-                            }
-                            tmp = tmp.ToUpper();
-                            if (tmp[0] != '\'')
-                            {
-                                tmp = "'" + tmp + "'";
-                            }
-                            return new string[] {"(UPPER(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + ") LIKE(" +
-                                 tmp + "))"};
-                        }
-                        else
-                        {
-                            return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + "=" +
-                            GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper() + ")"};
-                        }
-                    }
-                    if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "IsNullOrEmpty")
-                    {
-                        string tmp = GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0];
-                        if (settings.Type == DatabaseType.Oracle)
-                        {
-                            if (unaryExpression.NodeType == ExpressionType.Not)
-                            {
-                                return new string[] { "((" + tmp + " IS NOT NULL))" };
-                            }
-                            return new string[] { "((" + tmp + " IS NULL))" };
-                        }
-                        else
-                        {
-                            if (unaryExpression.NodeType == ExpressionType.Not)
-                            {
-                                return new string[] { "((" + tmp + " IS NOT NULL AND " + tmp + " <> ''))" };
-                            }
-                            return new string[] { "((" + tmp + " IS NULL OR " + tmp + " = ''))" };
-                        }
-                    }
-                    throw new ArgumentOutOfRangeException("Unknown SQL command: " + m.Method.Name + ".");
+                    return HandleMethod(settings, unaryExpression, m, quoteSeparator, where, getValue);
                 }
                 return GetMembers(settings, unaryExpression.Operand, quoteSeparator, where);
             }
@@ -1191,24 +1215,15 @@ namespace Gurux.Service.Orm
             {
                 // Property, field of method returning value type
                 var newExpression = (NewArrayExpression)expression;
-                StringBuilder sb = new StringBuilder();
-                bool first = true;
+                List<string> list = new List<string>();
                 foreach (var it in newExpression.Expressions)
                 {
-                    if (first)
-                    {
-                        first = false;
-                    }
-                    else
-                    {
-                        sb.Append(", ");
-                    }
                     foreach (string var in GetMembers(settings, it, quoteSeparator, where))
                     {
-                        sb.Append(var.ToString());
+                        list.Add(var.ToString());
                     }
                 }
-                return new string[] { sb.ToString() };
+                return list.ToArray();
             }
 
             if (expression is BinaryExpression)
@@ -1224,8 +1239,12 @@ namespace Gurux.Service.Orm
                         op = " + ";
                         break;
                     case ExpressionType.And:
-                    case ExpressionType.AndAlso:
                         op = " AND ";
+                        break;
+                    case ExpressionType.AndAlso:
+                        list.Add("(" + GetMembers(settings, newExpression.Left, quoteSeparator, where)[0] + " AND " +
+                            GetMembers(settings, newExpression.Right, quoteSeparator, where)[0] + ")");
+                        return list.ToArray();
                         break;
                     case ExpressionType.Coalesce:
                         op = " COALESCE ";
@@ -1240,7 +1259,7 @@ namespace Gurux.Service.Orm
                         op = " > ";
                         break;
                     case ExpressionType.GreaterThanOrEqual:
-                        op = " => ";
+                        op = " >= ";
                         break;
                     case ExpressionType.LessThan:
                         op = " < ";

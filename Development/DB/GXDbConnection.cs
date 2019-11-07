@@ -803,22 +803,22 @@ namespace Gurux.Service.Orm
                             if ((it.Value.Attributes & (Attributes.AutoIncrement | Attributes.PrimaryKey)) != 0)
                             {
 #if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                                if (Builder.Settings.Type != DatabaseType.Access && Builder.Settings.Type != DatabaseType.Oracle)
+                                if (Builder.Settings.Type == DatabaseType.Access || Builder.Settings.Type == DatabaseType.Oracle)
                                 {
-                                    sb.Append(" PRIMARY KEY ");
                                     if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                                     {
                                         sb.Append(Builder.Settings.AutoIncrementDefinition);
                                     }
+                                    sb.Append(" PRIMARY KEY ");
                                 }
                                 else
 #endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                 {
+                                    sb.Append(" PRIMARY KEY ");
                                     if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                                     {
                                         sb.Append(Builder.Settings.AutoIncrementDefinition);
                                     }
-                                    sb.Append(" PRIMARY KEY ");
                                 }
                                 if (it.Value.DefaultValue == null && Builder.Settings.Type == DatabaseType.Oracle)
                                 {
@@ -2093,7 +2093,10 @@ namespace Gurux.Service.Orm
                     //Add table index position.
                     if (TableIndexes != null && (c.Setter.Attributes & Attributes.PrimaryKey) != 0)
                     {
-                        TableIndexes.Add(tableType, pos);
+                        if (!TableIndexes.ContainsKey(tableType))
+                        {
+                            TableIndexes.Add(tableType, pos);
+                        }
                     }
                 }
                 c.TableType = tableType;

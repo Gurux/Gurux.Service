@@ -406,7 +406,7 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
-        public override string ConvertToString(object value)
+        public override string ConvertToString(object value, bool where)
         {
             if (value is DateTime)
             {
@@ -418,7 +418,7 @@ namespace Gurux.Service.Orm.Settings
                 string format = "yyyyMMdd HH:mm:ss";
                 return GetQuetedValue(((DateTimeOffset)value).ToString(format, CultureInfo.InvariantCulture));
             }
-            return base.ConvertToString(value);
+            return base.ConvertToString(value, where);
         }
     }
 }

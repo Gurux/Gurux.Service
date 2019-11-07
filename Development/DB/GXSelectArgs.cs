@@ -253,7 +253,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentException("Select by ID failed. Target class must be derived from IUnique.");
             }
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns);
-            arg.Where.And<IUnique<T>>(q => q.Id.Equals(id));
+            arg.Where.And<IUnique<T>>( q => q.Id.Equals(id));
             return arg;
         }
 

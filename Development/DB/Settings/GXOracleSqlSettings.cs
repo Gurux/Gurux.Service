@@ -445,7 +445,7 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
-        public override string ConvertToString(object value)
+        public override string ConvertToString(object value, bool where)
         {
             if (value is DateTime)
             {
