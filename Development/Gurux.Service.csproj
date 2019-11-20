@@ -40,5 +40,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
   <ItemGroup>
     <Folder Include="Properties\" />
   </ItemGroup>
- 
+ <ItemGroup>
+    <None Include="..\gurux_service.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
