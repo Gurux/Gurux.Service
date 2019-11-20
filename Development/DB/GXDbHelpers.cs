@@ -1292,7 +1292,6 @@ namespace Gurux.Service.Orm
                         list.Add("(" + GetMembers(settings, newExpression.Left, quoteSeparator, where)[0] + " AND " +
                             GetMembers(settings, newExpression.Right, quoteSeparator, where)[0] + ")");
                         return list.ToArray();
-                        break;
                     case ExpressionType.Coalesce:
                         op = " COALESCE ";
                         break;
