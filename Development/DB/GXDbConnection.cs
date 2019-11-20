@@ -852,6 +852,10 @@ namespace Gurux.Service.Orm
                                 {
                                     sb.Append("'" + (string)it.Value.DefaultValue + "'");
                                 }
+                                else if (it.Value.DefaultValue is bool)
+                                {
+                                    sb.Append((bool)it.Value.DefaultValue ? 1 : 0);
+                                }
                                 else
                                 {
                                     sb.Append(Convert.ToString(it.Value.DefaultValue));

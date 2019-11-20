@@ -122,7 +122,7 @@ namespace Gurux.Service.Orm
             string prefix = settings.TablePrefix;
             bool allowNull;
             MemberExpression me;
-            foreach (var it in list.List)
+            foreach (KeyValuePair<JoinType, BinaryExpression> it in list.List)
             {
                 GXJoin join = new GXJoin();
                 join.Type = it.Key;
