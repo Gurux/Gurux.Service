@@ -111,7 +111,7 @@ namespace Gurux.Service_Test
         public void GetByIdTest()
         {
             GXSelectArgs arg = GXSelectArgs.SelectById<TestIDClass>(1);
-            Assert.AreEqual("SELECT `ID`, `Text` FROM TestIDClass WHERE Id=1", arg.ToString());
+            Assert.AreEqual("SELECT `ID`, `Text` FROM TestIDClass WHERE ID=1", arg.ToString());
         }
 
         /// <summary>
@@ -131,7 +131,7 @@ namespace Gurux.Service_Test
         public void GetByIdColumnsTest()
         {
             GXSelectArgs arg = GXSelectArgs.SelectById<TestIDClass>(1, q => q.Id);
-            Assert.AreEqual("SELECT `ID` FROM TestIDClass WHERE Id=1", arg.ToString());
+            Assert.AreEqual("SELECT `ID` FROM TestIDClass WHERE ID=1", arg.ToString());
         }
 
         /// <summary>
@@ -561,9 +561,22 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void SqlInTest()
         {
+
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => new int[] { 1, 2, 3 }.Contains(q.Id));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID not in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlNotInTest()
+        {
+            int[] list = new int[] { 1, 2, 3 };
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => !list.Contains(q.Id));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` NOT IN (1, 2, 3)", arg.ToString());
         }
 
         /// <summary>
@@ -679,6 +692,58 @@ namespace Gurux.Service_Test
             expected = "WHERE (TestClass.`Text` IS NULL OR TestClass.`Text` = '')";
             args = GXSelectArgs.SelectAll<TestClass>(q => string.IsNullOrEmpty(q.Text));
             actual = args.Where.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlIn2Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => GXSql.In(q.Id, new int[] { 1, 2, 3 }));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlNotIn2Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => !GXSql.In(q.Id, new int[] { 1, 2, 3 }));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` NOT IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID is in the array.
+        /// </summary>
+        [TestMethod]
+        public void ExistsTest()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
+            arg.Where.And<Country>(q => GXSql.Exists<Company, Country>(a => a.Country, b => b.Id, arg2));
+            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Country.`ID` = Company.`CountryID`)";
+            string actual = arg.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        /// <summary>
+        /// Select Guid where ID is not in the array.
+        /// </summary>
+        [TestMethod]
+        public void NotExistsTest()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
+            arg.Where.And<Country>(q => !GXSql.Exists<Company, Country>(a => a.Country, b => b.Id, arg2));
+            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE NOT EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Country.`ID` = Company.`CountryID`)";
+            string actual = arg.ToString();
             Assert.AreEqual(expected, actual);
         }
     }

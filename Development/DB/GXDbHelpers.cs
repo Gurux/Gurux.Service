@@ -778,17 +778,36 @@ namespace Gurux.Service.Orm
                 }
                 if (m.Method.Name == "In")
                 {
-                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + " IN (" +
-                               GetMembers(settings, m.Arguments[1], quoteSeparator, where, true)[0] + "))"};
+                    string[] list = GetMembers(settings, m.Arguments[1], quoteSeparator, where, true);
+                    string tmp = "(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0];
+                    if (unaryExpression != null && unaryExpression.NodeType == ExpressionType.Not)
+                    {
+                        tmp += " NOT IN (";
+                    }
+                    else
+                    {
+                        tmp += " IN (";
+                    }
+                    tmp += string.Join(", ", list) + "))";
+                    return new string[] { tmp };
                 }
                 if (m.Method.Name == "Exists")
                 {
                     if (m.Arguments.Count == 3)
                     {
-                        return new string[] { "(EXISTS (" +
-                                 GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " AND " +
+                        string tmp;
+                        if (unaryExpression != null && unaryExpression.NodeType == ExpressionType.Not)
+                        {
+                            tmp = "(NOT EXISTS (";
+                        }
+                        else
+                        {
+                            tmp = "(EXISTS (";
+                        }
+                        tmp += GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " AND " +
                                   GetMembers(settings, m.Arguments[1], quoteSeparator, where, false)[0] + " = " +
-                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))" };
+                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))";
+                        return new string[] { tmp };
                     }
                     else
                     {
@@ -799,7 +818,15 @@ namespace Gurux.Service.Orm
             if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
             {
                 StringBuilder sb = new StringBuilder();
-                sb.Append("(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where)[0] + " IN (");
+                sb.Append("(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where)[0]);
+                if (unaryExpression.NodeType == ExpressionType.Not)
+                {
+                    sb.Append(" NOT IN (");
+                }
+                else
+                {
+                    sb.Append(" IN (");
+                }
                 foreach (string it in GetMembers(settings, m.Arguments[0], quoteSeparator, where))
                 {
                     sb.Append(it);
@@ -989,6 +1016,25 @@ namespace Gurux.Service.Orm
                     if (target is IList)
                     {
                         properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
+                        //If this is a basic type list. example int[].
+                        if (properties.Count == 0)
+                        {
+                            IEnumerator e2 = (target as IEnumerable).GetEnumerator();
+                            first = true;
+                            while (e2.MoveNext())
+                            {
+                                if (first)
+                                {
+                                    first = false;
+                                }
+                                else
+                                {
+                                    sb.Append(", ");
+                                }
+                                sb.Append(e2.Current);
+                            }
+                            return new string[] { sb.ToString() };
+                        }
                     }
                     else if (target is string || target is GXSelectArgs || !target.GetType().IsClass)//String is class.
                     {
@@ -1017,12 +1063,13 @@ namespace Gurux.Service.Orm
                         if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                         {
                             //If collection
-                            if (target is System.Collections.IEnumerable)
+                            if (target is IEnumerable)
                             {
                                 sb.Append('(');
                                 sb.Append(GetColumnName(it.Value.Target as PropertyInfo, settings.ColumnQuotation));
                                 sb.Append(" IN(");
                                 IEnumerator e2 = (target as System.Collections.IEnumerable).GetEnumerator();
+                                first = true;
                                 while (e2.MoveNext())
                                 {
                                     if (it.Value.Get != null)
@@ -1066,12 +1113,12 @@ namespace Gurux.Service.Orm
                     }
                     //If primary key is not used.
                     //If collection
-                    if (target is System.Collections.IEnumerable)
+                    if (target is IEnumerable)
                     {
                         Type itemType = GXInternal.GetPropertyType(target.GetType());
                         sb.Append('(');
                         bool firstRow = true;
-                        IEnumerator e2 = (target as System.Collections.IEnumerable).GetEnumerator();
+                        IEnumerator e2 = (target as IEnumerable).GetEnumerator();
                         while (e2.MoveNext())
                         {
                             if (firstRow)
