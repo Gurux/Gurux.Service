@@ -450,6 +450,14 @@ namespace Gurux.Service.Orm
                     {
                         if (!cols.Contains(it.Key))
                         {
+                            if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type)
+                            {
+                                if (it.Value.Relation.RelationType == RelationType.OneToOne ||
+                                    it.Value.Relation.RelationType == RelationType.OneToMany)
+                                {
+                                    continue;
+                                }
+                            }
                             StringBuilder sb = new StringBuilder();
                             sb.Append("ALTER TABLE ");
                             sb.Append(GXDbHelpers.AddQuotes(tableName, Builder.Settings.TableQuotation));
