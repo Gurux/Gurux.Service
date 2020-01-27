@@ -29,7 +29,7 @@
 // This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
 using System;
 using System.Net;
 using System.Threading;
@@ -650,4 +650,4 @@ namespace Gurux.Service.Rest
         }
     }
 }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1

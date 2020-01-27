@@ -4,14 +4,14 @@
     <AssemblyName>Gurux.Service</AssemblyName>
     <Company>Gurux Ltd</Company>
     <Authors>Gurux Ltd</Authors>
-    <Copyright>Copyright (c) 1998-2019 Gurux Ltd. All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 1998-2020 Gurux Ltd. All rights reserved.</Copyright>
     <PackageProjectUrl>www.gurux.fi/index.php?q=Gurux.Service</PackageProjectUrl>
     <Description>Gurux.Service class implements 
 Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.</Description>
   <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <TargetFrameworks>net46;net40;net45;netcoreapp2.1</TargetFrameworks>
+    <TargetFrameworks>net46;net40;net45;net35;netcoreapp3.1;netcoreapp2.1;</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
     <PackageTags>Gurux Service framework.</PackageTags>
@@ -24,7 +24,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <PackageIcon>gurux_service.png</PackageIcon>
   </PropertyGroup> 
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.1.1907.301" />
+    <PackageReference Include="Gurux.Common" Version="8.1.2001.2404" />
  </ItemGroup>
  
 
@@ -33,7 +33,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <Reference Include="System.ComponentModel.DataAnnotations" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35'">
+  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35' or '$(TargetFramework)' == 'netcoreapp3.1'">
     <Reference Include="System.Data.Linq" />
   </ItemGroup>
  
@@ -43,4 +43,14 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
  <ItemGroup>
     <None Include="..\gurux_service.png" Pack="true" PackagePath="\" />
   </ItemGroup>
+ <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1'">
+   <PackageReference Include="System.Data.Odbc">
+     <Version>4.7.0</Version>
+   </PackageReference>
+ </ItemGroup>
+ <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp2.1'">
+   <PackageReference Include="System.Data.Odbc">
+     <Version>4.7.0</Version>
+   </PackageReference>
+ </ItemGroup>
 </Project>

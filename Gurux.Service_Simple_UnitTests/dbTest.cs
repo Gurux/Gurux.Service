@@ -286,7 +286,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Time);
             arg.Where.And<TestClass>(q => q.Time > DateTime.MinValue && q.Time < DateTime.MaxValue);
-            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00.00.00') AND (TestClass.`Time` < '9999-12-31 23.59.59')", arg.ToString());
+            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00:00:00') AND (TestClass.`Time` < '9999-12-31 23:59:59')", arg.ToString());
         }
 
         /// <summary>
@@ -636,7 +636,7 @@ namespace Gurux.Service_Test
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
-            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00.00.00' WHERE `ID` = 2", args.ToString());
+            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00:00:00' WHERE `ID` = 2", args.ToString());
         }
 
         /// <summary>

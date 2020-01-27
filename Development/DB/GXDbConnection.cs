@@ -1398,7 +1398,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
@@ -1418,7 +1418,7 @@ namespace Gurux.Service.Orm
                 return list.ToArray();
             }
             else
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
             {
                 query = Builder.Settings.GetColumnsQuery(connection.Database, tableName, out index);
             }
@@ -1670,7 +1670,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = "SELECT NAME FROM sqlite_master WHERE type='table'";
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1690,7 +1690,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                     return list.ToArray();
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
@@ -1721,7 +1721,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1733,7 +1733,7 @@ namespace Gurux.Service.Orm
                         dt = (Connection as System.Data.Odbc.OdbcConnection).GetSchema("Tables", new string[] { null, null, tableName });
                     }
                     return dt.Rows.Count != 0;
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
@@ -2174,7 +2174,7 @@ namespace Gurux.Service.Orm
                 //Read column headers.
                 if (columns != null)
                 {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                     if (Connection is OdbcConnection)
                     {
                         using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
@@ -2201,7 +2201,7 @@ namespace Gurux.Service.Orm
                             }
                         }
                     }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
 
                 }
                 using (IDbCommand com = Connection.CreateCommand())
@@ -2594,7 +2594,7 @@ namespace Gurux.Service.Orm
                 //Read column headers.
                 if (columns != null)
                 {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                     if (Connection is OdbcConnection)
                     {
                         using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
@@ -2621,7 +2621,7 @@ namespace Gurux.Service.Orm
                             }
                         }
                     }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                 }
                 using (IDbCommand com = Connection.CreateCommand())
                 {
@@ -2839,11 +2839,11 @@ namespace Gurux.Service.Orm
                             reader.Close();
                         }
                     }
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                     catch (SqlException ex)
 #else
                     catch (Exception ex)
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
                     {
                         throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
                     }
