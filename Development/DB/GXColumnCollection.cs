@@ -49,6 +49,7 @@ namespace Gurux.Service.Orm
         /// List of tables and columns to get.
         /// </summary>
         internal Dictionary<Type, List<string>> ColumnList = new Dictionary<Type, List<string>>();
+        internal Dictionary<string, string> Maps = new Dictionary<string, string>();
 
         internal List<LambdaExpression> List = new List<LambdaExpression>();
         internal GXJoinCollection Joins;
@@ -484,7 +485,7 @@ namespace Gurux.Service.Orm
             return null;
         }
 
-        private static void SelectToString(GXDBSettings settings, StringBuilder sb, bool distinct,
+        private void SelectToString(GXDBSettings settings, StringBuilder sb, bool distinct,
                 Dictionary<Type, List<string>> columnList, List<GXJoin> joinList, UInt32 index, UInt32 count)
         {
             Dictionary<Type, string> asTable = new Dictionary<Type, string>();
@@ -556,9 +557,9 @@ namespace Gurux.Service.Orm
                 {
                     table = GXDbHelpers.GetTableName(it.Key, true, settings.TableQuotation, settings.TablePrefix);
                 }
-
                 foreach (var col in it.Value)
                 {
+                    name = null;
                     if (first)
                     {
                         first = false;
@@ -590,17 +591,20 @@ namespace Gurux.Service.Orm
                         }
                         else
                         {
-                            sb.Append(GXDbHelpers.AddQuotes(col, settings.ColumnQuotation));
+                            name = GXDbHelpers.AddQuotes(col, settings.ColumnQuotation);
+                            sb.Append(name);
                         }
                         if (tableAs != null)
                         {
                             sb.Append(" AS ");
-                            sb.Append(GXDbHelpers.AddQuotes(tableAs + "." + col, settings.ColumnQuotation));
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col, settings.ColumnQuotation);
+                            sb.Append(name);
                         }
                         else if (settings.SelectUsingAs && index == 0)
                         {
                             sb.Append(" AS ");
-                            sb.Append(GXDbHelpers.AddQuotes(tableAs + "." + col, settings.ColumnQuotation));
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col, settings.ColumnQuotation);
+                            sb.Append(name);
                         }
                     }
                     else //If method like COUNT(*)
@@ -609,8 +613,14 @@ namespace Gurux.Service.Orm
                         if (settings.SelectUsingAs && index == 0)
                         {
                             sb.Append(" AS ");
-                            sb.Append(GXDbHelpers.AddQuotes(tableAs + "." + col.Substring(0, pos), settings.ColumnQuotation));
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col.Substring(0, pos), settings.ColumnQuotation);
+                            sb.Append(name);
                         }
+                    }
+                    if (Maps.ContainsKey(col))
+                    {
+                        sb.Append(" AS ");
+                        sb.Append(GXDbHelpers.AddQuotes(Maps[col], settings.ColumnQuotation));
                     }
                 }
             }

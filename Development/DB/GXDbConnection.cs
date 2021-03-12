@@ -499,6 +499,18 @@ namespace Gurux.Service.Orm
             }
         }
 
+        /// <summary>
+        /// Create new view.
+        /// </summary>
+        /// <param name="type">View type.</param>
+        /// <param name="map">How columns are mapped between select and view.</param>
+        /// <param name="select">How data is retreaved from the tables.</param>
+        /// <param name="overwrite">Old view is dropped if exists.</param>
+        public void CreateView(GXCreateViewArgs map, GXSelectArgs select, bool overwrite)
+        {
+
+        }
+
         class GXTableCreateQuery
         {
             public Type Table;
@@ -2998,7 +3010,7 @@ namespace Gurux.Service.Orm
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
             foreach (var it in arg.Values)
             {
-                GXDbHelpers.GetValues(it.Key, null, it.Value, list, true, false, Builder.Settings.ColumnQuotation, false);
+                GXDbHelpers.GetValues(it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, false);
             }
             UpdateOrInsert(list, true);
         }
@@ -3018,16 +3030,15 @@ namespace Gurux.Service.Orm
             arg.Settings = Builder.Settings;
             //Get values to insert first.
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            List<object> insertedList = new List<object>();
             foreach (var it in arg.Values)
             {
-                GXDbHelpers.GetValues(it.Key, null, it.Value, list, true, false, Builder.Settings.ColumnQuotation, true);
+                GXDbHelpers.GetValues(it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, true);
             }
             UpdateOrInsert(list, true);
             //Get updated values.
             foreach (var it in arg.Values)
             {
-                GXDbHelpers.GetValues(it.Key, null, it.Value, list, false, false, Builder.Settings.ColumnQuotation, true);
+                GXDbHelpers.GetValues(it.Key, null, it.Value, list, arg.Excluded, false, false, Builder.Settings.ColumnQuotation, true);
             }
             UpdateOrInsert(list, false);
         }

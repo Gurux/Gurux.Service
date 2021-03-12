@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -40,7 +40,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Collections;
 namespace Gurux.Service.Orm
-{  
+{
     /// <summary>
     /// Select arguments.
     /// </summary>
@@ -54,6 +54,13 @@ namespace Gurux.Service.Orm
         /// </summary>
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<KeyValuePair<object, LambdaExpression>> Values = new List<KeyValuePair<object, LambdaExpression>>();
+
+        /// <summary>
+        /// List of values to exlude from update.
+        /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        internal List<KeyValuePair<Type, LambdaExpression>> Excluded = new List<KeyValuePair<Type, LambdaExpression>>();
+
         /// <summary>
         /// Generated update SQL string.
         /// </summary>
@@ -71,7 +78,7 @@ namespace Gurux.Service.Orm
 
         /// <summary>
         /// Clear all update settings.
-        /// </summary>        
+        /// </summary>
         public void Clear()
         {
             Parent.Clear();
@@ -102,11 +109,10 @@ namespace Gurux.Service.Orm
             {
                 List<string> queries = new List<string>();
                 //Get inserted items.
-                GXDbHelpers.GetQueries(true, Parent.Settings, Values, queries);
+                GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries);
                 //Get updated items.
-                GXDbHelpers.GetQueries(false, Parent.Settings, Values, queries);                
+                GXDbHelpers.GetQueries(false, Parent.Settings, Values, Excluded, queries);
                 sql = string.Join(" ", queries.ToArray());
-//                sql += Where.ToString();
             }
             return sql;
         }
@@ -119,7 +125,7 @@ namespace Gurux.Service.Orm
         public static GXUpdateArgs Update<T>(T value)
         {
             return Update<T>(value, null);
-        }    
+        }
 
         /// <summary>
         /// Create new update expression.
@@ -136,7 +142,7 @@ namespace Gurux.Service.Orm
             if (value is IEnumerable)
             {
                 throw new ArgumentException("Use UpdateRange to update a collection.");
-            } 
+            }
             GXUpdateArgs args = new GXUpdateArgs();
             args.Parent.Updated = true;
             args.Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
@@ -159,7 +165,7 @@ namespace Gurux.Service.Orm
             }
             return args;
         }
-               
+
         /// <summary>
         /// Add new item to update.
         /// </summary>
@@ -176,7 +182,7 @@ namespace Gurux.Service.Orm
             }
             Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
         }
-               
+
         /// <summary>
         /// Where expression.
         /// </summary>
@@ -193,6 +199,17 @@ namespace Gurux.Service.Orm
         {
             get;
             private set;
-        }        
+        }
+
+        /// <summary>
+        /// Exclude columns from the update.
+        /// </summary>
+        /// <param name="value">Updated value.</param>
+        /// <returns>Created update attribute.</returns>
+        public void Exclude<T>(Expression<Func<T, object>> columns)
+        {
+            Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));
+            Parent.Updated = true;
+        }
     }
 }

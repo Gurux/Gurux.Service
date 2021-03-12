@@ -692,6 +692,7 @@ namespace Gurux.Service_Test
             get;
             set;
         }
+
         [DataMember(Name = "CountryID")]
         [ForeignKey]
         public Country Country
@@ -718,14 +719,6 @@ namespace Gurux.Service_Test
             get;
             set;
         }
-        /*
-        [DataMember, Relation]
-        public Company Company
-        {
-            get;
-            set;
-        }
-         */
     }
 
 

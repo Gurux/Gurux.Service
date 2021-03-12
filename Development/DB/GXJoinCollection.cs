@@ -47,26 +47,7 @@ namespace Gurux.Service.Orm
         internal GXJoinCollection(GXSettingsArgs parent)
         {
             Parent = parent;
-        }
-
-        private static UnaryExpression GetExpression(Expression e)
-        {
-            if (e is UnaryExpression)
-            {
-                return (UnaryExpression)e;
-            }
-            if (e is MemberExpression)
-            {
-                MemberExpression m = (MemberExpression)e;
-                object u = Expression.Convert(m, typeof(UnaryExpression));
-                return (UnaryExpression)u;
-            }
-            if (e is ParameterExpression)
-            {
-                throw new Exception("Invalid expression.");
-            }
-            throw new Exception("Invalid expression.");
-        }
+        }      
 
         /// <summary>
         /// Add inner join.

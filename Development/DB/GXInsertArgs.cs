@@ -1,7 +1,7 @@
 ﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,14 +19,14 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
@@ -58,10 +58,10 @@ namespace Gurux.Service.Orm
         public string Where;
 
         /// <summary>
-        /// Is item inserted. 
+        /// Is item inserted.
         /// </summary>
         /// <remarks>
-        /// This is used in update. 
+        /// This is used in update.
         /// </remarks>
         public bool Inserted;
 
@@ -83,6 +83,12 @@ namespace Gurux.Service.Orm
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<KeyValuePair<object, LambdaExpression>> Values = new List<KeyValuePair<object, LambdaExpression>>();
 
+        /// <summary>
+        /// List of values to exlude from insert.
+        /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        internal List<KeyValuePair<Type, LambdaExpression>> Excluded = new List<KeyValuePair<Type, LambdaExpression>>();
+
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal GXSettingsArgs Parent = new GXSettingsArgs();
 
@@ -101,7 +107,7 @@ namespace Gurux.Service.Orm
 
         /// <summary>
         /// Clear all insert settings.
-        /// </summary>        
+        /// </summary>
         public void Clear()
         {
             Values.Clear();
@@ -135,9 +141,9 @@ namespace Gurux.Service.Orm
         public override string ToString()
         {
             if (Parent.Updated)
-            {               
+            {
                 List<string> queries = new List<string>();
-                GXDbHelpers.GetQueries(true, Parent.Settings, Values, queries);
+                GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries);
                 sql = string.Join(" ", queries.ToArray());
             }
             return sql;
@@ -257,5 +263,15 @@ namespace Gurux.Service.Orm
             return null;
         }
 
+        /// <summary>
+        /// Exclude columns from the insert.
+        /// </summary>
+        /// <param name="value">Updated value.</param>
+        /// <returns>Created update attribute.</returns>
+        public void Exclude<T>(Expression<Func<T, object>> columns)
+        {
+            Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));
+            Parent.Updated = true;
+        }
     }
 }

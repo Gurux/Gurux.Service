@@ -185,3 +185,5 @@ Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache
 *.zip
 *.testlog
 *.manifest
+Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache.v2
+Gurux.Service_Simple_UnitTests/.vs/Gurux.Service_Simple_Unit_Test/DesignTimeBuild/.dtbcache.v2

@@ -34,6 +34,8 @@ using System;
 using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
+using System.Runtime.Serialization;
+using System.Globalization;
 
 namespace Gurux.Service_Test
 {
@@ -284,9 +286,10 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void WhereDateTimeTest()
         {
+            string format = "yyyy-MM-dd HH:mm:ss";
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Time);
             arg.Where.And<TestClass>(q => q.Time > DateTime.MinValue && q.Time < DateTime.MaxValue);
-            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '0001-01-01 00:00:00') AND (TestClass.`Time` < '9999-12-31 23:59:59')", arg.ToString());
+            Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '" + DateTime.MinValue.ToString(format) + "') AND (TestClass.`Time` < '" + DateTime.MaxValue.ToString(format) + "')", arg.ToString());
         }
 
         /// <summary>
@@ -477,7 +480,6 @@ namespace Gurux.Service_Test
             t.Id = 1;
             t.Text = "Gurux";
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
-            string mikko = t.Text;
             arg.Where.And<TestClass>(q => q.Id == t.Id && q.Text.Equals(t.Text));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`ID` = 1) AND (UPPER(TestClass.`Text`) LIKE('GURUX'))", arg.ToString());
         }
@@ -492,7 +494,6 @@ namespace Gurux.Service_Test
             t.Id = 1;
             t.Text = "Gurux";
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid });
-            string mikko = t.Text;
             arg.Where.And<TestClass>(q => q.Text.Equals(t.Text) && q.Id == t.Id);
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (UPPER(TestClass.`Text`) LIKE('GURUX')) AND (TestClass.`ID` = 1)", arg.ToString());
         }
@@ -632,11 +633,13 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void UpdateTest()
         {
+            string format = "yyyy-MM-dd HH:mm:ss";
+            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00", format, CultureInfo.CurrentCulture);
             TestClass t = new TestClass();
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
-            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '2014-01-02 00:00:00' WHERE `ID` = 2", args.ToString());
+            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
         }
 
         /// <summary>
@@ -745,6 +748,164 @@ namespace Gurux.Service_Test
             string expected = "SELECT `ID`, `CountryName` FROM Country WHERE NOT EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Country.`ID` = Company.`CountryID`)";
             string actual = arg.ToString();
             Assert.AreEqual(expected, actual);
+        }
+
+        [DataContract(Name = "Countries")]
+        public class CountriesView
+        {
+            [DataMember(Name = "ID")]
+            [AutoIncrement]
+            public int Id
+            {
+                get;
+                set;
+            }
+
+            public string CountryName
+            {
+                get;
+                set;
+            }
+        }
+
+        /// <summary>
+        /// Create simple view where data is retreaved from one table.
+        /// </summary>
+        [TestMethod]
+        public void CreateSimpleViewTest()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.Select<Country>(q => new { q.Id, q.Name });
+            arg.Where.And<Country>(q => !GXSql.Exists<Company, Country>(a => a.Country, b => b.Id, arg2));
+            GXCreateViewArgs view = GXCreateViewArgs.Create<CountriesView>(arg);
+            string expected = "Create View Countries AS SELECT `ID`, `CountryName` FROM Country WHERE NOT EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Country.`ID` = Company.`CountryID`)";
+            string actual = view.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        [DataContract(Name = "Companies")]
+        public class CompaniesView
+        {
+            [DataMember(Name = "ID")]
+            [AutoIncrement]
+            public int Id
+            {
+                get;
+                set;
+            }
+            public string Name
+            {
+                get;
+                set;
+            }
+
+            public string CountryName
+            {
+                get;
+                set;
+            }
+        }
+
+        /// <summary>
+        /// Create simple view where data is retreaved from two table.
+        /// </summary>
+        [TestMethod]
+        public void CreateSimpleViewTest2()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Company>(q => new { q.Id, q.Name });
+            arg.Columns.Add<Country>(q => q.Name);
+            arg.Joins.AddInnerJoin<Company, Country>(a => a.Country, b => b.Id);
+            GXCreateViewArgs view = GXCreateViewArgs.Create<CountriesView>(arg);
+            string expected = "Create View Countries AS SELECT Company.`Id`, Company.`Name`, Country.`CountryName` FROM Company INNER JOIN Country ON Company.`CountryID`=Country.`ID`";
+            string actual = view.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+
+        [DataContract(Name = "Companies")]
+        public class CompaniesView2
+        {
+            [DataMember(Name = "ID")]
+            [AutoIncrement]
+            public int Id
+            {
+                get;
+                set;
+            }
+            public string CompanyName
+            {
+                get;
+                set;
+            }
+
+            public string Name
+            {
+                get;
+                set;
+            }
+        }
+
+        /// <summary>
+        /// Create simple view where data is map from two table.
+        /// </summary>
+        [TestMethod]
+        public void CreateSimpleViewTest3()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Company>(q => new { q.Id, q.Name });
+            arg.Columns.Add<Country>(q => q.Name);
+            arg.Joins.AddInnerJoin<Company, Country>(a => a.Country, b => b.Id);
+            GXCreateViewArgs view = GXCreateViewArgs.Create<CountriesView>(arg);
+            view.Maps.AddMap<CompaniesView2, Company>(t => t.CompanyName, s => s.Name);
+            view.Maps.AddMap<CompaniesView2, Country>(t => t.Name, s => s.Name);
+            string expected = "Create View Countries AS SELECT Company.`Id`, Company.`Name` AS `CompanyName`, Country.`CountryName` AS `Name` FROM Company INNER JOIN Country ON Company.`CountryID`=Country.`ID`";
+            string actual = view.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        /// <summary>
+        /// Exclude update test.
+        /// </summary>
+        [TestMethod]
+        public void ExcludeUpdateTest()
+        {
+            string format = "yyyy-MM-dd HH:mm:ss";
+            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00", format, CultureInfo.CurrentCulture);
+            TestClass t = new TestClass();
+            t.Id = 2;
+            t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
+            GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
+            args.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+        }
+
+        /// <summary>
+        /// Exclude update test.
+        /// </summary>
+        [TestMethod]
+        public void ExcludeUpdateTest2()
+        {
+            string format = "yyyy-MM-dd HH:mm:ss";
+            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00", format, CultureInfo.CurrentCulture);
+            TestClass t = new TestClass();
+            t.Id = 2;
+            t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
+            GXUpdateArgs args = GXUpdateArgs.Update(t);
+            args.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000000000000000000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+        }
+
+        /// <summary>
+        /// Exclude insert test.
+        /// </summary>
+        [TestMethod]
+        public void ExcludeInsertTest()
+        {
+            TestClass t = new TestClass();
+            t.Text = "Gurux";
+            GXInsertArgs args = GXInsertArgs.Insert(t);
+            args.Exclude<TestClass>(x => new { x.Time, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            Assert.AreEqual("INSERT INTO TestClass (`Guid`, `Text`) VALUES('00000000000000000000000000000000', 'Gurux')", args.ToString());
         }
     }
 }

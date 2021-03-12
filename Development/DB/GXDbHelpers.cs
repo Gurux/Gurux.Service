@@ -259,14 +259,19 @@ namespace Gurux.Service.Orm
         /// Get all queries to execute.
         /// </summary>
         /// <param name="queries"></param>
-        internal static void GetQueries(bool insert, GXDBSettings settings, List<KeyValuePair<object, LambdaExpression>> values, List<string> queries)
+        internal static void GetQueries(
+            bool insert,
+            GXDBSettings settings,
+            List<KeyValuePair<object, LambdaExpression>> values,
+            List<KeyValuePair<Type, LambdaExpression>> excluded,
+            List<string> queries)
         {
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            foreach (var it in values)
+            foreach (KeyValuePair<object, LambdaExpression> it in values)
             {
-                GetValues(it.Key, null, it.Value, list, insert, false, settings.ColumnQuotation, false);
+                GetValues(it.Key, null, it.Value, list, excluded, insert, false, settings.ColumnQuotation, false);
             }
-            foreach (var table in list)
+            foreach (KeyValuePair<Type, GXUpdateItem> table in list)
             {
                 if (insert)
                 {
@@ -279,7 +284,10 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static void GetUpdateQuery(KeyValuePair<Type, GXUpdateItem> table, GXDBSettings settings, List<string> queries)
+        internal static void GetUpdateQuery(
+            KeyValuePair<Type, GXUpdateItem> table,
+            GXDBSettings settings,
+            List<string> queries)
         {
             if (!table.Value.Inserted)
             {
@@ -373,7 +381,11 @@ namespace Gurux.Service.Orm
             }
         }
 
-        private static void GetInsertColumns(GXDBSettings settings, bool first, KeyValuePair<Type, GXUpdateItem> table, StringBuilder sb)
+        private static void GetInsertColumns(
+            GXDBSettings settings,
+            bool first,
+            KeyValuePair<Type, GXUpdateItem> table,
+            StringBuilder sb)
         {
             string tableName = GXDbHelpers.GetTableName(table.Key, true, settings);
             GetInsert(settings, first, sb);
@@ -395,12 +407,15 @@ namespace Gurux.Service.Orm
             sb.Append(") VALUES(");
         }
 
-        internal static int GetInsertQuery(KeyValuePair<Type, GXUpdateItem> table, GXDBSettings settings, List<string> queries)
+        internal static int GetInsertQuery(
+            KeyValuePair<Type, GXUpdateItem> table,
+            GXDBSettings settings,
+            List<string> queries)
         {
             StringBuilder sb = new StringBuilder();
             object value;
             sb.Length = 0;
-            bool firstRow = true, first = true;
+            bool firstRow = true, first;
             GetInsertColumns(settings, true, table, sb);
             int rowCnt = 1;
             foreach (var col in table.Value.Rows)
@@ -497,8 +512,17 @@ namespace Gurux.Service.Orm
         /// <param name="value">Value to insert or update.</param>
         /// <param name="columns">Columns to update or insert.</param>
         /// <param name="itemsList">List of items to update.</param>
-        internal static void GetValues(object value, object parent, LambdaExpression columns, List<KeyValuePair<Type, GXUpdateItem>> itemsList,
-            bool insert, bool mapTable, char columnQuotation, bool updating)
+        /// <param name="excluded">Excluded columns.</param>
+        internal static void GetValues(
+            object value,
+            object parent,
+            LambdaExpression columns,
+            List<KeyValuePair<Type, GXUpdateItem>> itemsList,
+            List<KeyValuePair<Type, LambdaExpression>> excluded,
+            bool insert,
+            bool mapTable,
+            char columnQuotation,
+            bool updating)
         {
             bool inserted = false;
             object tmp;
@@ -516,7 +540,7 @@ namespace Gurux.Service.Orm
                     {
                         foreach (object v in (IEnumerable)value)
                         {
-                            GetValues(v, parent, columns, itemsList, insert, false, columnQuotation, updating);
+                            GetValues(v, parent, columns, itemsList, excluded, insert, false, columnQuotation, updating);
                         }
                         return;
                     }
@@ -619,7 +643,7 @@ namespace Gurux.Service.Orm
                                 //Relations are not inserted. They are expected to be in DB already.
                                 else if (it.Value.Relation.RelationType != RelationType.Relation)
                                 {
-                                    GetValues(target, value, null, itemsList, insert, mapTable, columnQuotation, updating);
+                                    GetValues(target, value, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
                                 }
                             }
                             else if (!update)
@@ -653,6 +677,21 @@ namespace Gurux.Service.Orm
                         else if (!update && (it.Value.Attributes & Attributes.AutoIncrement) == 0)
                         {
                             u.Columns.Add(it.Key);
+                        }
+                    }
+                }
+                //Remove excluded columns.
+                if (excluded != null)
+                {
+                    foreach (KeyValuePair<Type, LambdaExpression> it in excluded)
+                    {
+                        if (it.Key == type)
+                        {
+                            string[] removed = GetMembers(null, it.Value, '\0', false);
+                            foreach (string col in removed)
+                            {
+                                u.Columns.Remove(col);
+                            }
                         }
                     }
                 }
@@ -706,7 +745,7 @@ namespace Gurux.Service.Orm
                                     Dictionary<Type, GXUpdateItem> tmpList = new Dictionary<Type, GXUpdateItem>();
                                     tmpList = itemsList.Concat(tmpList).ToDictionary(x => x.Key, x => x.Value);
                                     itemsList.Clear();
-                                    GetValues(target, parent, null, itemsList, insert, mapTable, columnQuotation, updating);
+                                    GetValues(target, parent, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
                                     foreach (var it2 in tmpList)
                                     {
                                         itemsList.Add(new KeyValuePair<Type, GXUpdateItem>(it2.Key, it2.Value));
@@ -737,7 +776,7 @@ namespace Gurux.Service.Orm
                             foreach (object v in (IEnumerable)target)
                             {
                                 tmp = si.Get(v);
-                                GetValues(v, parent, null, itemsList, insert, mapTable, columnQuotation, updating);
+                                GetValues(v, parent, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
                             }
                             row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
                         }
