@@ -410,6 +410,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
+        [DefaultValue(null)]
         public Guid Guid
         {
             get;
@@ -417,6 +418,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
+        [DefaultValue(null)]
         public DateTime Time
         {
             get;

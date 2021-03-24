@@ -240,6 +240,23 @@ namespace Gurux.Service.Orm
                     if ((it.Value.Attributes & Attributes.DefaultValue) != 0)
                     {
                         object actual = it.Value.Get(target);
+                        if (it.Value.DefaultValue == null)
+                        {
+                            if (actual is DateTime d)
+                            {
+                                if (d == DateTime.MinValue)
+                                {
+                                    continue;
+                                }
+                            }
+                            if (actual is Guid q)
+                            {
+                                if (q == Guid.Empty)
+                                {
+                                    continue;
+                                }
+                            }
+                        }
                         if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
                         {
                             And<T>(q => it.Key.Equals(actual));
