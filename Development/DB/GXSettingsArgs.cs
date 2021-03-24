@@ -43,18 +43,12 @@ namespace Gurux.Service.Orm
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         UInt32 index, count;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        internal bool updated, distinct, descending;
+        internal bool distinct, descending;
 
         internal bool Updated
         {
-            get
-            {
-                return updated;
-            }
-            set
-            {
-                updated = value;
-            }
+            get;
+            set;
         }
 
         /// <summary>
@@ -75,8 +69,8 @@ namespace Gurux.Service.Orm
             }
             set
             {
-                Updated = true;
                 settings = value;
+                Updated = true;
             }
         }
 
@@ -101,8 +95,8 @@ namespace Gurux.Service.Orm
             }
             set
             {
-                Updated = true;
                 index = value;
+                Updated = true;
             }
         }
 
@@ -120,8 +114,8 @@ namespace Gurux.Service.Orm
             }
             set
             {
-                Updated = true;
                 count = value;
+                Updated = true;
             }
         }
 
@@ -136,8 +130,8 @@ namespace Gurux.Service.Orm
             }
             set
             {
-                Updated = true;
                 distinct = value;
+                Updated = true;
             }
         }
 
@@ -152,8 +146,8 @@ namespace Gurux.Service.Orm
             }
             set
             {
-                Updated = true;
                 descending = value;
+                Updated = true;
             }
         }
     }

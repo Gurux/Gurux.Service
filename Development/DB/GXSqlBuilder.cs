@@ -306,7 +306,7 @@ namespace Gurux.Service.Orm
         /// <param name="s"></param>
         private static void UpdateAttributes(Type type, object[] attributes, GXSerializedItem s)
         {
-            int settings = 0;
+            int value = 0;
             PropertyInfo pi = s.Target as PropertyInfo;
             if (pi != null && pi.Name == "Id")
             {
@@ -314,7 +314,7 @@ namespace Gurux.Service.Orm
                 {
                     if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IUnique<>))
                     {
-                        settings |= (int)(Attributes.Id | Attributes.PrimaryKey);
+                        value |= (int)(Attributes.Id | Attributes.PrimaryKey);
                         break;
                     }
                 }
@@ -324,7 +324,7 @@ namespace Gurux.Service.Orm
                 //If field is ignored.
                 if (att is IgnoreAttribute && (((IgnoreAttribute)att).IgnoreType & IgnoreType.Db) != 0)
                 {
-                    settings |= (int)Attributes.Ignored;
+                    value |= (int)Attributes.Ignored;
                 }
                 else
                 {
@@ -336,43 +336,47 @@ namespace Gurux.Service.Orm
                     //Is property indexed.
                     if (att is IndexAttribute)
                     {
-                        settings |= (int)Attributes.Index;
+                        value |= (int)Attributes.Index;
                     }
                     //Is property auto indexed value.
                     if (att is AutoIncrementAttribute)
                     {
-                        settings |= (int)Attributes.AutoIncrement;
+                        value |= (int)Attributes.AutoIncrement;
                     }
                     //Primary key value.
                     if (att is PrimaryKeyAttribute)
                     {
-                        settings |= (int)Attributes.PrimaryKey;
+                        value |= (int)Attributes.PrimaryKey;
                     }
                     //Foreign key value.
                     if (att is ForeignKeyAttribute)
                     {
-                        settings |= (int)Attributes.ForeignKey;
+                        value |= (int)Attributes.ForeignKey;
                     }
                     //Relation field.
                     if (att is RelationAttribute)
                     {
-                        settings |= (int)Attributes.Relation;
+                        value |= (int)Attributes.Relation;
                     }
                     if (att is StringLengthAttribute)
                     {
-                        settings |= (int)Attributes.StringLength;
+                        value |= (int)Attributes.StringLength;
                     }
                     if (att is DataMemberAttribute)
                     {
                         DataMemberAttribute n = att as DataMemberAttribute;
                         if (n.IsRequired)
                         {
-                            settings |= (int)Attributes.IsRequired;
+                            value |= (int)Attributes.IsRequired;
                         }
+                    }
+                    if (att is DefaultValueAttribute)
+                    {
+                        value |= (int)Attributes.DefaultValue;
                     }
                 }
             }
-            s.Attributes = (Attributes)settings;
+            s.Attributes = (Attributes)value;
         }
 
         public static string[] GetFields<T>()

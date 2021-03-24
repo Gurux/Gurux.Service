@@ -431,6 +431,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember(Name = "SimpleText")]
+        [DefaultValue("")]
         public String Text2
         {
             get;
@@ -438,6 +439,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
+        [DefaultValue(null)]
         public String Text3
         {
             get;

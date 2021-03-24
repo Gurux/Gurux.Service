@@ -35,6 +35,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Linq.Expressions;
 using Gurux.Service.Orm.Settings;
+using Gurux.Common.Internal;
 
 namespace Gurux.Service.Orm
 {
@@ -99,8 +100,8 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("expression");
             }
-            Updated = true;
             List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.And, expression));
+            Updated = true;
         }
 
         /// <summary>
@@ -112,8 +113,8 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("expression");
             }
-            Updated = true;
             List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.Or, expression));
+            Updated = true;
         }
 
         internal static string WhereToString(GXDBSettings settings, List<KeyValuePair<WhereType, LambdaExpression>> list)
@@ -217,6 +218,32 @@ namespace Gurux.Service.Orm
                 }
             }
             return null;
+        }
+
+        public void Append(GXWhereCollection where)
+        {
+            List.AddRange(where.List);
+        }
+
+        /// <summary>
+        /// Update where condition. The DefaultValue attribute is used as a filter.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="target"></param>
+        public void FilterBy<T>(T target)
+        {
+            Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
+            foreach (var it in properties)
+            {
+                if ((it.Value.Attributes & Attributes.DefaultValue) != 0)
+                {
+                    object actual = it.Value.Get(target);
+                    if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
+                    {
+                        And<T>(q => it.Key.Equals(actual));
+                    }
+                }
+            }
         }
     }
 }

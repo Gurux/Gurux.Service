@@ -1316,13 +1316,13 @@ namespace Gurux.Service.Orm
         {
             lock (this)
             {
-                if (Connection.State != ConnectionState.Open)
-                {
-                    Connection.Open();
-                }
                 if (sql != null)
                 {
                     sql(this, query);
+                }
+                if (Connection.State != ConnectionState.Open)
+                {
+                    Connection.Open();
                 }
                 using (IDbCommand com = Connection.CreateCommand())
                 {
@@ -2562,6 +2562,10 @@ namespace Gurux.Service.Orm
             string query = arg.ToString();
             lock (Connection)
             {
+                if (sql != null)
+                {
+                    sql(this, query);
+                }
                 if (Connection.State != ConnectionState.Open)
                 {
                     Connection.Open();

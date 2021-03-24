@@ -907,5 +907,44 @@ namespace Gurux.Service_Test
             args.Exclude<TestClass>(x => new { x.Time, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
             Assert.AreEqual("INSERT INTO TestClass (`Guid`, `Text`) VALUES('00000000000000000000000000000000', 'Gurux')", args.ToString());
         }
+
+        /// <summary>
+        /// Append where test.
+        /// </summary>
+        [TestMethod]
+        public void AppendWhereTest()
+        {
+            GXSelectArgs append = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            append.Where.And<TestClass>(q => GXSql.In(q.Id, new int[] { 1, 2, 3 }));
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.Append(append.Where);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Filter by test.
+        /// </summary>
+        [TestMethod]
+        public void FilterByTest()
+        {
+            TestClass filter = new TestClass();
+            filter.Text2 = "More";
+            filter.Text3 = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.FilterBy(filter);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (('SimpleText'='MORE') AND ('Text3'='GURUX') AND ('Status'=0))", arg.ToString());
+        }
+
+        /// <summary>
+        /// Filter by test.
+        /// </summary>
+        [TestMethod]
+        public void FilterByTest2()
+        {
+            TestClass filter = new TestClass();
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.FilterBy(filter);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE 'Status'=0", arg.ToString());
+        }
     }
 }
