@@ -37,9 +37,7 @@ using Gurux.Common.JSon;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
-using Gurux.Common;
 using System.Data.Common;
-using Gurux.Service.Orm;
 using System.Reflection;
 using System.Collections;
 using Gurux.Common.Internal;
@@ -1314,7 +1312,7 @@ namespace Gurux.Service.Orm
         /// <param name="query">Query to execute.</param>
         public void ExecuteNonQuery(IDbTransaction transaction, string query)
         {
-            lock (this)
+            lock (Connection)
             {
                 if (sql != null)
                 {
@@ -2529,7 +2527,7 @@ namespace Gurux.Service.Orm
             arg.Parent.Settings = Builder.Settings;
             arg.ExecutionTime = 0;
             DateTime tm = DateTime.Now;
-            lock (this)
+            lock (Connection)
             {
                 List<T> value = (List<T>)SelectInternal2<T>(arg);
                 arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
@@ -3054,7 +3052,7 @@ namespace Gurux.Service.Orm
         /// <param name="insert">Insert or update.</param>
         private void UpdateOrInsert(List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
         {
-            lock (this)
+            lock (Connection)
             {
                 int pos = 0;
                 string columnName;
@@ -3064,138 +3062,135 @@ namespace Gurux.Service.Orm
                 IDbTransaction transaction = Transaction;
                 bool autoTransaction = transaction == null;
                 List<string> queries = new List<string>();
-                lock (Connection)
+                try
                 {
-                    try
+                    if (AutoTransaction)
                     {
-                        if (AutoTransaction)
+                        transaction = Connection.BeginTransaction();
+                    }
+                    foreach (var q in list)
+                    {
+                        queries.Clear();
+                        if (insert)
                         {
-                            transaction = Connection.BeginTransaction();
+                            total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
+                            q.Value.Inserted = true;
                         }
-                        foreach (var q in list)
+                        else
                         {
-                            queries.Clear();
-                            if (insert)
+                            GXDbHelpers.GetUpdateQuery(q, Builder.Settings, queries);
+                        }
+                        type = q.Key;
+                        pos = -1;
+                        foreach (var it in q.Value.Rows[0])
+                        {
+                            if (it.Key.GetType() == type)
                             {
-                                total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
-                                q.Value.Inserted = true;
-                            }
-                            else
-                            {
-                                GXDbHelpers.GetUpdateQuery(q, Builder.Settings, queries);
-                            }
-                            type = q.Key;
-                            pos = -1;
-                            foreach (var it in q.Value.Rows[0])
-                            {
-                                if (it.Key.GetType() == type)
-                                {
-                                    ++pos;
-                                    break;
-                                }
                                 ++pos;
+                                break;
                             }
-                            if (Builder.Settings.MaximumRowUpdate != 1 && total > Builder.Settings.MaximumRowUpdate)
+                            ++pos;
+                        }
+                        if (Builder.Settings.MaximumRowUpdate != 1 && total > Builder.Settings.MaximumRowUpdate)
+                        {
+                            if (transaction != null && autoTransaction)
                             {
-                                if (transaction != null && autoTransaction)
-                                {
-                                    transaction.Commit();
-                                    transaction = Connection.BeginTransaction();
-                                }
-                                total = 0;
+                                transaction.Commit();
+                                transaction = Connection.BeginTransaction();
                             }
-                            GXSerializedItem si = GXSqlBuilder.FindAutoIncrement(type);
-                            int index = 0;
+                            total = 0;
+                        }
+                        GXSerializedItem si = GXSqlBuilder.FindAutoIncrement(type);
+                        int index = 0;
+                        foreach (string query in queries)
+                        {
+                            ExecuteNonQuery(transaction, query);
+                            //Update auto increment value if it's used and transaction is not updated.
+                            if (total != 0 && si != null && pos != -1)
+                            {
+                                columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
+                                id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
+                                //If each value is added separately.
+                                if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                {
+                                    if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                    {
+                                        si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
+                                    }
+                                    ++index;
+                                }
+                                else
+                                {
+                                    if (!Builder.Settings.AutoIncrementFirst)
+                                    {
+                                        id -= (ulong)(q.Value.Rows.Count - 1);
+                                    }
+                                    foreach (var it in q.Value.Rows)
+                                    {
+                                        if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
+                                        {
+                                            si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
+                                        }
+                                        ++id;
+                                    }
+                                }
+                            }
+                        }
+
+                        /////////////////////////////////////////////////////////////////////////////////////////////////
+                        //Update ID's after transaction is made and all the rows are updated.
+                        //Update auto increment value if it's used.
+                        if (insert && total == 0 && si != null && pos != -1)
+                        {
                             foreach (string query in queries)
                             {
-                                ExecuteNonQuery(transaction, query);
-                                //Update auto increment value if it's used and transaction is not updated.
-                                if (total != 0 && si != null && pos != -1)
+                                columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
+                                id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
+                                //If each value is added separately.
+                                if (this.Builder.Settings.MaximumRowUpdate == 1)
                                 {
-                                    columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-                                    id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
-                                    //If each value is added separately.
-                                    if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                    if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
                                     {
-                                        if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                        {
-                                            si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
-                                        }
-                                        ++index;
+                                        si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
                                     }
-                                    else
-                                    {
-                                        if (!Builder.Settings.AutoIncrementFirst)
-                                        {
-                                            id -= (ulong)(q.Value.Rows.Count - 1);
-                                        }
-                                        foreach (var it in q.Value.Rows)
-                                        {
-                                            if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                            {
-                                                si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
-                                            }
-                                            ++id;
-                                        }
-                                    }
+                                    ++index;
                                 }
-                            }
-
-                            /////////////////////////////////////////////////////////////////////////////////////////////////
-                            //Update ID's after transaction is made and all the rows are updated.
-                            //Update auto increment value if it's used.
-                            if (insert && total == 0 && si != null && pos != -1)
-                            {
-                                foreach (string query in queries)
+                                else
                                 {
-                                    columnName = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-                                    id = (ulong)GetLastInsertId(transaction, typeof(ulong), columnName, type);
-                                    //If each value is added separately.
-                                    if (this.Builder.Settings.MaximumRowUpdate == 1)
+                                    if (!Builder.Settings.AutoIncrementFirst)
                                     {
-                                        if (Convert.ChangeType(si.Get(q.Value.Rows[index][pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                        {
-                                            si.Set(q.Value.Rows[index][pos].Key, Convert.ChangeType(id, si.Type));
-                                        }
-                                        ++index;
+                                        id -= (ulong)(q.Value.Rows.Count - 1);
                                     }
-                                    else
+                                    foreach (var it in q.Value.Rows)
                                     {
-                                        if (!Builder.Settings.AutoIncrementFirst)
+                                        if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
                                         {
-                                            id -= (ulong)(q.Value.Rows.Count - 1);
+                                            si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
                                         }
-                                        foreach (var it in q.Value.Rows)
-                                        {
-                                            if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                            {
-                                                si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
-                                            }
-                                            ++id;
-                                        }
+                                        ++id;
                                     }
                                 }
                             }
                         }
-                        if (transaction != null && autoTransaction)
-                        {
-                            transaction.Commit();
-                        }
                     }
-                    catch (Exception ex)
+                    if (transaction != null && autoTransaction)
                     {
-                        if (transaction != null && autoTransaction)
-                        {
-                            transaction.Rollback();
-                        }
-                        throw ex;
+                        transaction.Commit();
                     }
-                    finally
+                }
+                catch (Exception ex)
+                {
+                    if (transaction != null && autoTransaction)
                     {
-                        if (transaction != null && autoTransaction)
-                        {
-                            transaction.Dispose();
-                        }
+                        transaction.Rollback();
+                    }
+                    throw ex;
+                }
+                finally
+                {
+                    if (transaction != null && autoTransaction)
+                    {
+                        transaction.Dispose();
                     }
                 }
             }
@@ -3224,16 +3219,6 @@ namespace Gurux.Service.Orm
                     Connection = null;
                 }
             }
-        }
-
-        private void AddSpaces(TextWriter tw, int count)
-        {
-            StringBuilder sb = new StringBuilder();
-            for (int pos = 0; pos != count; ++pos)
-            {
-                sb.Append(' ');
-            }
-            tw.Write(sb);
         }
 
         private static bool ContainsTable(string[] list, string value)
@@ -3498,32 +3483,29 @@ namespace Gurux.Service.Orm
             {
                 IDbTransaction transaction = Transaction;
                 bool autoTransaction = transaction == null;
-                lock (Connection)
+                if (AutoTransaction)
                 {
-                    if (AutoTransaction)
+                    transaction = Connection.BeginTransaction();
+                }
+                try
+                {
+                    string query = "TRUNCATE TABLE " + Builder.GetTableName(typeof(T), true);
+                    ExecuteNonQuery(transaction, query);
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    if (autoTransaction && transaction != null)
                     {
-                        transaction = Connection.BeginTransaction();
+                        transaction.Rollback();
                     }
-                    try
+                    throw ex;
+                }
+                finally
+                {
+                    if (autoTransaction && transaction != null)
                     {
-                        string query = "TRUNCATE TABLE " + Builder.GetTableName(typeof(T), true);
-                        ExecuteNonQuery(transaction, query);
-                        transaction.Commit();
-                    }
-                    catch (Exception ex)
-                    {
-                        if (autoTransaction && transaction != null)
-                        {
-                            transaction.Rollback();
-                        }
-                        throw ex;
-                    }
-                    finally
-                    {
-                        if (autoTransaction && transaction != null)
-                        {
-                            transaction.Dispose();
-                        }
+                        transaction.Dispose();
                     }
                 }
             }
