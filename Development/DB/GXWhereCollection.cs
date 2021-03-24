@@ -232,15 +232,18 @@ namespace Gurux.Service.Orm
         /// <param name="target"></param>
         public void FilterBy<T>(T target)
         {
-            Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
-            foreach (var it in properties)
+            if (target != null)
             {
-                if ((it.Value.Attributes & Attributes.DefaultValue) != 0)
+                Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
+                foreach (var it in properties)
                 {
-                    object actual = it.Value.Get(target);
-                    if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
+                    if ((it.Value.Attributes & Attributes.DefaultValue) != 0)
                     {
-                        And<T>(q => it.Key.Equals(actual));
+                        object actual = it.Value.Get(target);
+                        if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
+                        {
+                            And<T>(q => it.Key.Equals(actual));
+                        }
                     }
                 }
             }
