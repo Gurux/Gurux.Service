@@ -2558,12 +2558,12 @@ namespace Gurux.Service.Orm
             //Columns that are updated when row is read. This is needed when relation data is try to update and it's not read yet.
             List<KeyValuePair<int, object>> UpdatedColumns = new List<KeyValuePair<int, object>>();
             string query = arg.ToString();
+            if (sql != null)
+            {
+                sql(this, query);
+            }
             lock (Connection)
             {
-                if (sql != null)
-                {
-                    sql(this, query);
-                }
                 if (Connection.State != ConnectionState.Open)
                 {
                     Connection.Open();

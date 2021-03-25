@@ -853,6 +853,16 @@ namespace Gurux.Service.Orm
                         throw new ArgumentOutOfRangeException("Exist failed.");
                     }
                 }
+                if (m.Method.Name == "Contains")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0] + " LIKE('%" +
+                            GetMembers(settings, m.Arguments[1], '\0', where)[0] + "%'))"};
+                    /*                  string tmp = GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " Like " +
+                                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false)[0] + " = " +
+                                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))";
+                                      return new string[] { tmp };
+                    */
+                }
             }
             if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
             {
@@ -1034,6 +1044,21 @@ namespace Gurux.Service.Orm
                         {
                             return new string[] { sb.ToString() };
                         }
+                    }
+                    else if (value is PropertyInfo p)
+                    {
+                        //In where get table type and column name.
+                        if (where && p.DeclaringType.IsClass)
+                        {
+                            if (GXDbHelpers.IsAliasName(p.DeclaringType))
+                            {
+                                return new string[] { GXDbHelpers.OriginalTableName(p.DeclaringType) +
+                            "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
+                            }
+                            return new string[] { GXDbHelpers.GetTableName(p.DeclaringType, true, settings) +
+                            "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
+                        }
+                        return new string[] { GetColumnName(value as PropertyInfo, quoteSeparator) };
                     }
                     return new string[] { ConvertToString(value, settings, where) };
                 }

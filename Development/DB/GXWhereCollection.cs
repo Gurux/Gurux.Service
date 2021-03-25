@@ -36,6 +36,7 @@ using System.Text;
 using System.Linq.Expressions;
 using Gurux.Service.Orm.Settings;
 using Gurux.Common.Internal;
+using System.Reflection;
 
 namespace Gurux.Service.Orm
 {
@@ -230,7 +231,8 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="target"></param>
-        public void FilterBy<T>(T target)
+        /// <param name="exact">Is compared value exact or containing given value.</param>
+        public void FilterBy<T>(T target, bool exact)
         {
             if (target != null)
             {
@@ -259,11 +261,31 @@ namespace Gurux.Service.Orm
                         }
                         if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
                         {
-                            And<T>(q => it.Key.Equals(actual));
+                            if (actual != null)
+                            {
+                                if (exact)
+                                {
+                                    And<T>(q => it.Value.Target == actual);
+                                }
+                                else
+                                {
+                                    And<T>(q => GXSql.Contains(it.Value.Target, actual));
+                                }
+                            }
                         }
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Update where condition. The DefaultValue attribute is used as a filter.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="target"></param>
+        public void FilterBy<T>(T target)
+        {
+            FilterBy<T>(target, true);
         }
     }
 }
