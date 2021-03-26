@@ -263,6 +263,11 @@ namespace Gurux.Service.Orm
                         {
                             if (actual != null)
                             {
+                                if (actual.GetType().IsEnum)
+                                {
+                                    actual = Convert.ToInt64(actual);
+                                }
+
                                 if (exact)
                                 {
                                     And<T>(q => it.Value.Target == actual);

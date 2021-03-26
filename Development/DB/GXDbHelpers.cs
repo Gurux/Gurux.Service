@@ -927,8 +927,13 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
+                    string value = GetMembers(settings, m.Arguments[0], '\0', where, true)[0];
+                    if (value == null)
+                    {
+                        return new string[] { "(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " IS NULL)" };
+                    }
                     return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + "=" +
-                            GetMembers(settings, m.Arguments[0], '\0', where, true)[0].ToUpper() + ")"};
+                            value.ToUpper() + ")"};
                 }
             }
             if (m.Method.DeclaringType == typeof(string) && m.Method.Name == "IsNullOrEmpty")
@@ -1474,7 +1479,6 @@ namespace Gurux.Service.Orm
                 else if (newExpression.Value is bool)
                 {
                     return new string[] { ((bool)newExpression.Value) ? "1" : "0" };
-                    //return new string[] { AddQuotes(newExpression.Value.ToString(), quoteSeparator) };
                 }
                 else
                 {

@@ -932,7 +932,7 @@ namespace Gurux.Service_Test
             filter.Text3 = "Gurux";
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.FilterBy(filter);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (('SimpleText'='MORE') AND ('Text3'='GURUX') AND ('Status'=0))", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`SimpleText` = 'More') AND (TestClass.`Text3` = 'Gurux') AND (TestClass.`Status` = 0))", arg.ToString());
         }
 
         /// <summary>
@@ -944,7 +944,45 @@ namespace Gurux.Service_Test
             TestClass filter = new TestClass();
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.FilterBy(filter);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE 'Status'=0", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Status` = 0", arg.ToString());
+        }
+
+        /// <summary>
+        /// Filter by status.
+        /// </summary>
+        [TestMethod]
+        public void FilterByStatus()
+        {
+            TestClass filter = new TestClass();
+            filter.Status = State.Failed;
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.FilterBy(filter);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Status` = 200", arg.ToString());
+        }
+
+        /// <summary>
+        /// Find Empty Guid.
+        /// </summary>
+        [TestMethod]
+        public void FindEmptyGuid()
+        {
+            TestClass filter = new TestClass();
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid == null);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IS NULL", arg.ToString());
+            arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid.Equals(null));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IS NULL", arg.ToString());
+        }
+        /// <summary>
+        /// Find Empty date time values.
+        /// </summary>
+        [TestMethod]
+        public void FindEmptyDateTime()
+        {
+            TestClass filter = new TestClass();
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Time == null);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IS NULL", arg.ToString());
+            arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Time.Equals(null));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IS NULL", arg.ToString());
         }
     }
 }
