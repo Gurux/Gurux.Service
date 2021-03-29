@@ -857,11 +857,6 @@ namespace Gurux.Service.Orm
                 {
                     return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0] + " LIKE('%" +
                             GetMembers(settings, m.Arguments[1], '\0', where)[0] + "%'))"};
-                    /*                  string tmp = GetMembers(settings, m.Arguments[2], quoteSeparator, where, false)[0] + " Like " +
-                                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false)[0] + " = " +
-                                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false)[0] + "))";
-                                      return new string[] { tmp };
-                    */
                 }
             }
             if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
@@ -877,6 +872,29 @@ namespace Gurux.Service.Orm
                     sb.Append(" IN (");
                 }
                 foreach (string it in GetMembers(settings, m.Arguments[0], quoteSeparator, where))
+                {
+                    sb.Append(it);
+                    sb.Append(", ");
+                }
+                sb.Length -= 2;
+                sb.Append("))");
+                return new string[] { sb.ToString() };
+            }
+            if (typeof(IEnumerable).IsAssignableFrom(m.Method.DeclaringType) &&
+                m.Method.DeclaringType != typeof(string) &&
+                m.Method.Name == "Contains")
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.Append("(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where)[0]);
+                if (unaryExpression.NodeType == ExpressionType.Not)
+                {
+                    sb.Append(" NOT IN (");
+                }
+                else
+                {
+                    sb.Append(" IN (");
+                }
+                foreach (string it in GetMembers(settings, m.Object, quoteSeparator, where))
                 {
                     sb.Append(it);
                     sb.Append(", ");
@@ -1088,9 +1106,7 @@ namespace Gurux.Service.Orm
                         //If this is a basic type list. example int[].
                         if (properties.Count == 0)
                         {
-                            IEnumerator e2 = (target as IEnumerable).GetEnumerator();
-                            first = true;
-                            while (e2.MoveNext())
+                            foreach(object it in (target as IEnumerable))
                             {
                                 if (first)
                                 {
@@ -1100,7 +1116,22 @@ namespace Gurux.Service.Orm
                                 {
                                     sb.Append(", ");
                                 }
-                                sb.Append(e2.Current);
+                                if (it is string || it is DateTime)
+                                {
+                                    sb.Append("'");
+                                    sb.Append(it);
+                                    sb.Append("'");
+                                }
+                                else if (it is Guid)
+                                {
+                                    sb.Append("'");
+                                    sb.Append(it.ToString().Replace("-", ""));
+                                    sb.Append("'");
+                                }
+                                else
+                                {
+                                    sb.Append(it);
+                                }
                             }
                             return new string[] { sb.ToString() };
                         }

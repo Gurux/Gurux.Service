@@ -36,6 +36,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
 using System.Runtime.Serialization;
 using System.Globalization;
+using System.Collections.Generic;
 
 namespace Gurux.Service_Test
 {
@@ -569,12 +570,43 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlInTest2()
+        {
+            List<int> list = new List<int>();
+            list.Add(1);
+            list.Add(2);
+            list.Add(3);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => list.Contains(q.Id));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
+        }
+
+
+        /// <summary>
         /// Select Guid where ID not in array.
         /// </summary>
         [TestMethod]
         public void SqlNotInTest()
         {
             int[] list = new int[] { 1, 2, 3 };
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => !list.Contains(q.Id));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` NOT IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID not in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlNotInTest2()
+        {
+            List<int> list = new List<int>();
+            list.Add(1);
+            list.Add(2);
+            list.Add(3);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => !list.Contains(q.Id));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` NOT IN (1, 2, 3)", arg.ToString());
@@ -966,7 +998,6 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void FindEmptyGuid()
         {
-            TestClass filter = new TestClass();
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid == null);
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IS NULL", arg.ToString());
             arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid.Equals(null));
@@ -978,7 +1009,6 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void FindEmptyDateTime()
         {
-            TestClass filter = new TestClass();
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Time == null);
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IS NULL", arg.ToString());
             arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Time.Equals(null));
@@ -991,7 +1021,6 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void EmptyGuidTest()
         {
-            TestClass filter = new TestClass();
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Guid.Equals(null) || q.Guid.Equals(Guid.Empty));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Guid` IS NULL) OR (TestClass.`Guid`='00000000000000000000000000000000')", arg.ToString());
         }
@@ -1002,9 +1031,45 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void EmptyDateTimeTest()
         {
-            TestClass filter = new TestClass();
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Time.Equals(null) || q.Time.Equals(DateTime.MinValue));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Time` IS NULL) OR (TestClass.`Time`='0001-01-01 00.00.00')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Guid in test.
+        /// </summary>
+        [TestMethod]
+        public void GuidInTest()
+        {
+            List<Guid> list = new List<Guid>();
+            list.Add(Guid.Empty);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => list.Contains(q.Guid));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000000000000000000000000000')", arg.ToString());
+        }
+
+
+        /// <summary>
+        /// DateTime in test.
+        /// </summary>
+        [TestMethod]
+        public void DateTimeInTest()
+        {
+            List<DateTime> list = new List<DateTime>();
+            list.Add(DateTime.MinValue);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => list.Contains(q.Time));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IN ('1.1.0001 0.00.00')", arg.ToString());
+        }
+
+        /// <summary>
+        /// string in test.
+        /// </summary>
+        [TestMethod]
+        public void StringInTest()
+        {
+            List<string> list = new List<string>();
+            list.Add("Gurux");
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => list.Contains(q.Text));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` IN ('Gurux')", arg.ToString());
         }
     }
 }
