@@ -1283,7 +1283,9 @@ namespace Gurux.Service.Orm
             {
                 // Reference type method
                 var methodCallExpression = (MethodCallExpression)expression;
-                if (methodCallExpression.Arguments.Count != 0 && methodCallExpression.Arguments[0].NodeType == ExpressionType.MemberAccess)
+                if (methodCallExpression.Arguments.Count != 0 &&
+                    (methodCallExpression.Arguments[0].NodeType == ExpressionType.MemberAccess ||
+                    methodCallExpression.Arguments[0].NodeType == ExpressionType.Constant))
                 {
                     return HandleMethod(settings, null, methodCallExpression, quoteSeparator, where, getValue);
                 }

@@ -984,5 +984,27 @@ namespace Gurux.Service_Test
             arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Time.Equals(null));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IS NULL", arg.ToString());
         }
+
+        /// <summary>
+        /// Find Empty guid values.
+        /// </summary>
+        [TestMethod]
+        public void EmptyGuidTest()
+        {
+            TestClass filter = new TestClass();
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Guid.Equals(null) || q.Guid.Equals(Guid.Empty));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Guid` IS NULL) OR (TestClass.`Guid`='00000000000000000000000000000000')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Find Empty date time values.
+        /// </summary>
+        [TestMethod]
+        public void EmptyDateTimeTest()
+        {
+            TestClass filter = new TestClass();
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Time.Equals(null) || q.Time.Equals(DateTime.MinValue));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Time` IS NULL) OR (TestClass.`Time`='0001-01-01 00.00.00')", arg.ToString());
+        }
     }
 }
