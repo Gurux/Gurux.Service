@@ -269,7 +269,7 @@ namespace Gurux.Service.Orm
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
             foreach (KeyValuePair<object, LambdaExpression> it in values)
             {
-                GetValues(it.Key, null, it.Value, list, excluded, insert, false, settings.ColumnQuotation, false);
+                GetValues(settings ,it.Key, null, it.Value, list, excluded, insert, false, settings.ColumnQuotation, false);
             }
             foreach (KeyValuePair<Type, GXUpdateItem> table in list)
             {
@@ -514,6 +514,7 @@ namespace Gurux.Service.Orm
         /// <param name="itemsList">List of items to update.</param>
         /// <param name="excluded">Excluded columns.</param>
         internal static void GetValues(
+            GXDBSettings settings,
             object value,
             object parent,
             LambdaExpression columns,
@@ -540,7 +541,7 @@ namespace Gurux.Service.Orm
                     {
                         foreach (object v in (IEnumerable)value)
                         {
-                            GetValues(v, parent, columns, itemsList, excluded, insert, false, columnQuotation, updating);
+                            GetValues(settings, v, parent, columns, itemsList, excluded, insert, false, columnQuotation, updating);
                         }
                         return;
                     }
@@ -609,7 +610,8 @@ namespace Gurux.Service.Orm
                 }
                 if (!insert && !inserted)
                 {
-                    u.Where = GetColumnName(si.Target as PropertyInfo, columnQuotation) + " = " + si.Get(value).ToString();
+                    string str = ConvertToString(si.Get(value), settings, false);
+                    u.Where = GetColumnName(si.Target as PropertyInfo, columnQuotation) + " = " + str;
                 }
 
                 //Get inserted column names.
@@ -643,7 +645,7 @@ namespace Gurux.Service.Orm
                                 //Relations are not inserted. They are expected to be in DB already.
                                 else if (it.Value.Relation.RelationType != RelationType.Relation)
                                 {
-                                    GetValues(target, value, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
+                                    GetValues(settings, target, value, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
                                 }
                             }
                             else if (!update)
@@ -745,7 +747,7 @@ namespace Gurux.Service.Orm
                                     Dictionary<Type, GXUpdateItem> tmpList = new Dictionary<Type, GXUpdateItem>();
                                     tmpList = itemsList.Concat(tmpList).ToDictionary(x => x.Key, x => x.Value);
                                     itemsList.Clear();
-                                    GetValues(target, parent, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
+                                    GetValues(settings, target, parent, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
                                     foreach (var it2 in tmpList)
                                     {
                                         itemsList.Add(new KeyValuePair<Type, GXUpdateItem>(it2.Key, it2.Value));
@@ -776,7 +778,7 @@ namespace Gurux.Service.Orm
                             foreach (object v in (IEnumerable)target)
                             {
                                 tmp = si.Get(v);
-                                GetValues(v, parent, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
+                                GetValues(settings, v, parent, null, itemsList, excluded, insert, mapTable, columnQuotation, updating);
                             }
                             row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
                         }
@@ -945,7 +947,7 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    string value = GetMembers(settings, m.Arguments[0], '\0', where, true)[0];
+                    string value = GetMembers(settings, m.Arguments[0], quoteSeparator, where, true)[0];
                     if (value == null)
                     {
                         return new string[] { "(" + GetMembers(settings, m.Object, quoteSeparator, where)[0] + " IS NULL)" };
@@ -1061,7 +1063,22 @@ namespace Gurux.Service.Orm
                             {
                                 sb.Append(", ");
                             }
-                            sb.Append(Convert.ToString(it));
+                            if (it is string || it is DateTime)
+                            {
+                                sb.Append("'");
+                                sb.Append(it);
+                                sb.Append("'");
+                            }
+                            else if (it is Guid)
+                            {
+                                sb.Append("'");
+                                sb.Append(it.ToString().Replace("-", ""));
+                                sb.Append("'");
+                            }
+                            else
+                            {
+                                sb.Append(Convert.ToString(it));
+                            }
                         }
                         if (!stringValue)
                         {
@@ -1082,6 +1099,10 @@ namespace Gurux.Service.Orm
                             "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
                         }
                         return new string[] { GetColumnName(value as PropertyInfo, quoteSeparator) };
+                    }
+                    if (quoteSeparator == '\0')
+                    {
+                        return new string[] { Convert.ToString(value) };
                     }
                     return new string[] { ConvertToString(value, settings, where) };
                 }
@@ -1142,7 +1163,15 @@ namespace Gurux.Service.Orm
                         {
                             ((GXSelectArgs)target).Settings = settings;
                         }
-                        string str = Convert.ToString(target);
+                        string str;
+                        if (target is DateTime)
+                        {
+                            str = settings.ConvertToString(target, where);
+                        }
+                        else
+                        {
+                            str = Convert.ToString(target);
+                        }
                         if (where && getValue && target is string)
                         {
                             return new string[] { "'" + str + "'" };
@@ -1485,10 +1514,6 @@ namespace Gurux.Service.Orm
                     {
                         throw new ArgumentException("Argument is null.");
                     }
-                }
-                else if (newExpression.Right.NodeType == ExpressionType.Constant && newExpression.Right.Type == typeof(string))
-                {
-                    tmp = "'" + tmp + "'";
                 }
                 list.Add("(" + GetMembers(settings, newExpression.Left, quoteSeparator, where)[0] + op + tmp + ")");
                 return list.ToArray();

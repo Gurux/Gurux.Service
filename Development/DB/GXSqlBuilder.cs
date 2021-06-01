@@ -209,7 +209,7 @@ namespace Gurux.Service.Orm
                     {
                         s.Relation.RelationType = RelationType.ManyToMany;
                     }
-                    else if (typeof(System.Collections.IEnumerable).IsAssignableFrom(s.Type))
+                    else if (s.Type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(s.Type))
                     {
                         s.Relation.RelationType = RelationType.OneToMany;
                         s.Relation.PrimaryId = GXSqlBuilder.FindRelation(type, mainType);
@@ -423,7 +423,7 @@ namespace Gurux.Service.Orm
         {
             foreach (var it in GetProperties(type))
             {
-                if ((it.Value.Attributes & Common.Internal.Attributes.AutoIncrement) != 0)
+                if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                 {
                     return it.Value;
                 }

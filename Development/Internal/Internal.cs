@@ -428,7 +428,7 @@ namespace Gurux.Common.Internal
                             }
                             value = items;
                         }
-#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                         else if (pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(System.Data.Linq.EntitySet<>))
                         {
                             Type listT = typeof(System.Data.Linq.EntitySet<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
@@ -439,7 +439,7 @@ namespace Gurux.Common.Internal
                             }
                             value = list;
                         }
-#endif //!NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#endif //!NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                         else
                         {
                             Type listT = typeof(List<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
@@ -684,7 +684,11 @@ namespace Gurux.Common.Internal
             else if (type == typeof(DateTimeOffset))
             {
                 DateTime dt = (DateTime)Convert.ChangeType(value, typeof(DateTime));
-                if (utc)
+                if (dt == DateTime.MinValue || dt == DateTime.MaxValue)
+                {
+                    dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                }
+                else if (utc)
                 {
                     dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
                 }

@@ -140,6 +140,10 @@ namespace Gurux.Service.Orm
 
         public override string ToString()
         {
+            return ToString(true);
+        }
+        public string ToString(bool addExecutionTime)
+        {
             if (Parent.Updated)
             {
                 List<string> queries = new List<string>();

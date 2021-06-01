@@ -49,6 +49,8 @@ using System.IO;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Data.SqlClient;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace Gurux.Service.Orm
 {
@@ -295,24 +297,21 @@ namespace Gurux.Service.Orm
             {
                 tables.Add(type, null);
             }
-            lock (Connection)
+            if (Connection.State != ConnectionState.Open)
             {
-                if (Connection.State != ConnectionState.Open)
+                Connection.Open();
+            }
+            //Find existing tables.
+            foreach (var it in tables)
+            {
+                Type tmp = it.Key;
+                if (GXDbHelpers.IsSharedTable(tmp))
                 {
-                    Connection.Open();
+                    tmp = tmp.BaseType;
                 }
-                //Find existing tables.
-                foreach (var it in tables)
+                if (TableExist(Builder.GetTableName(tmp, false)))
                 {
-                    Type tmp = it.Key;
-                    if (GXDbHelpers.IsSharedTable(tmp))
-                    {
-                        tmp = tmp.BaseType;
-                    }
-                    if (TableExist(Builder.GetTableName(tmp, false)))
-                    {
-                        list.Add(it.Key);
-                    }
+                    list.Add(it.Key);
                 }
             }
             return list.ToArray();
@@ -337,7 +336,6 @@ namespace Gurux.Service.Orm
             {
                 tables.Add(type, null);
             }
-            StringBuilder sb = new StringBuilder();
             lock (Connection)
             {
                 try
@@ -401,7 +399,7 @@ namespace Gurux.Service.Orm
                     {
                         transaction.Rollback();
                     }
-                    throw ex;
+                    throw;
                 }
                 finally
                 {
@@ -428,11 +426,11 @@ namespace Gurux.Service.Orm
         /// <param name="type">Table type.</param>
         public void UpdateTable(Type type)
         {
+            string[] cols = GetColumns(type);
+            string tableName = Builder.GetTableName(type, false);
+            IDbTransaction transaction = Transaction;
             lock (Connection)
             {
-                string[] cols = GetColumns(type);
-                string tableName = Builder.GetTableName(type, false);
-                IDbTransaction transaction = Transaction;
                 try
                 {
                     if (Connection.State != ConnectionState.Open)
@@ -1191,17 +1189,17 @@ namespace Gurux.Service.Orm
         /// <param name="relations">Are relation tables dropped also.</param>
         public void DropTable(Type type, bool relations)
         {
-            lock (Connection)
+            if (Connection.State != ConnectionState.Open)
             {
-                if (Connection.State != ConnectionState.Open)
+                Connection.Open();
+            }
+            string table = Builder.GetTableName(type, false);
+            if (TableExist(table))
+            {
+                IDbTransaction transaction = Transaction;
+                bool autoTransaction = transaction == null;
+                lock (Connection)
                 {
-                    Connection.Open();
-                }
-                string table = Builder.GetTableName(type, false);
-                if (TableExist(table))
-                {
-                    IDbTransaction transaction = Transaction;
-                    bool autoTransaction = transaction == null;
                     try
                     {
                         Dictionary<Type, GXSerializedItem> tables = new Dictionary<Type, GXSerializedItem>();
@@ -1249,13 +1247,13 @@ namespace Gurux.Service.Orm
                             transaction.Commit();
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         if (autoTransaction && transaction != null)
                         {
                             transaction.Rollback();
                         }
-                        throw ex;
+                        throw;
                     }
                     finally
                     {
@@ -1268,11 +1266,6 @@ namespace Gurux.Service.Orm
             }
         }
 
-        private void DropTable(IDbTransaction transaction, string table)
-        {
-            ExecuteNonQuery(transaction, "DROP TABLE " + GXDbHelpers.AddQuotes(table, this.Builder.Settings.TableQuotation));
-        }
-
         public T ExecuteScalar<T>(string query)
         {
             return (T)ExecuteScalarInternal(null, query, typeof(T));
@@ -1280,12 +1273,12 @@ namespace Gurux.Service.Orm
 
         private object ExecuteScalarInternal(IDbTransaction transaction, string query, Type type)
         {
-            lock (Connection)
+            if (Connection.State != ConnectionState.Open)
             {
-                if (Connection.State != ConnectionState.Open)
-                {
-                    Connection.Open();
-                }
+                Connection.Open();
+            }
+            try
+            {
                 using (IDbCommand com = Connection.CreateCommand())
                 {
                     com.Transaction = transaction;
@@ -1293,6 +1286,11 @@ namespace Gurux.Service.Orm
                     com.CommandText = query;
                     return Convert.ChangeType(com.ExecuteScalar(), type);
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
         }
 
@@ -1312,22 +1310,30 @@ namespace Gurux.Service.Orm
         /// <param name="query">Query to execute.</param>
         public void ExecuteNonQuery(IDbTransaction transaction, string query)
         {
+            if (sql != null)
+            {
+                sql(this, query);
+            }
             lock (Connection)
             {
-                if (sql != null)
-                {
-                    sql(this, query);
-                }
                 if (Connection.State != ConnectionState.Open)
                 {
                     Connection.Open();
                 }
-                using (IDbCommand com = Connection.CreateCommand())
+                try
                 {
-                    com.CommandType = CommandType.Text;
-                    com.Transaction = transaction;
-                    com.CommandText = query;
-                    com.ExecuteNonQuery();
+                    using (IDbCommand com = Connection.CreateCommand())
+                    {
+                        com.CommandType = CommandType.Text;
+                        com.Transaction = transaction;
+                        com.CommandText = query;
+                        com.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ex.Data.Add("SQL", query);
+                    throw;
                 }
             }
         }
@@ -1393,14 +1399,11 @@ namespace Gurux.Service.Orm
 
         public string[] GetColumns(string tableName)
         {
-            lock (Connection)
+            if (Connection.State != ConnectionState.Open)
             {
-                if (Connection.State != ConnectionState.Open)
-                {
-                    Connection.Open();
-                }
-                return GetColumnsInteral(tableName, Builder.Settings.Type, Connection);
+                Connection.Open();
             }
+            return GetColumnsInteral(tableName, Builder.Settings.Type, Connection);
         }
 
         private string[] GetColumnsInteral(string tableName, DatabaseType type, DbConnection connection)
@@ -1408,7 +1411,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
@@ -1428,23 +1431,31 @@ namespace Gurux.Service.Orm
                 return list.ToArray();
             }
             else
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
             {
                 query = Builder.Settings.GetColumnsQuery(connection.Database, tableName, out index);
             }
             list = new List<string>();
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        list.Add(reader.GetString(index));
+                        while (reader.Read())
+                        {
+                            list.Add(reader.GetString(index));
+                        }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return list.ToArray();
         }
@@ -1453,22 +1464,30 @@ namespace Gurux.Service.Orm
         private bool IsAutoIncrement(string tableName, string columnName, DbConnection connection)
         {
             string query = Builder.Settings.GetAutoIncrementQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        object tmp = reader.GetValue(0);
-                        if (tmp != null && !(tmp is DBNull))
+                        while (reader.Read())
                         {
-                            return Builder.Settings.IsAutoIncrement(reader.GetValue(0));
+                            object tmp = reader.GetValue(0);
+                            if (tmp != null && !(tmp is DBNull))
+                            {
+                                return Builder.Settings.IsAutoIncrement(reader.GetValue(0));
+                            }
                         }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return false;
         }
@@ -1478,18 +1497,26 @@ namespace Gurux.Service.Orm
             onDelete = ForeignKeyDelete.None;
             onUpdate = ForeignKeyUpdate.None;
             string query = Builder.Settings.GetColumnConstraintsQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        targetTable = Builder.Settings.GetColumnConstraints(new object[] { reader.GetString(0), reader.GetString(1), reader.GetString(2) }, out onDelete, out onUpdate);
+                        while (reader.Read())
+                        {
+                            targetTable = Builder.Settings.GetColumnConstraints(new object[] { reader.GetString(0), reader.GetString(1), reader.GetString(2) }, out onDelete, out onUpdate);
+                        }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return targetTable;
         }
@@ -1505,22 +1532,30 @@ namespace Gurux.Service.Orm
         {
             bool ret = false;
             string query = Builder.Settings.GetPrimaryKeyQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        object tmp = reader.GetValue(0);
-                        if (tmp != null && !(tmp is DBNull))
+                        while (reader.Read())
                         {
-                            ret = Builder.Settings.IsPrimaryKey(tmp);
+                            object tmp = reader.GetValue(0);
+                            if (tmp != null && !(tmp is DBNull))
+                            {
+                                ret = Builder.Settings.IsPrimaryKey(tmp);
+                            }
                         }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return ret;
         }
@@ -1536,22 +1571,30 @@ namespace Gurux.Service.Orm
         {
             bool ret = false;
             string query = Builder.Settings.GetPrimaryKeyQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        object tmp = reader.GetValue(0);
-                        if (tmp != null && !(tmp is DBNull))
+                        while (reader.Read())
                         {
-                            ret = Builder.Settings.IsPrimaryKey(tmp);
+                            object tmp = reader.GetValue(0);
+                            if (tmp != null && !(tmp is DBNull))
+                            {
+                                ret = Builder.Settings.IsPrimaryKey(tmp);
+                            }
                         }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return ret;
         }
@@ -1560,18 +1603,26 @@ namespace Gurux.Service.Orm
         {
             bool ret = false;
             string query = Builder.Settings.GetColumnNullableQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        ret = Builder.Settings.IsNullable(reader.GetValue(0));
+                        while (reader.Read())
+                        {
+                            ret = Builder.Settings.IsNullable(reader.GetValue(0));
+                        }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return ret;
         }
@@ -1580,18 +1631,26 @@ namespace Gurux.Service.Orm
         {
             List<string> list = new List<string>();
             string query = Builder.Settings.GetReferenceTablesQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        list.Add(reader.GetString(0));
+                        while (reader.Read())
+                        {
+                            list.Add(reader.GetString(0));
+                        }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return list.ToArray();
         }
@@ -1599,22 +1658,30 @@ namespace Gurux.Service.Orm
         private string GetColumnDefaultValueQuery(string tableName, string columnName, DbConnection connection)
         {
             string query = Builder.Settings.GetColumnDefaultValueQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        object tmp = reader.GetValue(0);
-                        if (tmp != null && !(tmp is DBNull))
+                        while (reader.Read())
                         {
-                            return Convert.ToString(tmp);
+                            object tmp = reader.GetValue(0);
+                            if (tmp != null && !(tmp is DBNull))
+                            {
+                                return Convert.ToString(tmp);
+                            }
                         }
+                        reader.Close();
                     }
-                    reader.Close();
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             return "";
         }
@@ -1624,35 +1691,43 @@ namespace Gurux.Service.Orm
             string str = null;
             len = 0;
             string query = Builder.Settings.GetColumnTypeQuery(connection.Database, tableName, columnName);
-            using (IDbCommand com = connection.CreateCommand())
+            try
             {
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                using (IDataReader reader = com.ExecuteReader())
+                using (IDbCommand com = connection.CreateCommand())
                 {
-                    while (reader.Read())
+                    com.CommandType = CommandType.Text;
+                    com.CommandText = query;
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        str = reader.GetString(0);
-                        if (reader.FieldCount > 1)
+                        while (reader.Read())
                         {
-                            object tmp = reader.GetValue(1);
-                            if (tmp != null && !(tmp is DBNull))
+                            str = reader.GetString(0);
+                            if (reader.FieldCount > 1)
                             {
-                                len = Convert.ToInt32(tmp);
-                            }
-                            if (len < 1 && reader.FieldCount > 2)
-                            {
-                                tmp = reader.GetValue(2);
+                                object tmp = reader.GetValue(1);
                                 if (tmp != null && !(tmp is DBNull))
                                 {
                                     len = Convert.ToInt32(tmp);
                                 }
+                                if (len < 1 && reader.FieldCount > 2)
+                                {
+                                    tmp = reader.GetValue(2);
+                                    if (tmp != null && !(tmp is DBNull))
+                                    {
+                                        len = Convert.ToInt32(tmp);
+                                    }
+                                }
+                                break;
                             }
-                            break;
+                            reader.Close();
                         }
-                        reader.Close();
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
             }
             Type type = Builder.GetDataType(str, len);
             if (type == null)
@@ -1680,7 +1755,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = "SELECT NAME FROM sqlite_master WHERE type='table'";
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1700,7 +1775,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                     return list.ToArray();
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
@@ -1731,7 +1806,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (Connection as System.Data.OleDb.OleDbConnection != null)
@@ -1743,7 +1818,7 @@ namespace Gurux.Service.Orm
                         dt = (Connection as System.Data.Odbc.OdbcConnection).GetSchema("Tables", new string[] { null, null, tableName });
                     }
                     return dt.Rows.Count != 0;
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
@@ -1810,6 +1885,26 @@ namespace Gurux.Service.Orm
             return Builder.DbTypeMap[type];
         }
 
+        public async Task DeleteAsync(GXDeleteArgs arg)
+        {
+            await DeleteAsync(arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="items">List of items to remove.</param>
+        public async Task DeleteAsync(GXDeleteArgs arg, CancellationToken cancellationToken)
+        {
+            await new TaskFactory().StartNew(() =>
+            {
+                Delete(arg);
+            }, cancellationToken).ContinueWith(tsk =>
+            {
+                return tsk;
+            });
+        }
+
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
@@ -1826,7 +1921,7 @@ namespace Gurux.Service.Orm
                 }
                 try
                 {
-                    arg.Settings = this.Builder.Settings;
+                    arg.Settings = Builder.Settings;
                     ExecuteNonQuery(transaction, arg.ToString());
                     transaction.Commit();
                 }
@@ -2147,73 +2242,73 @@ namespace Gurux.Service.Orm
             Dictionary<Type, List<object>> mapTables = null;
             //Columns that are updated when row is read. This is needed when relation data is try tu update and it's not read yet.
             List<KeyValuePair<int, object>> UpdatedColumns = new List<KeyValuePair<int, object>>();
-            lock (Connection)
+            if (Connection.State != ConnectionState.Open)
             {
-                if (Connection.State != ConnectionState.Open)
+                Connection.Open();
+            }
+            if (typeof(T) == typeof(object[]))
+            {
+                objectList = new List<object[]>();
+            }
+            else if (GXInternal.IsGenericDataType(typeof(T)))
+            {
+                baseList = new List<T>();
+            }
+            else
+            {
+                tables = new Dictionary<Type, GXSerializedItem>();
+                GetTables(typeof(T), tables);
+                //If there are no relations to other tables.
+                if (!tables.ContainsKey(type))
                 {
-                    Connection.Open();
+                    tables.Add(type, null);
                 }
-                if (typeof(T) == typeof(object[]))
+                list = new List<T>();
+                columns = new Dictionary<int, GXColumnHelper>();
+                //If we are using 1:n or n:n references.
+                if (tables.Count != 1)
                 {
-                    objectList = new List<object[]>();
+                    relationDataSetters = new Dictionary<Type, Dictionary<Type, GXSerializedItem>>();
+                    TableIndexes = new Dictionary<Type, int>();
+                    objects = new Dictionary<Type, SortedDictionary<object, object>>();
+                    mapTables = new Dictionary<Type, List<object>>();
                 }
-                else if (GXInternal.IsGenericDataType(typeof(T)))
+            }
+            //Read column headers.
+            if (columns != null)
+            {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
+                if (Connection is OdbcConnection)
                 {
-                    baseList = new List<T>();
-                }
-                else
-                {
-                    tables = new Dictionary<Type, GXSerializedItem>();
-                    GetTables(typeof(T), tables);
-                    //If there are no relations to other tables.
-                    if (!tables.ContainsKey(type))
+                    using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
                     {
-                        tables.Add(type, null);
-                    }
-                    list = new List<T>();
-                    columns = new Dictionary<int, GXColumnHelper>();
-                    //If we are using 1:n or n:n references.
-                    if (tables.Count != 1)
-                    {
-                        relationDataSetters = new Dictionary<Type, Dictionary<Type, GXSerializedItem>>();
-                        TableIndexes = new Dictionary<Type, int>();
-                        objects = new Dictionary<Type, SortedDictionary<object, object>>();
-                        mapTables = new Dictionary<Type, List<object>>();
-                    }
-                }
-                //Read column headers.
-                if (columns != null)
-                {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
-                    if (Connection is OdbcConnection)
-                    {
-                        using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
+                        com.CommandType = CommandType.Text;
+                        com.CommandText = query;
+                        using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
                         {
-                            com.CommandType = CommandType.Text;
-                            com.CommandText = query;
-                            using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
-                            {
-                                InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                                reader.Close();
-                            }
+                            InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
+                            reader.Close();
                         }
                     }
-                    else if (Connection is OleDbConnection)
+                }
+                else if (Connection is OleDbConnection)
+                {
+                    using (IDbCommand com = ((OleDbConnection)Connection).CreateCommand())
                     {
-                        using (IDbCommand com = ((OleDbConnection)Connection).CreateCommand())
+                        com.CommandType = CommandType.Text;
+                        com.CommandText = query;
+                        using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
                         {
-                            com.CommandType = CommandType.Text;
-                            com.CommandText = query;
-                            using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
-                            {
-                                InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                                reader.Close();
-                            }
+                            InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
+                            reader.Close();
                         }
                     }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
+                }
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
 
-                }
+            }
+            try
+            {
                 using (IDbCommand com = Connection.CreateCommand())
                 {
                     com.CommandType = CommandType.Text;
@@ -2416,105 +2511,110 @@ namespace Gurux.Service.Orm
                         reader.Close();
                     }
                 }
-                if (list != null)
+            }
+            catch (Exception ex)
+            {
+                ex.Data.Add("SQL", query);
+                throw;
+            }
+            if (list != null)
+            {
+                //Update relation data.
+                if (relationDataSetters != null)
                 {
-                    //Update relation data.
-                    if (relationDataSetters != null)
+                    Type mapTable = null;
+                    foreach (var it in objects)
                     {
-                        Type mapTable = null;
-                        foreach (var it in objects)
+                        if (relationDataSetters.ContainsKey(it.Key))
                         {
-                            if (relationDataSetters.ContainsKey(it.Key))
+                            var parents = relationDataSetters[it.Key];
+                            foreach (var p in parents)
                             {
-                                var parents = relationDataSetters[it.Key];
-                                foreach (var p in parents)
+                                if (!objects.ContainsKey(p.Key))
                                 {
-                                    if (!objects.ContainsKey(p.Key))
+                                    continue;
+                                }
+                                if (p.Value.Relation.RelationType == RelationType.ManyToMany)
+                                {
+                                    mapTable = p.Value.Relation.RelationMapTable.Relation.PrimaryTable;
+                                }
+                                SortedDictionary<object, object> parentList = objects[p.Key];
+                                Dictionary<object, List<object>> parentValues = new Dictionary<object, List<object>>();
+                                foreach (var p2 in parentList)
+                                {
+                                    parentValues.Add(p2.Key, new List<object>());
+                                }
+                                object pId;
+                                if (p.Value.Relation.RelationType == RelationType.ManyToMany)
+                                {
+                                    foreach (object v in mapTables[mapTable])
                                     {
-                                        continue;
-                                    }
-                                    if (p.Value.Relation.RelationType == RelationType.ManyToMany)
-                                    {
-                                        mapTable = p.Value.Relation.RelationMapTable.Relation.PrimaryTable;
-                                    }
-                                    SortedDictionary<object, object> parentList = objects[p.Key];
-                                    Dictionary<object, List<object>> parentValues = new Dictionary<object, List<object>>();
-                                    foreach (var p2 in parentList)
-                                    {
-                                        parentValues.Add(p2.Key, new List<object>());
-                                    }
-                                    object pId;
-                                    if (p.Value.Relation.RelationType == RelationType.ManyToMany)
-                                    {
-                                        foreach (object v in mapTables[mapTable])
-                                        {
-                                            pId = relationDataSetters[mapTable][p.Key].Get(v);
-                                            object cId = relationDataSetters[mapTable][p.Value.Relation.ForeignTable].Get(v);
-                                            //Loop values and map them to parent id.
-                                            foreach (var c in it.Value)
-                                            {
-                                                object id2 = p.Value.Relation.ForeignId.Get(c.Value);
-                                                if (id2.Equals(cId))
-                                                {
-                                                    //Value is null if item is empty in that row.
-                                                    if (parentValues.ContainsKey(pId))
-                                                    {
-                                                        parentValues[pId].Add(c.Value);
-                                                    }
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
+                                        pId = relationDataSetters[mapTable][p.Key].Get(v);
+                                        object cId = relationDataSetters[mapTable][p.Value.Relation.ForeignTable].Get(v);
                                         //Loop values and map them to parent id.
                                         foreach (var c in it.Value)
                                         {
-                                            if (p.Value.Relation.RelationType != RelationType.Relation)
+                                            object id2 = p.Value.Relation.ForeignId.Get(c.Value);
+                                            if (id2.Equals(cId))
                                             {
-                                                //If FK is primary data type like int.
-                                                if (GXInternal.IsGenericDataType(p.Value.Relation.PrimaryId.Type))
-                                                {
-                                                    pId = p.Value.Relation.PrimaryId.Get(c.Value);
-                                                }
-                                                else //If FK is class.
-                                                {
-                                                    //Get target class.
-                                                    pId = p.Value.Relation.PrimaryId.Get(c.Value);
-                                                    //With SQLite there might be some empty rows after delete.
-                                                    if (pId != null)
-                                                    {
-                                                        //Get ID from target class.
-                                                        pId = p.Value.Relation.PrimaryId.Relation.ForeignId.Get(pId);
-                                                    }
-                                                }
                                                 //Value is null if item is empty in that row.
-                                                if (pId != null && parentValues.ContainsKey(pId))
+                                                if (parentValues.ContainsKey(pId))
                                                 {
                                                     parentValues[pId].Add(c.Value);
                                                 }
+                                                break;
                                             }
                                         }
                                     }
-                                    //Add collections of child values to the parent.
-                                    foreach (var p3 in parentValues)
+                                }
+                                else
+                                {
+                                    //Loop values and map them to parent id.
+                                    foreach (var c in it.Value)
                                     {
-                                        object p2 = parentList[p3.Key];
-                                        GXInternal.SetValue(p2, p.Value.Target, p3.Value);
+                                        if (p.Value.Relation.RelationType != RelationType.Relation)
+                                        {
+                                            //If FK is primary data type like int.
+                                            if (GXInternal.IsGenericDataType(p.Value.Relation.PrimaryId.Type))
+                                            {
+                                                pId = p.Value.Relation.PrimaryId.Get(c.Value);
+                                            }
+                                            else //If FK is class.
+                                            {
+                                                //Get target class.
+                                                pId = p.Value.Relation.PrimaryId.Get(c.Value);
+                                                //With SQLite there might be some empty rows after delete.
+                                                if (pId != null)
+                                                {
+                                                    //Get ID from target class.
+                                                    pId = p.Value.Relation.PrimaryId.Relation.ForeignId.Get(pId);
+                                                }
+                                            }
+                                            //Value is null if item is empty in that row.
+                                            if (pId != null && parentValues.ContainsKey(pId))
+                                            {
+                                                parentValues[pId].Add(c.Value);
+                                            }
+                                        }
                                     }
+                                }
+                                //Add collections of child values to the parent.
+                                foreach (var p3 in parentValues)
+                                {
+                                    object p2 = parentList[p3.Key];
+                                    GXInternal.SetValue(p2, p.Value.Target, p3.Value);
                                 }
                             }
                         }
                     }
-                    return list;
                 }
-                if (baseList != null)
-                {
-                    return baseList;
-                }
-                return objectList;
+                return list;
             }
+            if (baseList != null)
+            {
+                return baseList;
+            }
+            return objectList;
         }
 
         public List<T> Select<T>(GXSelectArgs arg)
@@ -2527,12 +2627,22 @@ namespace Gurux.Service.Orm
             arg.Parent.Settings = Builder.Settings;
             arg.ExecutionTime = 0;
             DateTime tm = DateTime.Now;
-            lock (Connection)
+            List<T> value = (List<T>)SelectInternal2<T>(arg);
+            arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
+            return value;
+        }
+
+        public async Task<List<T>> SelectAsync<T>(GXSelectArgs arg)
+        {
+            return await SelectAsync<T>(arg, CancellationToken.None);
+        }
+
+        public async Task<List<T>> SelectAsync<T>(GXSelectArgs arg, CancellationToken cancellationToken)
+        {
+            return await new TaskFactory().StartNew(() =>
             {
-                List<T> value = (List<T>)SelectInternal2<T>(arg);
-                arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
-                return value;
-            }
+                return Select<T>(arg);
+            }, cancellationToken);
         }
 
         private object SelectInternal2<T>(GXSelectArgs arg)
@@ -2557,410 +2667,409 @@ namespace Gurux.Service.Orm
             Dictionary<Type, List<object>> mapTables = null;
             //Columns that are updated when row is read. This is needed when relation data is try to update and it's not read yet.
             List<KeyValuePair<int, object>> UpdatedColumns = new List<KeyValuePair<int, object>>();
-            string query = arg.ToString();
+            //Generate SQL again.
+            arg.Parent.Updated = true;
+            string query = arg.ToString(false);
             if (sql != null)
             {
                 sql(this, query);
             }
-            lock (Connection)
+            if (Connection.State != ConnectionState.Open)
             {
-                if (Connection.State != ConnectionState.Open)
+                Connection.Open();
+            }
+            if (typeof(T) == typeof(object[]))
+            {
+                objectList = new List<object[]>();
+            }
+            else if (GXInternal.IsGenericDataType(typeof(T)))
+            {
+                baseList = new List<T>();
+            }
+            else
+            {
+                tables = new Dictionary<Type, GXSerializedItem>();
+                Dictionary<Type, GXSerializedItem> tmp = new Dictionary<Type, GXSerializedItem>();
+                GetTables(typeof(T), tmp);
+                //If there are no relations to other tables.
+                if (!tmp.ContainsKey(type))
                 {
-                    Connection.Open();
+                    tmp.Add(type, null);
                 }
-                if (typeof(T) == typeof(object[]))
+                ///Loop throw all tables and add only selected tables.
+                foreach (var it in tmp)
                 {
-                    objectList = new List<object[]>();
-                }
-                else if (GXInternal.IsGenericDataType(typeof(T)))
-                {
-                    baseList = new List<T>();
-                }
-                else
-                {
-                    tables = new Dictionary<Type, GXSerializedItem>();
-                    Dictionary<Type, GXSerializedItem> tmp = new Dictionary<Type, GXSerializedItem>();
-                    GetTables(typeof(T), tmp);
-                    //If there are no relations to other tables.
-                    if (!tmp.ContainsKey(type))
+                    if (arg.Columns.ColumnList.ContainsKey(it.Key))
                     {
-                        tmp.Add(type, null);
+                        tables.Add(it.Key, it.Value);
                     }
-                    ///Loop throw all tables and add only selected tables.
-                    foreach (var it in tmp)
+                }
+                list = new List<T>();
+                columns = new Dictionary<int, GXColumnHelper>();
+                //If we are using 1:n or n:n references.
+                if (tables.Count != 1)
+                {
+                    relationDataSetters = new Dictionary<Type, Dictionary<Type, GXSerializedItem>>();
+                    TableIndexes = new Dictionary<Type, int>();
+                    objects = new Dictionary<Type, SortedDictionary<object, object>>();
+                    mapTables = new Dictionary<Type, List<object>>();
+                }
+            }
+            //Read column headers.
+            if (columns != null)
+            {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
+                if (Connection is OdbcConnection)
+                {
+                    using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
                     {
-                        if (arg.Columns.ColumnList.ContainsKey(it.Key))
+                        com.CommandType = CommandType.Text;
+                        com.CommandText = query;
+                        using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
                         {
-                            tables.Add(it.Key, it.Value);
+                            InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
+                            reader.Close();
                         }
                     }
-                    list = new List<T>();
-                    columns = new Dictionary<int, GXColumnHelper>();
-                    //If we are using 1:n or n:n references.
-                    if (tables.Count != 1)
+                }
+                else if (Connection is OleDbConnection)
+                {
+                    using (IDbCommand com = ((OleDbConnection)Connection).CreateCommand())
                     {
-                        relationDataSetters = new Dictionary<Type, Dictionary<Type, GXSerializedItem>>();
-                        TableIndexes = new Dictionary<Type, int>();
-                        objects = new Dictionary<Type, SortedDictionary<object, object>>();
-                        mapTables = new Dictionary<Type, List<object>>();
+                        com.CommandType = CommandType.Text;
+                        com.CommandText = query;
+                        using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
+                        {
+                            InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
+                            reader.Close();
+                        }
                     }
                 }
-                //Read column headers.
-                if (columns != null)
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
+            }
+            using (IDbCommand com = Connection.CreateCommand())
+            {
+                com.CommandType = CommandType.Text;
+                com.CommandText = query;
+                try
                 {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
-                    if (Connection is OdbcConnection)
+                    using (IDataReader reader = com.ExecuteReader())
                     {
-                        using (IDbCommand com = ((OdbcConnection)Connection).CreateCommand())
+                        while (reader.Read())
                         {
-                            com.CommandType = CommandType.Text;
-                            com.CommandText = query;
-                            using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
+                            UpdatedColumns.Clear();
+                            if (values == null)
+                            {
+                                values = new object[reader.FieldCount];
+                            }
+                            reader.GetValues(values);
+                            if (columns != null && columns.Count == 0)
                             {
                                 InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                                reader.Close();
                             }
-                        }
-                    }
-                    else if (Connection is OleDbConnection)
-                    {
-                        using (IDbCommand com = ((OleDbConnection)Connection).CreateCommand())
-                        {
-                            com.CommandType = CommandType.Text;
-                            com.CommandText = query;
-                            using (IDataReader reader = com.ExecuteReader(CommandBehavior.KeyInfo))
-                            {
-                                InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                                reader.Close();
-                            }
-                        }
-                    }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
-                }
-                using (IDbCommand com = Connection.CreateCommand())
-                {
-                    com.CommandType = CommandType.Text;
-                    com.CommandText = query;
-                    try
-                    {
-                        using (IDataReader reader = com.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                UpdatedColumns.Clear();
-                                if (values == null)
-                                {
-                                    values = new object[reader.FieldCount];
-                                }
-                                reader.GetValues(values);
-                                if (columns != null && columns.Count == 0)
-                                {
-                                    InitializeSelect<T>(reader, this.Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                                }
 
-                                targetTable = null;
-                                if (list != null)
+                            targetTable = null;
+                            if (list != null)
+                            {
+                                //If we want to read only basic data types example count(*)
+                                if (GXInternal.IsGenericDataType(type))
                                 {
-                                    //If we want to read only basic data types example count(*)
-                                    if (GXInternal.IsGenericDataType(type))
+                                    list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type, Builder.Settings.UniversalTime));
+                                    return list;
+                                }
+                                properties = GXSqlBuilder.GetProperties<T>();
+                            }
+                            if (objectList != null)
+                            {
+                                objectList.Add(values);
+                            }
+                            else if (baseList != null)
+                            {
+                                baseList.Add((T)Convert.ChangeType(values[0], type));
+                            }
+                            else
+                            {
+                                item = null;
+                                //If we are reading values from multiple tables each component is created only once.
+                                bool isCreated = false;
+                                //For Oracle reader.FieldCount is too high. For this reason columns.Count is used.
+                                for (int pos = 0; pos != Math.Min(reader.FieldCount, columns.Count); ++pos)
+                                {
+                                    value = null;
+                                    //If we are asking some data from the DB that is not exist on class.
+                                    //This is removed from the interface etc...
+                                    if (!columns.ContainsKey(pos))
                                     {
-                                        list.Add((T)GXInternal.ChangeType(reader.GetValue(0), type, Builder.Settings.UniversalTime));
-                                        return list;
+                                        continue;
                                     }
-                                    properties = GXSqlBuilder.GetProperties<T>();
-                                }
-                                if (objectList != null)
-                                {
-                                    objectList.Add(values);
-                                }
-                                else if (baseList != null)
-                                {
-                                    baseList.Add((T)Convert.ChangeType(values[0], type));
-                                }
-                                else
-                                {
-                                    item = null;
-                                    //If we are reading values from multiple tables each component is created only once.
-                                    bool isCreated = false;
-                                    //For Oracle reader.FieldCount is too high. For this reason columns.Count is used.
-                                    for (int pos = 0; pos != Math.Min(reader.FieldCount, columns.Count); ++pos)
+                                    GXColumnHelper col = columns[pos];
+                                    //If we are reading multiple objects and object has changed.
+                                    if (string.Compare(col.Table, targetTable, true) != 0)
                                     {
-                                        value = null;
-                                        //If we are asking some data from the DB that is not exist on class.
-                                        //This is removed from the interface etc...
-                                        if (!columns.ContainsKey(pos))
+                                        isCreated = false;
+                                        if (TableIndexes != null && TableIndexes.ContainsKey(col.TableType))
                                         {
-                                            continue;
-                                        }
-                                        GXColumnHelper col = columns[pos];
-                                        //If we are reading multiple objects and object has changed.
-                                        if (string.Compare(col.Table, targetTable, true) != 0)
-                                        {
-                                            isCreated = false;
-                                            if (TableIndexes != null && TableIndexes.ContainsKey(col.TableType))
+                                            id = values[TableIndexes[col.TableType]];
+                                            if (id == null || id is DBNull)
                                             {
-                                                id = values[TableIndexes[col.TableType]];
-                                                if (id == null || id is DBNull)
+                                                isCreated = true;
+                                            }
+                                            else
+                                            {
+                                                if (objects.ContainsKey(col.TableType))
                                                 {
-                                                    isCreated = true;
+                                                    // Check is item already created.
+                                                    if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime)))
+                                                    {
+                                                        isCreated = true;
+                                                    }
                                                 }
                                                 else
                                                 {
-                                                    if (objects.ContainsKey(col.TableType))
-                                                    {
-                                                        // Check is item already created.
-                                                        if (objects[col.TableType].ContainsKey(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime)))
-                                                        {
-                                                            isCreated = true;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        objects.Add(col.TableType, new SortedDictionary<object, object>());
-                                                    }
+                                                    objects.Add(col.TableType, new SortedDictionary<object, object>());
                                                 }
                                             }
-                                            else //If Map table.
-                                            {
-                                                id = null;
-                                            }
-                                            if (!isCreated)
-                                            {
-                                                if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
-                                                {
-                                                    item = GXJsonParser.CreateInstance(col.TableType);
-                                                    if (item != null && item.GetType() == typeof(T))
-                                                    {
-                                                        list.Add((T)item);
-                                                    }
-                                                    //If we are adding map table.
-                                                    if (mapTables != null && item != null && id == null && mapTables.ContainsKey(item.GetType()))
-                                                    {
-                                                        mapTables[item.GetType()].Add(item);
-                                                    }
-                                                }
-                                                if (objects != null && id != null)
-                                                {
-                                                    //Id is not save directly because class might change it's type example from uint to int.
-                                                    if (GXInternal.IsGenericDataType(col.Setter.Type))
-                                                    {
-                                                        objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime), item);
-                                                    }
-                                                    else //If we are saving table.
-                                                    {
-                                                        objects[col.TableType].Add(id, item);
-                                                    }
-                                                }
-                                            }
-                                            targetTable = col.Table;
+                                        }
+                                        else //If Map table.
+                                        {
+                                            id = null;
                                         }
                                         if (!isCreated)
                                         {
-                                            //If 1:1 relation.
-                                            if (objects != null && !GXInternal.IsGenericDataType(col.Setter.Type) &&
-                                                !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) &&
-                                                col.Setter.Type.IsClass && col.Setter.Type != typeof(byte[]))
+                                            if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
                                             {
-                                                Type pt = GXInternal.GetPropertyType(col.Setter.Type);
-                                                if (GXInternal.IsGenericDataType(pt))
+                                                item = GXJsonParser.CreateInstance(col.TableType);
+                                                if (item != null && item.GetType() == typeof(T))
                                                 {
-                                                    if (!string.IsNullOrEmpty(values[pos].ToString()))
+                                                    list.Add((T)item);
+                                                }
+                                                //If we are adding map table.
+                                                if (mapTables != null && item != null && id == null && mapTables.ContainsKey(item.GetType()))
+                                                {
+                                                    mapTables[item.GetType()].Add(item);
+                                                }
+                                            }
+                                            if (objects != null && id != null)
+                                            {
+                                                //Id is not save directly because class might change it's type example from uint to int.
+                                                if (GXInternal.IsGenericDataType(col.Setter.Type))
+                                                {
+                                                    objects[col.TableType].Add(GXInternal.ChangeType(id, col.Setter.Type, Builder.Settings.UniversalTime), item);
+                                                }
+                                                else //If we are saving table.
+                                                {
+                                                    objects[col.TableType].Add(id, item);
+                                                }
+                                            }
+                                        }
+                                        targetTable = col.Table;
+                                    }
+                                    if (!isCreated)
+                                    {
+                                        //If 1:1 relation.
+                                        if (objects != null && !GXInternal.IsGenericDataType(col.Setter.Type) &&
+                                            !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) &&
+                                            col.Setter.Type.IsClass && col.Setter.Type != typeof(byte[]))
+                                        {
+                                            Type pt = GXInternal.GetPropertyType(col.Setter.Type);
+                                            if (GXInternal.IsGenericDataType(pt))
+                                            {
+                                                if (!string.IsNullOrEmpty(values[pos].ToString()))
+                                                {
+                                                    string[] tmp = values[pos].ToString().Split(new char[] { ';' });
+                                                    Array items = Array.CreateInstance(pt, tmp.Length);
+                                                    int pos2 = -1;
+                                                    foreach (string it in tmp)
                                                     {
-                                                        string[] tmp = values[pos].ToString().Split(new char[] { ';' });
-                                                        Array items = Array.CreateInstance(pt, tmp.Length);
-                                                        int pos2 = -1;
-                                                        foreach (string it in tmp)
-                                                        {
-                                                            items.SetValue(GXInternal.ChangeType(it, pt, Builder.Settings.UniversalTime), ++pos2);
-                                                        }
-                                                        value = items;
+                                                        items.SetValue(GXInternal.ChangeType(it, pt, Builder.Settings.UniversalTime), ++pos2);
                                                     }
-                                                    else
-                                                    {
-                                                        value = Array.CreateInstance(pt, 0);
-                                                    }
+                                                    value = items;
                                                 }
                                                 else
                                                 {
-                                                    //Columns relations are updated when all data from the row is read.
-                                                    UpdatedColumns.Add(new KeyValuePair<int, object>(pos, item));
-                                                }
-                                            }
-                                            else if (col.Setter != null)
-                                            {
-                                                //Get value if not class.
-                                                if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
-                                                {
-                                                    value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
-                                                    if (value == null && col.Setter.Type == typeof(string) && UseEmptyString)
-                                                    {
-                                                        value = "";
-                                                    }
-                                                }
-                                                else //Parameter type is class. Set to null.
-                                                {
-                                                    value = null;
+                                                    value = Array.CreateInstance(pt, 0);
                                                 }
                                             }
                                             else
                                             {
-                                                value = values[pos];
+                                                //Columns relations are updated when all data from the row is read.
+                                                UpdatedColumns.Add(new KeyValuePair<int, object>(pos, item));
                                             }
-                                            if (value != null)
+                                        }
+                                        else if (col.Setter != null)
+                                        {
+                                            //Get value if not class.
+                                            if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
                                             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                                                //Access minimum date time is 98, 11, 26.
-                                                if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
-                                                    ((DateTime)value).Date <= new DateTime(100, 1, 1))
+                                                value = GXInternal.ChangeType(values[pos], col.Setter.Type, Builder.Settings.UniversalTime);
+                                                if (value == null && col.Setter.Type == typeof(string) && UseEmptyString)
                                                 {
-                                                    value = DateTime.MinValue;
+                                                    value = "";
                                                 }
+                                            }
+                                            else //Parameter type is class. Set to null.
+                                            {
+                                                value = null;
+                                            }
+                                        }
+                                        else
+                                        {
+                                            value = values[pos];
+                                        }
+                                        if (value != null)
+                                        {
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+                                            //Access minimum date time is 98, 11, 26.
+                                            if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
+                                                ((DateTime)value).Date <= new DateTime(100, 1, 1))
+                                            {
+                                                value = DateTime.MinValue;
+                                            }
 #endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
-                                                if (col.Setter.Set != null)
+                                            if (col.Setter.Set != null)
+                                            {
+                                                col.Setter.Set(item, value);
+                                            }
+                                            else
+                                            {
+                                                PropertyInfo pi = col.Setter.Target as PropertyInfo;
+                                                if (pi != null)
                                                 {
-                                                    col.Setter.Set(item, value);
+                                                    pi.SetValue(item, value, null);
                                                 }
                                                 else
                                                 {
-                                                    PropertyInfo pi = col.Setter.Target as PropertyInfo;
-                                                    if (pi != null)
-                                                    {
-                                                        pi.SetValue(item, value, null);
-                                                    }
-                                                    else
-                                                    {
-                                                        FieldInfo fi = col.Setter.Target as FieldInfo;
-                                                        fi.SetValue(item, value);
-                                                    }
+                                                    FieldInfo fi = col.Setter.Target as FieldInfo;
+                                                    fi.SetValue(item, value);
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                //Update columns that was not read yet.
-                                foreach (var it in UpdatedColumns)
-                                {
-                                    GXColumnHelper col = columns[it.Key];
-                                    object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type, Builder.Settings.UniversalTime);
-                                    if (objects.ContainsKey(col.Setter.Type) && objects[col.Setter.Type].ContainsKey(relationId))
-                                    {
-                                        object relationData = objects[col.Setter.Type][relationId];
-                                        col.Setter.Set(it.Value, relationData);
-                                    }
-                                }
-                                UpdatedColumns.Clear();
                             }
-                            reader.Close();
+                            //Update columns that was not read yet.
+                            foreach (var it in UpdatedColumns)
+                            {
+                                GXColumnHelper col = columns[it.Key];
+                                object relationId = GXInternal.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type, Builder.Settings.UniversalTime);
+                                if (objects.ContainsKey(col.Setter.Type) && objects[col.Setter.Type].ContainsKey(relationId))
+                                {
+                                    object relationData = objects[col.Setter.Type][relationId];
+                                    col.Setter.Set(it.Value, relationData);
+                                }
+                            }
+                            UpdatedColumns.Clear();
                         }
-                    }
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
-                    catch (SqlException ex)
-#else
-                    catch (Exception ex)
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1
-                    {
-                        throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
+                        reader.Close();
                     }
                 }
-                if (list != null)
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
+                catch (SqlException ex)
+#else
+                catch (Exception ex)
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                 {
-                    //Update relation data.
-                    if (relationDataSetters != null)
+                    throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
+                }
+            }
+            if (list != null)
+            {
+                //Update relation data.
+                if (relationDataSetters != null)
+                {
+                    Type mapTable = null;
+                    foreach (var it in objects)
                     {
-                        Type mapTable = null;
-                        foreach (var it in objects)
+                        if (relationDataSetters.ContainsKey(it.Key))
                         {
-                            if (relationDataSetters.ContainsKey(it.Key))
+                            var parents = relationDataSetters[it.Key];
+                            foreach (var p in parents)
                             {
-                                var parents = relationDataSetters[it.Key];
-                                foreach (var p in parents)
+                                if (!objects.ContainsKey(p.Key))
                                 {
-                                    if (!objects.ContainsKey(p.Key))
+                                    continue;
+                                }
+                                if (p.Value.Relation.RelationType == RelationType.ManyToMany)
+                                {
+                                    mapTable = p.Value.Relation.RelationMapTable.Relation.PrimaryTable;
+                                }
+                                SortedDictionary<object, object> parentList = objects[p.Key];
+                                Dictionary<object, List<object>> parentValues = new Dictionary<object, List<object>>();
+                                foreach (var p2 in parentList)
+                                {
+                                    parentValues.Add(p2.Key, new List<object>());
+                                }
+                                object pId;
+                                if (p.Value.Relation.RelationType == RelationType.ManyToMany)
+                                {
+                                    foreach (object v in mapTables[mapTable])
                                     {
-                                        continue;
-                                    }
-                                    if (p.Value.Relation.RelationType == RelationType.ManyToMany)
-                                    {
-                                        mapTable = p.Value.Relation.RelationMapTable.Relation.PrimaryTable;
-                                    }
-                                    SortedDictionary<object, object> parentList = objects[p.Key];
-                                    Dictionary<object, List<object>> parentValues = new Dictionary<object, List<object>>();
-                                    foreach (var p2 in parentList)
-                                    {
-                                        parentValues.Add(p2.Key, new List<object>());
-                                    }
-                                    object pId;
-                                    if (p.Value.Relation.RelationType == RelationType.ManyToMany)
-                                    {
-                                        foreach (object v in mapTables[mapTable])
-                                        {
-                                            pId = relationDataSetters[mapTable][p.Key].Get(v);
-                                            object cId = relationDataSetters[mapTable][p.Value.Relation.ForeignTable].Get(v);
-                                            //Loop values and map them to parent id.
-                                            foreach (var c in it.Value)
-                                            {
-                                                object id2 = p.Value.Relation.ForeignId.Get(c.Value);
-                                                if (id2.Equals(cId))
-                                                {
-                                                    //Value is null if item is empty in that row.
-                                                    if (parentValues.ContainsKey(pId))
-                                                    {
-                                                        parentValues[pId].Add(c.Value);
-                                                    }
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
+                                        pId = relationDataSetters[mapTable][p.Key].Get(v);
+                                        object cId = relationDataSetters[mapTable][p.Value.Relation.ForeignTable].Get(v);
                                         //Loop values and map them to parent id.
                                         foreach (var c in it.Value)
                                         {
-                                            if (p.Value.Relation.RelationType != RelationType.Relation)
+                                            object id2 = p.Value.Relation.ForeignId.Get(c.Value);
+                                            if (id2.Equals(cId))
                                             {
-                                                //If FK is primary data type like int.
-                                                if (GXInternal.IsGenericDataType(p.Value.Relation.PrimaryId.Type))
-                                                {
-                                                    pId = p.Value.Relation.PrimaryId.Get(c.Value);
-                                                }
-                                                else //If FK is class.
-                                                {
-                                                    //Get target class.
-                                                    pId = p.Value.Relation.PrimaryId.Get(c.Value);
-                                                    //With SQLite there might be some empty rows after delete.
-                                                    if (pId != null)
-                                                    {
-                                                        //Get ID from target class.
-                                                        pId = p.Value.Relation.PrimaryId.Relation.ForeignId.Get(pId);
-                                                    }
-                                                }
                                                 //Value is null if item is empty in that row.
-                                                if (pId != null && parentValues.ContainsKey(pId))
+                                                if (parentValues.ContainsKey(pId))
                                                 {
                                                     parentValues[pId].Add(c.Value);
                                                 }
+                                                break;
                                             }
                                         }
                                     }
-                                    //Add collections of child values to the parent.
-                                    foreach (var p3 in parentValues)
+                                }
+                                else
+                                {
+                                    //Loop values and map them to parent id.
+                                    foreach (var c in it.Value)
                                     {
-                                        object p2 = parentList[p3.Key];
-                                        GXInternal.SetValue(p2, p.Value.Target, p3.Value);
+                                        if (p.Value.Relation.RelationType != RelationType.Relation)
+                                        {
+                                            //If FK is primary data type like int.
+                                            if (GXInternal.IsGenericDataType(p.Value.Relation.PrimaryId.Type))
+                                            {
+                                                pId = p.Value.Relation.PrimaryId.Get(c.Value);
+                                            }
+                                            else //If FK is class.
+                                            {
+                                                //Get target class.
+                                                pId = p.Value.Relation.PrimaryId.Get(c.Value);
+                                                //With SQLite there might be some empty rows after delete.
+                                                if (pId != null)
+                                                {
+                                                    //Get ID from target class.
+                                                    pId = p.Value.Relation.PrimaryId.Relation.ForeignId.Get(pId);
+                                                }
+                                            }
+                                            //Value is null if item is empty in that row.
+                                            if (pId != null && parentValues.ContainsKey(pId))
+                                            {
+                                                parentValues[pId].Add(c.Value);
+                                            }
+                                        }
                                     }
+                                }
+                                //Add collections of child values to the parent.
+                                foreach (var p3 in parentValues)
+                                {
+                                    object p2 = parentList[p3.Key];
+                                    GXInternal.SetValue(p2, p.Value.Target, p3.Value);
                                 }
                             }
                         }
                     }
-                    return list;
                 }
-                if (baseList != null)
-                {
-                    return baseList;
-                }
-                return objectList;
+                return list;
             }
+            if (baseList != null)
+            {
+                return baseList;
+            }
+            return objectList;
         }
 
         public T SingleOrDefault<T>(GXSelectArgs arg)
@@ -2977,6 +3086,28 @@ namespace Gurux.Service.Orm
             }
             return list[0];
         }
+
+        public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg)
+        {
+            return await SingleOrDefaultAsync<T>(arg, CancellationToken.None);
+        }
+
+        public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg, CancellationToken cancellationToken)
+        {
+            arg.Verify();
+            DateTime tm = DateTime.Now;
+            arg.Parent.Settings = Builder.Settings;
+            arg.ExecutionTime = 0;
+            cancellationToken.ThrowIfCancellationRequested();
+            List<T> list = await SelectAsync<T>(arg, cancellationToken);
+            arg.ExecutionTime = (DateTime.Now - tm).Milliseconds;
+            if (list.Count == 0)
+            {
+                return default(T);
+            }
+            return list[0];
+        }
+
 
         /// <summary>
         /// Return values as read values.
@@ -3012,9 +3143,37 @@ namespace Gurux.Service.Orm
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
             foreach (var it in arg.Values)
             {
-                GXDbHelpers.GetValues(it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, false);
+                GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, false);
             }
             UpdateOrInsert(list, true);
+        }
+
+        /// <summary>
+        /// Insert new object as async.
+        /// </summary>
+        /// <param name="arg"></param>
+        public async Task InsertAsync(GXInsertArgs arg)
+        {
+            await InsertAsync(arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Insert new object as async.
+        /// </summary>
+        /// <param name="arg"></param>
+        public async Task InsertAsync(GXInsertArgs arg, CancellationToken cancellationToken)
+        {
+            if (arg == null)
+            {
+                throw new ArgumentNullException("Insert failed. There is nothing to insert.");
+            }
+            arg.Settings = Builder.Settings;
+            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
+            foreach (var it in arg.Values)
+            {
+                GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, false);
+            }
+            await UpdateOrInsertAsync(list, true);
         }
 
         /// <summary>
@@ -3034,15 +3193,59 @@ namespace Gurux.Service.Orm
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
             foreach (var it in arg.Values)
             {
-                GXDbHelpers.GetValues(it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, true);
+                GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, true);
             }
             UpdateOrInsert(list, true);
             //Get updated values.
             foreach (var it in arg.Values)
             {
-                GXDbHelpers.GetValues(it.Key, null, it.Value, list, arg.Excluded, false, false, Builder.Settings.ColumnQuotation, true);
+                GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, false, false, Builder.Settings.ColumnQuotation, true);
             }
             UpdateOrInsert(list, false);
+        }
+
+        /// <summary>
+        /// Update object as async.
+        /// </summary>
+        /// <param name="arg"></param>
+        public async Task UpdateAsync(GXUpdateArgs arg)
+        {
+            await UpdateAsync(arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Update object as async.
+        /// </summary>
+        /// <param name="arg"></param>
+        public async Task UpdateAsync(GXUpdateArgs arg, CancellationToken cancellationToken)
+        {
+            if (arg == null)
+            {
+                throw new ArgumentNullException("Update failed. There is nothing to update.");
+            }
+            arg.Settings = Builder.Settings;
+            //Get values to insert first.
+            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
+            foreach (var it in arg.Values)
+            {
+                GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, true, false, Builder.Settings.ColumnQuotation, true);
+            }
+            UpdateOrInsert(list, true);
+            //Get updated values.
+            foreach (var it in arg.Values)
+            {
+                GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, false, false, Builder.Settings.ColumnQuotation, true);
+            }
+            await UpdateOrInsertAsync(list, false);
+        }
+
+        private async Task UpdateOrInsertAsync(List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
+        {
+            await new TaskFactory().StartNew(() => UpdateOrInsert(list, insert))
+                .ContinueWith(tsk =>
+            {
+                return tsk;
+            });
         }
 
         /// <summary>
@@ -3052,16 +3255,16 @@ namespace Gurux.Service.Orm
         /// <param name="insert">Insert or update.</param>
         private void UpdateOrInsert(List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
         {
+            int pos;
+            string columnName;
+            ulong id;
+            int total = 0;
+            Type type;
+            IDbTransaction transaction = Transaction;
+            bool autoTransaction = transaction == null;
+            List<string> queries = new List<string>();
             lock (Connection)
             {
-                int pos = 0;
-                string columnName;
-                ulong id;
-                int total = 0;
-                Type type;
-                IDbTransaction transaction = Transaction;
-                bool autoTransaction = transaction == null;
-                List<string> queries = new List<string>();
                 try
                 {
                     if (AutoTransaction)
@@ -3271,201 +3474,198 @@ namespace Gurux.Service.Orm
             {
                 di.Create();
             }
-            lock (Connection)
+            try
             {
-                try
+                if (Connection.State != ConnectionState.Open)
                 {
-                    if (Connection.State != ConnectionState.Open)
+                    Connection.Open();
+                }
+                foreach (string table in GetTables())
+                {
+                    if (ContainsTable(settings.Tables, table))
                     {
-                        Connection.Open();
-                    }
-                    foreach (string table in GetTables())
-                    {
-                        if (ContainsTable(settings.Tables, table))
+                        StringBuilder header = new StringBuilder();
+                        StringBuilder data = new StringBuilder();
+                        System.Diagnostics.Debug.WriteLine("Import " + table);
+                        AddLine(header, settings, "using System;", 0);
+                        AddLine(header, settings, "using System.Runtime.Serialization;", 0);
+                        AddLine(header, settings, "using Gurux.Service.Orm;", 0);
+                        header.AppendLine("");
+                        if (!string.IsNullOrEmpty(settings.Namespace))
                         {
-                            StringBuilder header = new StringBuilder();
-                            StringBuilder data = new StringBuilder();
-                            System.Diagnostics.Debug.WriteLine("Import " + table);
-                            AddLine(header, settings, "using System;", 0);
-                            AddLine(header, settings, "using System.Runtime.Serialization;", 0);
-                            AddLine(header, settings, "using Gurux.Service.Orm;", 0);
-                            header.AppendLine("");
-                            if (!string.IsNullOrEmpty(settings.Namespace))
-                            {
-                                Add(header, settings, "namespace ", 0);
-                                header.AppendLine(settings.Namespace);
-                                AddLine(header, settings, "{", 0);
-                            }
-                            AddLine(header, settings, "[DataContract]", 1);
-                            if (settings.Serializable)
-                            {
-                                AddLine(header, settings, "[Serializable]", 1);
-                            }
-                            Add(header, settings, "class ", 1);
-                            //Convert first letter to Uppercase.
-                            header.Append(GetName(settings, table));
-                            AddLine(data, settings, "{", 1);
-                            int len;
-                            foreach (string col in GetColumns(table))
-                            {
-                                bool isunique = false;
-                                //AutoIncrement
-                                bool ai = IsAutoIncrement(table, col, Connection);
-                                //Data type
-                                string def = GetColumnDefaultValueQuery(table, col, Connection);
-                                Type type = GetColumnType(table, col, Connection, out len);
-                                bool nullable = GetColumnNullableQuery(table, col, Connection);
+                            Add(header, settings, "namespace ", 0);
+                            header.AppendLine(settings.Namespace);
+                            AddLine(header, settings, "{", 0);
+                        }
+                        AddLine(header, settings, "[DataContract]", 1);
+                        if (settings.Serializable)
+                        {
+                            AddLine(header, settings, "[Serializable]", 1);
+                        }
+                        Add(header, settings, "class ", 1);
+                        //Convert first letter to Uppercase.
+                        header.Append(GetName(settings, table));
+                        AddLine(data, settings, "{", 1);
+                        int len;
+                        foreach (string col in GetColumns(table))
+                        {
+                            bool isunique = false;
+                            //AutoIncrement
+                            bool ai = IsAutoIncrement(table, col, Connection);
+                            //Data type
+                            string def = GetColumnDefaultValueQuery(table, col, Connection);
+                            Type type = GetColumnType(table, col, Connection, out len);
+                            bool nullable = GetColumnNullableQuery(table, col, Connection);
 
-                                if (GetPrimaryKeyQuery(table, col, Connection))
+                            if (GetPrimaryKeyQuery(table, col, Connection))
+                            {
+                                isunique = true;
+                                header.Append(" : IUnique<" + type.Name + ">");
+                                if (col != "Id")
                                 {
-                                    isunique = true;
-                                    header.Append(" : IUnique<" + type.Name + ">");
-                                    if (col != "Id")
-                                    {
-                                        AddLine(data, settings, "[DataMember(Name = \"" + col + "\")]", 2);
-                                    }
-                                    else
-                                    {
-                                        AddLine(data, settings, "[DataMember()]", 2);
-                                    }
+                                    AddLine(data, settings, "[DataMember(Name = \"" + col + "\")]", 2);
                                 }
                                 else
                                 {
-                                    if (nullable)
+                                    AddLine(data, settings, "[DataMember()]", 2);
+                                }
+                            }
+                            else
+                            {
+                                if (nullable)
+                                {
+                                    AddLine(data, settings, "[DataMember()]", 2);
+                                }
+                                else
+                                {
+                                    AddLine(data, settings, "[DataMember(IsRequired = true)]", 2);
+                                }
+                                string[] refs = GetReferenceTablesQuery(table, col, Connection);
+                                if (refs.Length != 0)
+                                {
+                                    ForeignKeyDelete onDelete;
+                                    ForeignKeyUpdate onUpdate;
+                                    string t = GetColumnConstraintsQuery(table, col, Connection, out onDelete, out onUpdate);
+                                    if (onUpdate == ForeignKeyUpdate.Restrict)
                                     {
-                                        AddLine(data, settings, "[DataMember()]", 2);
+                                        onUpdate = ForeignKeyUpdate.None;
                                     }
-                                    else
+                                    //Only cascade is allowed on delete.
+                                    if (onDelete != ForeignKeyDelete.Cascade)
                                     {
-                                        AddLine(data, settings, "[DataMember(IsRequired = true)]", 2);
+                                        onDelete = ForeignKeyDelete.None;
                                     }
-                                    string[] refs = GetReferenceTablesQuery(table, col, Connection);
-                                    if (refs.Length != 0)
+                                    if (onDelete == ForeignKeyDelete.None && onUpdate == ForeignKeyUpdate.None)
                                     {
-                                        ForeignKeyDelete onDelete;
-                                        ForeignKeyUpdate onUpdate;
-                                        string t = GetColumnConstraintsQuery(table, col, Connection, out onDelete, out onUpdate);
-                                        if (onUpdate == ForeignKeyUpdate.Restrict)
+                                        foreach (string it in refs)
                                         {
-                                            onUpdate = ForeignKeyUpdate.None;
+                                            AddLine(data, settings, "[ForeignKey(typeof(" +
+                                                GetName(settings, it) + "))]", 2);
                                         }
-                                        //Only cascade is allowed on delete.
-                                        if (onDelete != ForeignKeyDelete.Cascade)
+                                    }
+                                    else if (onDelete != ForeignKeyDelete.None && onUpdate != ForeignKeyUpdate.None)
+                                    {
+                                        foreach (string it in refs)
                                         {
-                                            onDelete = ForeignKeyDelete.None;
+                                            AddLine(data, settings, "[ForeignKey(typeof(" +
+                                            GetName(settings, it) + "), OnDelete = ForeignKeyDelete." + onDelete +
+                                            ", OnUpdate = ForeignKeyUpdate." + onUpdate + ")]", 2);
                                         }
-                                        if (onDelete == ForeignKeyDelete.None && onUpdate == ForeignKeyUpdate.None)
+                                    }
+                                    else if (onDelete != ForeignKeyDelete.None)
+                                    {
+                                        foreach (string it in refs)
                                         {
-                                            foreach (string it in refs)
-                                            {
-                                                AddLine(data, settings, "[ForeignKey(typeof(" +
-                                                    GetName(settings, it) + "))]", 2);
-                                            }
+                                            AddLine(data, settings, "[ForeignKey(typeof(" +
+                                            GetName(settings, it) + "), OnDelete = ForeignKeyDelete." + onDelete + ")]", 2);
                                         }
-                                        else if (onDelete != ForeignKeyDelete.None && onUpdate != ForeignKeyUpdate.None)
+                                    }
+                                    else if (onUpdate != ForeignKeyUpdate.None)
+                                    {
+                                        foreach (string it in refs)
                                         {
-                                            foreach (string it in refs)
-                                            {
-                                                AddLine(data, settings, "[ForeignKey(typeof(" +
-                                                GetName(settings, it) + "), OnDelete = ForeignKeyDelete." + onDelete +
-                                                ", OnUpdate = ForeignKeyUpdate." + onUpdate + ")]", 2);
-                                            }
-                                        }
-                                        else if (onDelete != ForeignKeyDelete.None)
-                                        {
-                                            foreach (string it in refs)
-                                            {
-                                                AddLine(data, settings, "[ForeignKey(typeof(" +
-                                                GetName(settings, it) + "), OnDelete = ForeignKeyDelete." + onDelete + ")]", 2);
-                                            }
-                                        }
-                                        else if (onUpdate != ForeignKeyUpdate.None)
-                                        {
-                                            foreach (string it in refs)
-                                            {
-                                                AddLine(data, settings, "[ForeignKey(typeof(" +
-                                                GetName(settings, it) + "), OnUpdate = ForeignKeyUpdate." + onUpdate + ")]", 2);
-                                            }
+                                            AddLine(data, settings, "[ForeignKey(typeof(" +
+                                            GetName(settings, it) + "), OnUpdate = ForeignKeyUpdate." + onUpdate + ")]", 2);
                                         }
                                     }
                                 }
+                            }
 
-                                if (ai)
-                                {
-                                    AddLine(data, settings, "[AutoIncrement]", 2);
-                                }
+                            if (ai)
+                            {
+                                AddLine(data, settings, "[AutoIncrement]", 2);
+                            }
 
-                                if (def != "" && def != "NULL")
-                                {
-                                    if (type == typeof(bool))
-                                    {
-                                        if (def.IndexOfAny(new char[] { 't', 'T', '1' }) != -1)
-                                        {
-                                            AddLine(data, settings, "[DefaultValue(true)]", 2);
-                                        }
-                                        else
-                                        {
-                                            AddLine(data, settings, "[DefaultValue(false)]", 2);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        AddLine(data, settings, "[DefaultValue(" + def + ")]", 2);
-                                    }
-                                }
-                                else if (len != 0 && len != -1 && len != 65535 && type == typeof(string))
-                                {
-                                    AddLine(data, settings, "[StringLength(" + len.ToString() + ")]", 2);
-                                }
-                                Add(data, settings, "public ", 2);
+                            if (def != "" && def != "NULL")
+                            {
                                 if (type == typeof(bool))
                                 {
-                                    data.Append("bool");
-                                }
-                                else if (type == typeof(string))
-                                {
-                                    data.Append("string");
-                                }
-                                else
-                                {
-                                    data.Append(type.Name);
-                                }
-                                data.Append(' ');
-                                if (isunique)
-                                {
-                                    data.AppendLine("Id");
+                                    if (def.IndexOfAny(new char[] { 't', 'T', '1' }) != -1)
+                                    {
+                                        AddLine(data, settings, "[DefaultValue(true)]", 2);
+                                    }
+                                    else
+                                    {
+                                        AddLine(data, settings, "[DefaultValue(false)]", 2);
+                                    }
                                 }
                                 else
                                 {
-                                    data.AppendLine(settings.ColumnPrefix + col);
+                                    AddLine(data, settings, "[DefaultValue(" + def + ")]", 2);
                                 }
-                                AddLine(data, settings, "{", 2);
-                                AddLine(data, settings, "get;", 3);
-                                AddLine(data, settings, "set;", 3);
-                                AddLine(data, settings, "}", 2);
-                                data.AppendLine("");
                             }
-                            //Remove last new line.
-                            data.Length -= 2;
-                            AddLine(data, settings, "}", 1);
-                            if (!string.IsNullOrEmpty(settings.Namespace))
+                            else if (len != 0 && len != -1 && len != 65535 && type == typeof(string))
                             {
-                                AddLine(data, settings, "}", 0);
+                                AddLine(data, settings, "[StringLength(" + len.ToString() + ")]", 2);
                             }
+                            Add(data, settings, "public ", 2);
+                            if (type == typeof(bool))
+                            {
+                                data.Append("bool");
+                            }
+                            else if (type == typeof(string))
+                            {
+                                data.Append("string");
+                            }
+                            else
+                            {
+                                data.Append(type.Name);
+                            }
+                            data.Append(' ');
+                            if (isunique)
+                            {
+                                data.AppendLine("Id");
+                            }
+                            else
+                            {
+                                data.AppendLine(settings.ColumnPrefix + col);
+                            }
+                            AddLine(data, settings, "{", 2);
+                            AddLine(data, settings, "get;", 3);
+                            AddLine(data, settings, "set;", 3);
+                            AddLine(data, settings, "}", 2);
+                            data.AppendLine("");
+                        }
+                        //Remove last new line.
+                        data.Length -= 2;
+                        AddLine(data, settings, "}", 1);
+                        if (!string.IsNullOrEmpty(settings.Namespace))
+                        {
+                            AddLine(data, settings, "}", 0);
+                        }
 
-                            using (TextWriter tw = File.CreateText(Path.Combine(settings.Path, table + ".cs")))
-                            {
-                                tw.Write(header);
-                                tw.WriteLine("");
-                                tw.Write(data);
-                            }
+                        using (TextWriter tw = File.CreateText(Path.Combine(settings.Path, table + ".cs")))
+                        {
+                            tw.Write(header);
+                            tw.WriteLine("");
+                            tw.Write(data);
                         }
                     }
                 }
-                finally
-                {
-                    Connection.Close();
-                }
+            }
+            finally
+            {
+                Connection.Close();
             }
         }
 
@@ -3483,29 +3683,32 @@ namespace Gurux.Service.Orm
             {
                 IDbTransaction transaction = Transaction;
                 bool autoTransaction = transaction == null;
-                if (AutoTransaction)
+                lock (Connection)
                 {
-                    transaction = Connection.BeginTransaction();
-                }
-                try
-                {
-                    string query = "TRUNCATE TABLE " + Builder.GetTableName(typeof(T), true);
-                    ExecuteNonQuery(transaction, query);
-                    transaction.Commit();
-                }
-                catch (Exception ex)
-                {
-                    if (autoTransaction && transaction != null)
+                    if (AutoTransaction)
                     {
-                        transaction.Rollback();
+                        transaction = Connection.BeginTransaction();
                     }
-                    throw ex;
-                }
-                finally
-                {
-                    if (autoTransaction && transaction != null)
+                    try
                     {
-                        transaction.Dispose();
+                        string query = "TRUNCATE TABLE " + Builder.GetTableName(typeof(T), true);
+                        ExecuteNonQuery(transaction, query);
+                        transaction.Commit();
+                    }
+                    catch (Exception ex)
+                    {
+                        if (autoTransaction && transaction != null)
+                        {
+                            transaction.Rollback();
+                        }
+                        throw ex;
+                    }
+                    finally
+                    {
+                        if (autoTransaction && transaction != null)
+                        {
+                            transaction.Dispose();
+                        }
                     }
                 }
             }

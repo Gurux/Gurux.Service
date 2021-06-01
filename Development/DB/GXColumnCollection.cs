@@ -37,6 +37,7 @@ using System.Text;
 using Gurux.Service.Orm.Settings;
 using System.Reflection;
 using Gurux.Common.Internal;
+using System.Diagnostics;
 
 namespace Gurux.Service.Orm
 {
@@ -51,7 +52,14 @@ namespace Gurux.Service.Orm
         internal Dictionary<Type, List<string>> ColumnList = new Dictionary<Type, List<string>>();
         internal Dictionary<string, string> Maps = new Dictionary<string, string>();
 
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<LambdaExpression> List = new List<LambdaExpression>();
+        /// <summary>
+        /// List of values to exlude from update.
+        /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        internal List<KeyValuePair<Type, LambdaExpression>> Excluded = new List<KeyValuePair<Type, LambdaExpression>>();
+
         internal GXJoinCollection Joins;
         GXSettingsArgs Parent;
         internal bool Updated;
@@ -263,7 +271,11 @@ namespace Gurux.Service.Orm
         /// <param name="type"></param>
         /// <param name="columns"></param>
         /// <param name="tables"></param>
-        private void GetColumns(Type type, Dictionary<Type, List<string>> columns, Dictionary<Type, GXSerializedItem> tables)
+        /// <param name="excluded">Excluded columns.</param>
+        private void GetColumns(
+            Type type,
+            Dictionary<Type, List<string>> columns,
+            Dictionary<Type, GXSerializedItem> tables)
         {
             if (tables.ContainsKey(type))
             {
@@ -307,7 +319,7 @@ namespace Gurux.Service.Orm
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine("Column " + tableName + "." + it.Key + " is excluded.");
+                        Debug.WriteLine("Column " + tableName + "." + it.Key + " is excluded.");
                     }
                 }
                 if (!exists && list.Count != 0)
@@ -329,8 +341,6 @@ namespace Gurux.Service.Orm
                 //Get columns.
                 Dictionary<string, GXSerializedItem> properties;
                 Dictionary<Type, GXSerializedItem> neededTables = new Dictionary<Type, GXSerializedItem>();
-                //List of tables that are already go through in join.
-                List<Type> joinTables = new List<Type>();
                 foreach (var it in List)
                 {
                     //No relations.
@@ -380,6 +390,20 @@ namespace Gurux.Service.Orm
                                         GetColumns(si.Relation.ForeignTable, ColumnList, neededTables);
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+                foreach (var it in ColumnList)
+                {
+                    foreach (KeyValuePair<Type, LambdaExpression> x in Excluded)
+                    {
+                        if (x.Key == it.Key)
+                        {
+                            string[] removed = GXDbHelpers.GetMembers(null, x.Value, '\0', false);
+                            foreach (string col in removed)
+                            {
+                                it.Value.Remove(col);
                             }
                         }
                     }
@@ -809,5 +833,17 @@ namespace Gurux.Service.Orm
                 }
             }
         }
+
+        /// <summary>
+        /// Exclude columns from the update.
+        /// </summary>
+        /// <param name="value">Updated value.</param>
+        /// <returns>Created update attribute.</returns>
+        public void Exclude<T>(Expression<Func<T, object>> columns)
+        {
+            Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));
+            Parent.Updated = true;
+        }
+
     }
 }

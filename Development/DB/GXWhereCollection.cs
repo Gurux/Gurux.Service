@@ -51,7 +51,7 @@ namespace Gurux.Service.Orm
         internal List<KeyValuePair<WhereType, LambdaExpression>> List = new List<KeyValuePair<WhereType, LambdaExpression>>();
         string sql;
         GXSettingsArgs Parent;
-        bool Updated;
+        internal bool Updated;
 
         /// <summary>
         /// Constructor.
@@ -206,7 +206,7 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    str = GXDbHelpers.GetMembers(Settings, value.Body, '\0', true)[0];
+                    str = GXDbHelpers.GetMembers(Settings, value.Body, '\'', true)[0];
                 }
                 //Remove brackets.
                 if (removebrackets)
@@ -268,13 +268,27 @@ namespace Gurux.Service.Orm
                                     actual = Convert.ToInt64(actual);
                                 }
 
-                                if (exact)
+                                if (exact || actual is Guid)
                                 {
                                     And<T>(q => it.Value.Target == actual);
                                 }
                                 else
                                 {
-                                    And<T>(q => GXSql.Contains(it.Value.Target, actual));
+                                    if (actual is DateTime d)
+                                    {
+                                        if (d == DateTime.MinValue || d == DateTime.MaxValue)
+                                        {
+                                            And<T>(q => it.Value.Target == actual);
+                                        }
+                                        else
+                                        {
+                                            And<T>(q => (DateTime)it.Value.Target >= d);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        And<T>(q => GXSql.Contains(it.Value.Target, actual));
+                                    }
                                 }
                             }
                         }

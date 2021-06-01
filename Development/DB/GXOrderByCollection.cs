@@ -44,6 +44,7 @@ namespace Gurux.Service.Orm
         internal List<LambdaExpression> List = new List<LambdaExpression>();
         GXSelectArgs Parent;
         string sql;
+        internal bool Updated;
 
         /// <summary>
         /// Constructor.
@@ -56,7 +57,7 @@ namespace Gurux.Service.Orm
 
         public override string ToString()
         {
-            if (Parent.Parent.Updated)
+            if (Updated || Parent.Parent.Updated)
             {
                 List<GXJoin> joinList = new List<GXJoin>();
                 List<GXOrder> orderList = new List<GXOrder>();
@@ -68,7 +69,7 @@ namespace Gurux.Service.Orm
                 StringBuilder sb = new StringBuilder();
                 OrderByToString(Parent, sb, orderList, joinList);
                 sql = sb.ToString();
-                Parent.Parent.Updated = false;
+                Updated = false;
             }
             return sql;
         }
@@ -181,8 +182,8 @@ namespace Gurux.Service.Orm
         /// </summary>
         public void Clear()
         {
-            Parent.Parent.Updated = true;
             List.Clear();
+            Updated = true;
         }
 
         /// <summary>
@@ -196,8 +197,8 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("expression");
             }
-            Parent.Parent.Updated = true;
             List.Add(expression);
+            Updated = true;
         }
     }
 }

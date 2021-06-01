@@ -63,8 +63,13 @@ namespace Gurux.Service.Orm
 
         public override string ToString()
         {
+            return ToString(false);
+        }
+
+        public string ToString(bool addExecutionTime)
+        {
             StringBuilder sb = new StringBuilder();
-            if (this.ExecutionTime != 0)
+            if (addExecutionTime && ExecutionTime != 0)
             {
                 sb.Append("Execution time: ");
                 sb.Append(ExecutionTime);
@@ -83,7 +88,7 @@ namespace Gurux.Service.Orm
             {
                 sb.Append(str);
             }
-            if (this.Settings.Type == DatabaseType.Oracle)
+            if (Settings.Type == DatabaseType.Oracle)
             {
                 str = Where.LimitToString();
                 if (!string.IsNullOrEmpty(str))
@@ -95,7 +100,7 @@ namespace Gurux.Service.Orm
                 }
             }
 
-            if (this.Settings.Type != DatabaseType.Oracle)
+            if (Settings.Type != DatabaseType.Oracle)
             {
                 str = Where.LimitToString();
                 if (!string.IsNullOrEmpty(str))

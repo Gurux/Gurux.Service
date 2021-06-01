@@ -392,6 +392,16 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select all by string test.
+        /// </summary>
+        [TestMethod]
+        public void WhereExactString()
+        {
+            GXSelectArgs arg = GXSelectArgs.SelectAll<TestIDClass>(q => q.Text == "Gurux");
+            Assert.AreEqual("SELECT `ID`, `Text` FROM TestIDClass WHERE TestIDClass.`Text` = 'Gurux'", arg.ToString());
+        }
+
+        /// <summary>
         /// Select Guid where Text starts with Gurux.
         /// </summary>
         [TestMethod]
@@ -993,6 +1003,20 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Filter by date-time.
+        /// </summary>
+        [TestMethod]
+        public void FilterByDateTime()
+        {
+            TestClass filter = new TestClass();
+            filter.Status = State.OK;
+            filter.Time = new DateTime(2020, 4, 1);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.FilterBy(filter, false);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` >= '2020-04-01 00.00.00'", arg.ToString());
+        }
+
+        /// <summary>
         /// Find Empty Guid.
         /// </summary>
         [TestMethod]
@@ -1070,6 +1094,28 @@ namespace Gurux.Service_Test
             list.Add("Gurux");
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => list.Contains(q.Text));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` IN ('Gurux')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Exclude select test.
+        /// </summary>
+        [TestMethod]
+        public void ExcludeSelectTest()
+        {
+            GXSelectArgs args = GXSelectArgs.SelectAll<TestClass>();
+            args.Columns.Exclude<TestClass>(x => new { x.Id, x.Time, x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            Assert.AreEqual("SELECT `Guid` FROM TestClass", args.ToString());
+        }
+
+        /// <summary>
+        /// Exclude select test.
+        /// </summary>
+        [TestMethod]
+        public void ExcludeSelectTest2()
+        {
+            GXSelectArgs args = GXSelectArgs.Select<TestClass>(q => new {q.Guid, q.Text });
+            args.Columns.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            Assert.AreEqual("SELECT `Guid` FROM TestClass", args.ToString());
         }
     }
 }

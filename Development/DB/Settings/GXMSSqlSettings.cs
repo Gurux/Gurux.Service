@@ -284,7 +284,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "DATETIME2";
+                return "datetimeoffset";
             }
         }
 
