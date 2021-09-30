@@ -28,7 +28,7 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.1.2106.101" />
+    <PackageReference Include="Gurux.Common" Version="8.1.2109.2401" />
  </ItemGroup>
  
 
