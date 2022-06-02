@@ -29,6 +29,8 @@ Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component
   </PropertyGroup>
  <ItemGroup>
     <PackageReference Include="Gurux.Common" Version="8.4.2206.201" />
+  <ItemGroup>
+    <PackageReference Include="Gurux.Common" Version="8.1.2109.2401" />
  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
