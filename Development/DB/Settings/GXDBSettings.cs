@@ -34,6 +34,7 @@ using System;
 using System.Globalization;
 using System.ComponentModel;
 using System.Data.Common;
+using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -446,7 +447,7 @@ namespace Gurux.Service.Orm.Settings
             }
             if (value is DateTimeOffset)
             {
-                string format = "yyyy-MM-dd HH:mm:ss";
+                string format = "yyyy-MM-dd HH:mm:sszzz";
                 return GetQuetedValue(((DateTimeOffset)value).ToString(format));
             }
             if (value is float)

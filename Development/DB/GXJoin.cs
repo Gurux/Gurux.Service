@@ -45,7 +45,7 @@ namespace Gurux.Service.Orm
         {
         }
 
-        public void UpdateTables(System.Type table1, System.Type table2)
+        internal void UpdateTables(System.Type table1, System.Type table2)
         {
             Table1Type = table1;
             Table2Type = table2;

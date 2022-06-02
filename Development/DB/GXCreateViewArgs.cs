@@ -69,8 +69,9 @@ namespace Gurux.Service.Orm
             foreach (BinaryExpression it in list.List)
             {
                 var e = (MemberExpression)it.Right;
-                string[] target = GXDbHelpers.GetMembers(settings, it.Left, settings.TableQuotation, false, false);
-                string[] source = GXDbHelpers.GetMembers(settings, it.Right, settings.TableQuotation, false, false);
+                string post = null;
+                string[] target = GXDbHelpers.GetMembers(settings, it.Left, settings.TableQuotation, false, false, ref post);
+                string[] source = GXDbHelpers.GetMembers(settings, it.Right, settings.TableQuotation, false, false, ref post);
                 Select.Columns.Maps.Add(source[0], target[0]);
             }
         }
@@ -82,7 +83,7 @@ namespace Gurux.Service.Orm
             sb.Append("Create View ");
             sb.Append(GXDbHelpers.GetTableName(type, true, Parent.Settings.TableQuotation, null));
             sb.Append(" AS ");
-            sb.Append(Select.ToString());
+            sb.Append(Select.ToString(false));
             return sb.ToString();
         }
        

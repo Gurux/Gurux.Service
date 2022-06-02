@@ -530,18 +530,24 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [DataMember(), ForeignKey]
+        [DataMember()]
         public List<Product> Items
         {
             get;
             set;
         }
 
-        [DataMember(), ForeignKey]
+        [DataMember()]
         public List<Product2> NewProducts
         {
             get;
             set;
+        }
+
+        public Supplier()
+        {
+            Items = new List<Product>();
+            NewProducts = new List<Product2>();
         }
     }
 
@@ -700,6 +706,39 @@ namespace Gurux.Service_Test
         [DataMember(Name = "CountryID")]
         [ForeignKey]
         public Country Country
+        {
+            get;
+            set;
+        }
+    }
+
+    [DataContract]
+    class Company2 : IUnique<long>
+    {
+        [AutoIncrement]
+        [DataMember]
+        public long Id
+        {
+            get;
+            set;
+        }
+        [DataMember]
+        public string Name
+        {
+            get;
+            set;
+        }
+
+        [DataMember(Name = "CountryID")]
+        [ForeignKey]
+        public Country Country
+        {
+            get;
+            set;
+        }
+
+        [DataMember]
+        public string ExtraField
         {
             get;
             set;
@@ -1020,5 +1059,59 @@ namespace Gurux.Service_Test
 
     }
 
+    [DataContract]
+    class GuidTestClass : IUnique<Guid>
+    {
+        [DataMember()]
+        public Guid Id
+        {
+            get;
+            set;
+        }
 
+        [DataMember()]
+        [DefaultValue(null)]
+        public DateTime Time
+        {
+            get;
+            set;
+        }
+
+        [DataMember()]
+        public String Text
+        {
+            get;
+            set;
+        }
+
+        [DataMember(Name = "SimpleText")]
+        [DefaultValue("")]
+        public String Text2
+        {
+            get;
+            set;
+        }
+
+        [DataMember()]
+        [DefaultValue(null)]
+        public String Text3
+        {
+            get;
+            set;
+        }
+
+        [DataMember()]
+        public String Text4
+        {
+            get;
+            set;
+        }
+
+        [DataMember()]
+        public bool BooleanTest
+        {
+            get;
+            set;
+        }
+    }
 }

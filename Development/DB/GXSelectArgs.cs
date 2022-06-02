@@ -38,6 +38,9 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Gurux.Common.Internal;
+using Gurux.Common;
+using Gurux.Common.Db;
+
 namespace Gurux.Service.Orm
 {
     /// <summary>
@@ -59,24 +62,22 @@ namespace Gurux.Service.Orm
             Columns.Joins = Joins;
             Where = new GXWhereCollection(Parent);
             OrderBy = new GXOrderByCollection(this);
+            GroupBy = new GXGroupByCollection(this);
+            Having = new GXHavingCollection(Parent);
         }
+
+        internal string query;
 
         public override string ToString()
         {
-            return ToString(false);
+            return ToString(true);
         }
 
         public string ToString(bool addExecutionTime)
         {
             StringBuilder sb = new StringBuilder();
-            if (addExecutionTime && ExecutionTime != 0)
-            {
-                sb.Append("Execution time: ");
-                sb.Append(ExecutionTime);
-                sb.Append(" ms. ");
-                sb.Append(Environment.NewLine);
-            }
-            sb.Append(Columns.ToString());
+            string post = null;
+            sb.Append(Columns.ToString(ref post));
             string str, where = Where.ToString();
             if (!string.IsNullOrEmpty(where))
             {
@@ -84,6 +85,26 @@ namespace Gurux.Service.Orm
                 sb.Append(where);
             }
             str = OrderBy.ToString();
+            if (!string.IsNullOrEmpty(str))
+            {
+                sb.Append(str);
+            }
+            str = GroupBy.ToString();
+            if (!string.IsNullOrEmpty(str))
+            {
+                sb.Append(str);
+            }
+            if (Settings.LimitType == LimitType.Fetch &&
+                (Index != 0 || Count != 0))
+            {
+                sb.Append(" OFFSET ");
+                sb.Append(Index);
+                sb.Append(" ROWS");
+                sb.Append(" FETCH NEXT ");
+                sb.Append(Count);
+                sb.Append(" ROWS ONLY");
+            }
+            str = Having.ToString();
             if (!string.IsNullOrEmpty(str))
             {
                 sb.Append(str);
@@ -109,23 +130,37 @@ namespace Gurux.Service.Orm
                     sb.Append(str);
                 }
             }
-            return sb.ToString();
+            if (post != null)
+            {
+                sb.Append(post);
+            }
+            query = sb.ToString();
+            if (addExecutionTime && ExecutionTime != 0)
+            {
+                sb.Clear();
+                sb.Append("Execution time: ");
+                sb.Append(ExecutionTime);
+                sb.Append(" ms. ");
+                sb.Append(Environment.NewLine);
+                sb.Append(query);
+            }
+            return query;
         }
 
         internal void Verify()
         {
-            if (this.Descending && OrderBy.List.Count == 0)
+            if (Descending && OrderBy.List.Count == 0)
             {
                 throw new ArgumentException("Descending expects that OrderBy is used.");
             }
-            if (this.Index != 0)
+            if (Index != 0)
             {
                 List<Type> tables = new List<Type>();
                 foreach (var it in Columns.List)
                 {
-                    if (!tables.Contains(it.Parameters[0].Type))
+                    if (!tables.Contains(it.Key.Parameters[0].Type))
                     {
-                        tables.Add(it.Parameters[0].Type);
+                        tables.Add(it.Key.Parameters[0].Type);
                     }
                 }
                 bool found = false;
@@ -172,6 +207,8 @@ namespace Gurux.Service.Orm
             Columns.Clear();
             Where.Clear();
             OrderBy.Clear();
+            GroupBy.Clear();
+            Having.Clear();
             ExecutionTime = 0;
         }
 
@@ -209,6 +246,36 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        public static GXSelectArgs IsEmpty<T>(Expression<Func<T, object>> where)
+        {
+            GXSelectArgs arg = Select<T>(null);
+            if (where != null)
+            {
+                arg.Where.Or<T>(where);
+            }
+            return arg;
+        }
+
+        /// <summary>
+        /// Select item by Id.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        public static GXSelectArgs SelectById<T>(string id)
+        {
+            return SelectById<T, string>(id, q => "*");
+        }
+
+        /// <summary>
+        /// Select item by Id.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        public static GXSelectArgs SelectById<T>(Guid id)
+        {
+            return SelectById<T, Guid>(id, q => "*");
+        }
+
         /// <summary>
         /// Select item by Id.
         /// </summary>
@@ -216,7 +283,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         public static GXSelectArgs SelectById<T>(UInt64 id)
         {
-            return SelectByIdInternal<T, ulong>(id, q => "*");
+            return SelectById<T, ulong>(id, q => "*");
         }
 
         /// <summary>
@@ -226,7 +293,29 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         public static GXSelectArgs SelectById<T>(long id)
         {
-            return SelectByIdInternal<T, long>(id, null);
+            return SelectById<T, long>(id, null);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public static GXSelectArgs SelectById<T>(Guid id, Expression<Func<T, object>> columns)
+        {
+            return SelectById<T, Guid>(id, columns);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public static GXSelectArgs SelectById<T>(string id, Expression<Func<T, object>> columns)
+        {
+            return SelectById<T, string>(id, columns);
         }
 
         /// <summary>
@@ -237,7 +326,7 @@ namespace Gurux.Service.Orm
         /// <param name="columns">Selected columns.</param>
         public static GXSelectArgs SelectById<T>(long id, Expression<Func<T, object>> columns)
         {
-            return SelectByIdInternal<T, long>(id, columns);
+            return SelectById<T, long>(id, columns);
         }
 
         /// <summary>
@@ -248,10 +337,10 @@ namespace Gurux.Service.Orm
         /// <param name="columns">Selected columns.</param>
         public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>> columns)
         {
-            return SelectByIdInternal<T, UInt64>(id, columns);
+            return SelectById<T, UInt64>(id, columns);
         }
 
-        private static GXSelectArgs SelectByIdInternal<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
+        public static GXSelectArgs SelectById<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
         {
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns);
             GXSerializedItem si = GXSqlBuilder.FindUnique(typeof(T));
@@ -260,7 +349,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentException("Select by ID failed. Target class must be derived from IUnique.");
             }
             string name = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
-            arg.Where.Or<IUnique<T>>(q => name.Equals(id));
+            arg.Where.Or<IUnique<T>>(q => name.Equals((IDTYPE)id));
             return arg;
         }
 
@@ -283,9 +372,27 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Order items by.
+        /// Order items.
         /// </summary>
         public GXOrderByCollection OrderBy
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
+        /// Group items.
+        /// </summary>
+        public GXGroupByCollection GroupBy
+        {
+            get;
+            private set;
+        }
+
+        /// <summary>
+        /// Get rows that have the same value on a column.
+        /// </summary>
+        public GXHavingCollection Having
         {
             get;
             private set;
@@ -370,6 +477,6 @@ namespace Gurux.Service.Orm
             {
                 Parent.Count = value;
             }
-        }
+        }       
     }
 }

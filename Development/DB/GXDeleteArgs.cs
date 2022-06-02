@@ -41,6 +41,8 @@ using System.Collections;
 using Gurux.Common.Internal;
 using System.Diagnostics;
 using Gurux.Common.JSon;
+using Gurux.Common;
+using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm
 {
@@ -58,7 +60,6 @@ namespace Gurux.Service.Orm
         /// </summary>
         private GXDeleteArgs()
         {
-            Joins = new GXJoinCollection(Parent);
             Where = new GXWhereCollection(Parent);
         }
 
@@ -69,7 +70,6 @@ namespace Gurux.Service.Orm
         {
             Parent.Clear();
             Table = null;
-            Joins.List.Clear();
             Where.Clear();
         }
 
@@ -123,15 +123,6 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Where expression.
-        /// </summary>
-        public GXJoinCollection Joins
-        {
-            get;
-            private set;
-        }
-
-        /// <summary>
         /// Delete items from selected table.
         /// </summary>
         /// <typeparam name="T">Table where items are deleted.</typeparam>
@@ -150,18 +141,31 @@ namespace Gurux.Service.Orm
         {
             if (item == null)
             {
-                throw new ArgumentNullException("Removed item can't be null.");
+                throw new ArgumentNullException("Deleted item can't be null.");
             }
+            if (item is GXTableBase tb)
+            {
+                tb.BeforeRemove();
+            }
+            GXDeleteArgs arg;
             if (item is IEnumerable)
             {
-                GXDeleteArgs arg = Delete(GXInternal.GetPropertyType(typeof(T)));
+                arg = Delete(GXInternal.GetPropertyType(typeof(T)));
                 foreach (var it in item as IEnumerable)
                 {
                     arg.Where.Or<T>(q => it);
                 }
                 return arg;
             }
-            return Delete<T>(q => item);
+            GXSerializedItem si = GXSqlBuilder.FindUnique(typeof(T));
+            if (si == null)
+            {
+                throw new ArgumentException("Delete by ID failed. Target class must be derived from IUnique.");
+            }
+            string name = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
+            arg = DeleteAll<T>();
+            arg.Where.Or<IUnique<T>>(_ => name.Equals(item));
+            return arg;
         }
 
         public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where)

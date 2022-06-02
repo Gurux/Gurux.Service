@@ -39,7 +39,7 @@ using System.Reflection;
 
 namespace Gurux.Service.Orm
 {
-    public class GXOrderByCollection
+    public class GXGroupByCollection
     {
         internal List<LambdaExpression> List = new List<LambdaExpression>();
         GXSelectArgs Parent;
@@ -49,7 +49,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Constructor.
         /// </summary>
-        internal GXOrderByCollection(GXSelectArgs parent)
+        internal GXGroupByCollection(GXSelectArgs parent)
         {
             Parent = parent;
         }
@@ -64,10 +64,10 @@ namespace Gurux.Service.Orm
                 UpdateJoins(Parent.Settings, Parent.Joins, joinList);
                 foreach (var it in List)
                 {
-                    OrderBy(Parent.Settings, it, orderList);
+                    GroupBy(Parent.Settings, it, orderList);
                 }
                 StringBuilder sb = new StringBuilder();
-                OrderByToString(Parent, sb, orderList, joinList);
+                GroupByToString(Parent, sb, orderList, joinList);
                 sql = sb.ToString();
                 Updated = false;
             }
@@ -75,10 +75,10 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Order values by.
+        /// Group values by.
         /// </summary>
         /// <param name="sourceColumn">Columns order by.</param>
-        internal static void OrderBy(GXDBSettings settings, LambdaExpression sourceColumn, List<GXOrder> OrderList)
+        internal static void GroupBy(GXDBSettings settings, LambdaExpression sourceColumn, List<GXOrder> OrderList)
         {
             string post = null;
             string[] list = GXDbHelpers.GetMembers(settings, sourceColumn.Body, '\0', false, ref post);
@@ -93,9 +93,9 @@ namespace Gurux.Service.Orm
 
         internal static MemberExpression GetMemberExpression(Expression expression, out bool allowNull)
         {
-            if (expression is MemberExpression)
+            if (expression is MemberExpression me)
             {
-                MemberInfo m = (expression as MemberExpression).Member;
+                MemberInfo m = me.Member;
                 Type tp = (m as PropertyInfo).PropertyType;
                 allowNull = tp.IsGenericType && tp.GetGenericTypeDefinition() == typeof(Nullable<>);
                 return (expression as MemberExpression);
@@ -124,7 +124,6 @@ namespace Gurux.Service.Orm
         internal static void UpdateJoins(GXDBSettings settings, GXJoinCollection list, List<GXJoin> joins)
         {
             char separtor = settings.ColumnQuotation;
-            string prefix = settings.TablePrefix;
             bool allowNull;
             MemberExpression me;
             foreach (KeyValuePair<JoinType, BinaryExpression> it in list.List)
@@ -144,14 +143,13 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static void OrderByToString(GXSelectArgs parent, StringBuilder sb, List<GXOrder> OrderList, List<GXJoin> joinList)
+        internal static void GroupByToString(GXSelectArgs parent, StringBuilder sb, List<GXOrder> groupList, List<GXJoin> joinList)
         {
-            bool first = true;
-            if (OrderList.Count != 0)
+            if (groupList.Count != 0)
             {
-                sb.Append(" ORDER BY ");
-                first = true;
-                foreach (GXOrder it in OrderList)
+                sb.Append(" GROUP BY ");
+                bool first = true;
+                foreach (GXOrder it in groupList)
                 {
                     if (first)
                     {
@@ -161,24 +159,24 @@ namespace Gurux.Service.Orm
                     {
                         sb.Append(", ");
                     }
-                    if (parent.Settings.Type == DatabaseType.MSSQL && parent.Count != 0)
+                    //Table name is not added if there is only one table.
+                    if (joinList.Count != 0)
                     {
-                        string table = GXDbHelpers.GetTableName(it.Table, true, '\0', parent.Settings.TablePrefix);
-                        sb.Append(GXDbHelpers.AddQuotes(table + '.' + it.Column, parent.Settings.ColumnQuotation));
-                        continue;
-                    }
-                    //Add table name always until there is a way to check are multiple tables used. if (joinList.Count != 0)
-                    {
-                        string table = GXDbHelpers.GetTableName(it.Table, true, parent.Settings.TableQuotation, parent.Settings.TablePrefix);
-                        sb.Append(table);
-                        sb.Append('.');
+                        if (parent.Settings.Type == DatabaseType.MSSQL && parent.Count != 0)
+                        {
+                            string table = GXDbHelpers.GetTableName(it.Table, true, '\0', parent.Settings.TablePrefix);
+                            sb.Append(table);
+                            sb.Append('.');
+                        }
+                        else
+                        {
+                            string table = GXDbHelpers.GetTableName(it.Table, true, parent.Settings.TableQuotation, parent.Settings.TablePrefix);
+                            sb.Append(table);
+                            sb.Append('.');
+                        }
                     }
                     sb.Append(GXDbHelpers.AddQuotes(it.Column, parent.Settings.ColumnQuotation));
-                }
-                if (parent.Descending)
-                {
-                    sb.Append(" DESC");
-                }
+                }              
             }
         }
 
@@ -192,7 +190,7 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Add new order by expression.
+        /// Add new group by expression.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="expression"></param>

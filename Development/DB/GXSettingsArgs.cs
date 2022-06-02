@@ -56,8 +56,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         public GXSettingsArgs()
         {
-            //MySql settings are default settings because of MariaDB (https://mariadb.org/).
-            settings = new GXMySqlSettings();
+            settings = GXSqlBuilder.CreateSettings(GXDbConnection.DefaultDatabaseType);
             Updated = true;
         }
 

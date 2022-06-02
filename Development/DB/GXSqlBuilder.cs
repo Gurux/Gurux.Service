@@ -40,6 +40,8 @@ using Gurux.Common.Internal;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using Gurux.Common;
+using System.Diagnostics.CodeAnalysis;
+using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm
 {
@@ -52,7 +54,7 @@ namespace Gurux.Service.Orm
         /// Mapping between C# and DB types.
         /// </summary>
         internal Dictionary<Type, string> DbTypeMap = new Dictionary<Type, string>();
-
+        static Dictionary<Type, GXRelationTable> relationTable = new Dictionary<Type, GXRelationTable>();
 
         private string GetType(string value)
         {
@@ -117,6 +119,34 @@ namespace Gurux.Service.Orm
             private set;
         }
 
+        internal static GXDBSettings CreateSettings(DatabaseType type)
+        {
+            GXDBSettings settings;
+            switch (type)
+            {
+                case DatabaseType.MySQL:
+                    settings = new GXMySqlSettings();
+                    break;
+                case DatabaseType.MSSQL:
+                    settings = new GXMSSqlSettings();
+                    break;
+                case DatabaseType.SqLite:
+                    settings = new GXSqLiteSettings();
+                    break;
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1
+                case DatabaseType.Access:
+                    settings = new GXAccessSettings();
+                    break;
+#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
+                case DatabaseType.Oracle:
+                    settings = new GXOracleSqlSettings();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException("Invalid Database type.");
+            }
+            return settings;
+        }
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -124,28 +154,7 @@ namespace Gurux.Service.Orm
         /// <param name="tablePrefix">Used table prefix (optional).</param>
         public GXSqlBuilder(DatabaseType type, string tablePrefix)
         {
-            switch (type)
-            {
-                case DatabaseType.MySQL:
-                    Settings = new GXMySqlSettings();
-                    break;
-                case DatabaseType.MSSQL:
-                    Settings = new GXMSSqlSettings();
-                    break;
-                case DatabaseType.SqLite:
-                    Settings = new GXSqLiteSettings();
-                    break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                case DatabaseType.Access:
-                    Settings = new GXAccessSettings();
-                    break;
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
-                case DatabaseType.Oracle:
-                    Settings = new GXOracleSqlSettings();
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException("Invalid Database type.");
-            }
+            Settings = CreateSettings(type);
             Settings.TablePrefix = tablePrefix;
             DbTypeMap[typeof(char)] = Settings.CharColumnDefinition;
             DbTypeMap[typeof(bool)] = Settings.BoolColumnDefinition;
@@ -182,7 +191,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="mainType"></param>
         /// <param name="s"></param>
-        private static void UpdateRelations(Type mainType, Dictionary<string, GXSerializedItem> properties, GXSerializedItem s, bool primaryData)
+        private static void UpdateRelations(Type mainType, GXSerializedItem s, bool primaryData, Dictionary<Type, GXRelationTable> relationTable)
         {
             Type type;
             if (primaryData)
@@ -193,8 +202,18 @@ namespace Gurux.Service.Orm
                 s.Relation.PrimaryId = s;
                 if ((s.Attributes & Attributes.ForeignKey) != 0)
                 {
-                    ForeignKeyAttribute fk = ((ForeignKeyAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), false))[0];
-                    type = fk.Type;
+                    ForeignKeyAttribute[] fks = ((ForeignKeyAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), false));
+                    ForeignKeyAttribute fk;
+                    if (fks.Length == 0)
+                    {
+                        fk = null;
+                        type = null;
+                    }
+                    else
+                    {
+                        fk = fks[0];
+                        type = fk.Type;
+                    }
                     //If type is not give in ForeignKeyAttribute.
                     if (type == null)
                     {
@@ -205,7 +224,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                     s.Relation.ForeignTable = type;
-                    if (fk.MapTable != null)
+                    if (fk != null && fk.MapTable != null)
                     {
                         s.Relation.RelationType = RelationType.ManyToMany;
                     }
@@ -244,8 +263,18 @@ namespace Gurux.Service.Orm
             {
                 if ((s.Attributes & Attributes.ForeignKey) != 0)
                 {
-                    ForeignKeyAttribute fk = ((ForeignKeyAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), true))[0];
-                    type = fk.Type;
+                    ForeignKeyAttribute[] fks = ((ForeignKeyAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), false));
+                    ForeignKeyAttribute fk;
+                    if (fks.Length == 0)
+                    {
+                        fk = null;
+                        type = null;
+                    }
+                    else
+                    {
+                        fk = fks[0];
+                        type = fk.Type;
+                    }
                     //If type is not give in ForeignKeyAttribute.
                     if (type == null)
                     {
@@ -263,7 +292,7 @@ namespace Gurux.Service.Orm
                     }
                     s.Relation.ForeignId = secondary;
                     //Update relation map fields.
-                    if (fk.MapTable != null)
+                    if (fk != null && fk.MapTable != null)
                     {
                         foreach (var it in GetProperties(fk.MapTable))
                         {
@@ -305,7 +334,7 @@ namespace Gurux.Service.Orm
         /// <param name="attributes"></param>
         /// <param name="s"></param>
         private static void UpdateAttributes(Type type, object[] attributes, GXSerializedItem s)
-        {
+        {          
             int value = 0;
             PropertyInfo pi = s.Target as PropertyInfo;
             if (pi != null && pi.Name == "Id")
@@ -334,35 +363,39 @@ namespace Gurux.Service.Orm
                         s.DefaultValue = def.Value;
                     }
                     //Is property indexed.
-                    if (att is IndexAttribute)
+                    if (att is IndexAttribute || att is IndexCollectionAttribute)
                     {
                         value |= (int)Attributes.Index;
                     }
                     //Is property auto indexed value.
-                    if (att is AutoIncrementAttribute)
+                    else if (att is AutoIncrementAttribute)
                     {
                         value |= (int)Attributes.AutoIncrement;
                     }
                     //Primary key value.
-                    if (att is PrimaryKeyAttribute)
+                    else if (att is PrimaryKeyAttribute)
                     {
                         value |= (int)Attributes.PrimaryKey;
                     }
                     //Foreign key value.
-                    if (att is ForeignKeyAttribute)
+                    else if (att is ForeignKeyAttribute fk)
                     {
                         value |= (int)Attributes.ForeignKey;
+                        if (fk.AllowNull)
+                        {
+                            value |= (int)Attributes.AllowNull;
+                        }
                     }
                     //Relation field.
-                    if (att is RelationAttribute)
+                    else if (att is RelationAttribute)
                     {
                         value |= (int)Attributes.Relation;
                     }
-                    if (att is StringLengthAttribute)
+                    else if (att is StringLengthAttribute)
                     {
                         value |= (int)Attributes.StringLength;
                     }
-                    if (att is DataMemberAttribute)
+                    else if (att is DataMemberAttribute)
                     {
                         DataMemberAttribute n = att as DataMemberAttribute;
                         if (n.IsRequired)
@@ -370,7 +403,7 @@ namespace Gurux.Service.Orm
                             value |= (int)Attributes.IsRequired;
                         }
                     }
-                    if (att is DefaultValueAttribute)
+                    else if (att is DefaultValueAttribute)
                     {
                         value |= (int)Attributes.DefaultValue;
                     }
@@ -439,7 +472,8 @@ namespace Gurux.Service.Orm
         internal static Dictionary<string, GXSerializedItem> GetProperties(Type type)
         {
             //Return empty collection if basic type.
-            if (GXInternal.IsGenericDataType(type))
+            if (GXInternal.IsGenericDataType(type) ||
+                typeof(IEnumerable).IsAssignableFrom(type))
             {
                 return new Dictionary<string, GXSerializedItem>();
             }
@@ -455,16 +489,46 @@ namespace Gurux.Service.Orm
                 SerializedObjects.Add(type, properties);
                 foreach (var it in properties)
                 {
+                    //Check is this ForeignKey if not set.
+                    if ((it.Value.Attributes & Attributes.ForeignKey) == 0)
+                    {
+                        if (it.Value.Type != typeof(string) &&
+                            it.Value.Type != typeof(Guid) &&
+                            it.Value.Type != typeof(DateTime) &&
+                            it.Value.Type.IsClass)
+                        {
+                            Type type2;
+                            if (typeof(IEnumerable).IsAssignableFrom(it.Value.Type))
+                            {
+                                type2 = GXInternal.GetPropertyType(it.Value.Type);
+                            }
+                            else
+                            {
+                                type2 = type;
+                            }
+                            IDictionary<string, GXSerializedItem> tmp = GetProperties(type2);
+                            foreach (var it2 in tmp)
+                            {
+                                if ((it2.Value.Attributes & Attributes.ForeignKey) != 0 &&
+                                    it2.Value.Relation != null &&
+                                    it2.Value.Relation.ForeignTable == type)
+                                {
+                                    it.Value.Attributes |= Attributes.ForeignKey;
+                                }
+                            }
+                        }
+                    }
+
                     if ((it.Value.Attributes & (Attributes.ForeignKey | Attributes.Relation)) != 0)
                     {
-                        UpdateRelations(type, properties, it.Value, true);
+                        UpdateRelations(type, it.Value, true, relationTable);
                     }
                 }
                 foreach (var it in properties)
                 {
                     if ((it.Value.Attributes & (Attributes.ForeignKey | Attributes.Relation)) != 0)
                     {
-                        UpdateRelations(type, properties, it.Value, false);
+                        UpdateRelations(type, it.Value, false, relationTable);
                     }
                 }
             }

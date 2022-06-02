@@ -30,6 +30,7 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Common.Db;
 using System;
 using System.Globalization;
 namespace Gurux.Service.Orm.Settings
@@ -211,7 +212,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return LimitType.Top;
+                return LimitType.Fetch;
             }
         }
 
@@ -229,9 +230,9 @@ namespace Gurux.Service.Orm.Settings
         {
             if (maxLength == 0)
             {
-                return "VARCHAR(MAX)";
+                return "NVARCHAR(MAX)";
             }
-            return "VARCHAR(" + maxLength.ToString() + ")";
+            return "NVARCHAR(" + maxLength.ToString() + ")";
         }
 
         /// <inheritdoc cref="GXDBSettings.CharColumnDefinition"/>
@@ -392,7 +393,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "varchar(max)";
+                return "VARCHAR(max)";
             }
         }
 
@@ -401,7 +402,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "varchar(max)";
+                return "VARCHAR(max)";
             }
         }
 
@@ -415,7 +416,7 @@ namespace Gurux.Service.Orm.Settings
             }
             if (value is DateTimeOffset)
             {
-                string format = "yyyyMMdd HH:mm:ss";
+                string format = "yyyyMMdd HH:mm:ss zzz";
                 return GetQuetedValue(((DateTimeOffset)value).ToString(format, CultureInfo.InvariantCulture));
             }
             return base.ConvertToString(value, where);

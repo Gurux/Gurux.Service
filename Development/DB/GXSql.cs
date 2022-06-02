@@ -52,7 +52,21 @@ namespace Gurux.Service.Orm
         /// </example>
         /// <param name="expression"></param>
         /// <returns></returns>
-        public static bool Count(object expression)
+        public static int Count(object expression)
+        {
+            return 0;
+        }
+        public static int DistinctCount(object expression)
+        {
+            return 0;
+        }
+
+        /// <summary>
+        /// Are there any rows.
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns>True, if there are no rows.</returns>
+        public static bool IsEmpty(object expression)
         {
             return true;
         }
@@ -97,6 +111,20 @@ namespace Gurux.Service.Orm
             return true;
         }
 
+        /// <summary>
+        /// Select 1 FROM table.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public static bool One
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+
         public static bool In<T>(T value, params T[] collection)
         {
             return true;
@@ -115,6 +143,16 @@ namespace Gurux.Service.Orm
         /// <returns>True, if value exists.</returns>
         public static bool Exists<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> sourceColumn,
             Expression<Func<TDestinationTable, object>> destinationColumn, GXSelectArgs expression)
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Is value exists in the table.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool Exists(GXSelectArgs args)
         {
             return true;
         }

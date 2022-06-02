@@ -47,13 +47,18 @@ namespace Gurux.Service.Orm
     public class GXColumnCollection
     {
         /// <summary>
+        /// SelectUsingAs is not used when select is used in insert.
+        /// </summary>
+        internal bool Insert = false;
+
+        /// <summary>
         /// List of tables and columns to get.
         /// </summary>
         internal Dictionary<Type, List<string>> ColumnList = new Dictionary<Type, List<string>>();
         internal Dictionary<string, string> Maps = new Dictionary<string, string>();
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        internal List<LambdaExpression> List = new List<LambdaExpression>();
+        internal List<KeyValuePair<LambdaExpression, LambdaExpression>> List = new List<KeyValuePair<LambdaExpression, LambdaExpression>>();
         /// <summary>
         /// List of values to exlude from update.
         /// </summary>
@@ -331,6 +336,12 @@ namespace Gurux.Service.Orm
 
         public override string ToString()
         {
+            string post = null;
+            return ToString(ref post);
+        }
+
+        internal string ToString(ref string post)
+        {
             if (Parent.Updated || Updated)
             {
                 ColumnList.Clear();
@@ -344,43 +355,56 @@ namespace Gurux.Service.Orm
                 foreach (var it in List)
                 {
                     //No relations.
-                    if (!neededTables.ContainsKey(it.Parameters[0].Type))
+                    if (!neededTables.ContainsKey(it.Key.Parameters[0].Type))
                     {
-                        neededTables.Add(it.Parameters[0].Type, null);
+                        neededTables.Add(it.Key.Parameters[0].Type, null);
                     }
-                    list = GXDbHelpers.GetMembers(Parent.Settings, it, '\0', false);
+                    list = GXDbHelpers.GetMembers(Parent.Settings, it.Key, '\0', false, ref post);
                     foreach (var it2 in list)
                     {
-                        properties = GXSqlBuilder.GetProperties(it.Parameters[0].Type);
-                        if (it2 != "*" && ColumnList.ContainsKey(it.Parameters[0].Type))
+                        properties = GXSqlBuilder.GetProperties(it.Key.Parameters[0].Type);
+                        if (it2 != "*" && ColumnList.ContainsKey(it.Key.Parameters[0].Type))
                         {
-                            GXSerializedItem si = properties[it2];
-                            if (si.Relation != null)
+                            if (properties.ContainsKey(it2))
                             {
-                                //Get properties.
-                                GetColumns(si.Relation.ForeignTable, ColumnList, neededTables);
+                                GXSerializedItem si = properties[it2];
+                                if (si.Relation != null)
+                                {
+                                    //Get properties.
+                                    GetColumns(si.Relation.ForeignTable, ColumnList, neededTables);
+                                }
+                                if (si.Relation == null || si.Relation.RelationType != RelationType.ManyToMany)
+                                {
+                                    ColumnList[it.Key.Parameters[0].Type].Add(it2);
+                                }
                             }
-                            if (si.Relation == null || si.Relation.RelationType != RelationType.ManyToMany)
+                            else
                             {
-                                ColumnList[it.Parameters[0].Type].Add(it2);
+                                string str = it2;
+                                if (it.Value != null)
+                                {
+                                    string[] tmp = GXDbHelpers.GetMembers(Parent.Settings, it.Value, '\0', false, ref post);
+                                    str += " AS " + tmp[0];
+                                }
+                                ColumnList[it.Key.Parameters[0].Type].Add(str);
                             }
                         }
                         else
                         {
                             if (it2 == "*")
                             {
-                                GetColumns(it.Parameters[0].Type, ColumnList, neededTables);
+                                GetColumns(it.Key.Parameters[0].Type, ColumnList, neededTables);
                             }
                             else
                             {
-                                if (neededTables.ContainsKey(it.Parameters[0].Type))
+                                if (neededTables.ContainsKey(it.Key.Parameters[0].Type))
                                 {
-                                    neededTables.Remove(it.Parameters[0].Type);
+                                    neededTables.Remove(it.Key.Parameters[0].Type);
                                 }
 
                                 List<string> columns2 = new List<string>();
                                 columns2.Add(it2);
-                                ColumnList.Add(it.Parameters[0].Type, columns2);
+                                ColumnList.Add(it.Key.Parameters[0].Type, columns2);
                                 if (properties.ContainsKey(it2))
                                 {
                                     GXSerializedItem si = properties[it2];
@@ -400,15 +424,30 @@ namespace Gurux.Service.Orm
                     {
                         if (x.Key == it.Key)
                         {
-                            string[] removed = GXDbHelpers.GetMembers(null, x.Value, '\0', false);
+                            string[] removed = GXDbHelpers.GetMembers(null, x.Value, '\0', false, ref post);
                             foreach (string col in removed)
                             {
-                                it.Value.Remove(col);
+                                bool includeQuery = false;
+                                string col2 = GXDbHelpers.AddQuotes(col, Parent.Settings.ColumnQuotation);
+                                //Joins are not removed from the qyery or 1:1 doesn't work.
+                                foreach (var j in joinList)
+                                {
+                                    if ((it.Key == j.Table1Type && j.Column1 == col2) ||
+                                        (it.Key == j.Table2Type && j.Column2 == col2))
+                                    {
+                                        includeQuery = true;
+                                        break;
+                                    }
+                                }
+                                if (!includeQuery)
+                                {
+                                    it.Value.Remove(col);
+                                }
                             }
                         }
                     }
                 }
-                SelectToString(Parent.Settings, sb, Parent.Distinct, ColumnList, joinList, Parent.Index, Parent.Count);
+                SelectToString(Parent.Settings, sb, Parent.Distinct, ColumnList, joinList, Parent.Index, Parent.Count, post);
                 sql = sb.ToString();
                 Updated = false;
             }
@@ -417,7 +456,7 @@ namespace Gurux.Service.Orm
 
         public void Add<T>()
         {
-            Add<T>(q => "*");
+            Add<T>(_ => "*");
         }
 
         /// <summary>
@@ -428,7 +467,28 @@ namespace Gurux.Service.Orm
         public void Add<T>(Expression<Func<T, object>> expression)
         {
             Updated = true;
-            List.Add(expression);
+            List.Add(new KeyValuePair<LambdaExpression, LambdaExpression>(expression, null));
+        }
+
+        /// <summary>
+        /// Add new item to expression list where result is saved to target property.
+        /// </summary>
+        /// <remarks>
+        /// This can be used when items count is read from the database and it's saved to the variable.
+        /// </remarks>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="expression">Lambda expression.</param>
+        /// <param name="target">Target where read data is saved.</param>
+        /// <example>
+        /// <code>
+        /// GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Text);
+        /// arg.Columns.Add<TestClass>(q => GXSql.Count(q), n => n.IntTest);
+        /// </code>
+        /// </example>
+        public void Add<T>(Expression<Func<T, object>> expression, Expression<Func<T, object>> target)
+        {
+            Updated = true;
+            List.Add(new KeyValuePair<LambdaExpression, LambdaExpression>(expression, target));
         }
 
         /// <summary>
@@ -438,18 +498,6 @@ namespace Gurux.Service.Orm
         {
             Updated = true;
             List.Clear();
-        }
-
-        private static string GetNameByAliasName(string aliasName, List<KeyValuePair<string, string>> list)
-        {
-            foreach (var it in list)
-            {
-                if (string.Compare(it.Key, aliasName, true) == 0)
-                {
-                    return it.Value;
-                }
-            }
-            return null;
         }
 
         /// <summary>
@@ -510,13 +558,13 @@ namespace Gurux.Service.Orm
         }
 
         private void SelectToString(GXDBSettings settings, StringBuilder sb, bool distinct,
-                Dictionary<Type, List<string>> columnList, List<GXJoin> joinList, UInt32 index, UInt32 count)
+                Dictionary<Type, List<string>> columnList, List<GXJoin> joinList, UInt32 index, UInt32 count, string post)
         {
             Dictionary<Type, string> asTable = new Dictionary<Type, string>();
             string name;
             foreach (var it in columnList)
             {
-                name = GetAsName(joinList, it.Key, settings.SelectUsingAs);
+                name = GetAsName(joinList, it.Key, !Insert && settings.SelectUsingAs);
                 if (name != null)
                 {
                     asTable.Add(it.Key, name);
@@ -633,12 +681,54 @@ namespace Gurux.Service.Orm
                     }
                     else //If method like COUNT(*)
                     {
-                        sb.Append(col);
-                        if (settings.SelectUsingAs && index == 0)
+                        if (col == "1()")
                         {
-                            sb.Append(" AS ");
-                            name = GXDbHelpers.AddQuotes(tableAs + "." + col.Substring(0, pos), settings.ColumnQuotation);
-                            sb.Append(name);
+                            sb.Append('1');
+                        }
+                        else if (col == "COUNT(1())")
+                        {
+                            sb.Append("COUNT(1)");
+                        }
+                        else if (col == "COUNT(1)")
+                        {
+                            sb.Append("COUNT(1)");
+                        }
+                        else
+                        {
+                            if (joinList == null || joinList.Count == 0)
+                            {
+                                sb.Append(col);
+                            }
+                            else
+                            {
+                                if (col.StartsWith("COUNT(DISTINCT"))
+                                {
+                                    pos = 14;
+                                }
+                                name = table + "." + GXDbHelpers.AddQuotes(col.Substring(pos + 1, col.Length - pos - 2), settings.ColumnQuotation);
+                                name = col.Substring(0, pos + 1) + name + ")";
+                                sb.Append(name);
+
+                            }
+                        }
+                        if (post == null && settings.SelectUsingAs && index == 0)
+                        {
+                            int i = col.IndexOf(" AS ");
+                            if (i == -1)
+                            {
+                                sb.Append(" AS ");
+                                name = GXDbHelpers.AddQuotes(tableAs + "." + col.Substring(0, pos), settings.ColumnQuotation);
+                                sb.Append(name);
+                            }
+                            else
+                            {
+                                sb.Length -= col.Length;
+                                sb.Append(col.Substring(0, i));
+                                name = col.Substring(i + 4);
+                                sb.Append(" AS ");
+                                name = GXDbHelpers.AddQuotes(tableAs + "." + name, settings.ColumnQuotation);
+                                sb.Append(name);
+                            }
                         }
                     }
                     if (Maps.ContainsKey(col))
@@ -828,17 +918,23 @@ namespace Gurux.Service.Orm
                     {
                         id = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
                     }
-
-                    sb.Append(string.Format(" ORDER BY {0}) AS GX ORDER BY GX.{0} DESC) AS GX2", id));
+                    if (Parent.Descending)
+                    {
+                        sb.Append(string.Format(" ORDER BY {0} DESC) AS GX ORDER BY GX.{0}) AS GX2", id));
+                    }
+                    else
+                    {
+                        sb.Append(string.Format(" ORDER BY {0}) AS GX ORDER BY GX.{0} DESC) AS GX2", id));
+                    }
                 }
             }
         }
 
         /// <summary>
-        /// Exclude columns from the update.
+        /// Exclude columns from the query or update.
         /// </summary>
-        /// <param name="value">Updated value.</param>
-        /// <returns>Created update attribute.</returns>
+        /// <typeparam name="T">Object where columns are excluded.</typeparam>
+        /// <param name="columns">Excluded columns.</param>
         public void Exclude<T>(Expression<Func<T, object>> columns)
         {
             Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));

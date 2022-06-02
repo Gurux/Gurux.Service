@@ -32,15 +32,14 @@
 
 using System;
 using System.Linq.Expressions;
-using System.Text;
 using Gurux.Service.Orm.Settings;
-using System.Reflection;
 using Gurux.Common.Internal;
 using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;
-using System.Data;
 using Gurux.Common.JSon;
+using Gurux.Common.Db;
+
 namespace Gurux.Service.Orm
 {
     class GXUpdateItem
@@ -55,7 +54,10 @@ namespace Gurux.Service.Orm
         /// </summary>
         public List<List<KeyValuePair<object, GXSerializedItem>>> Rows;
 
-        public string Where;
+        /// <summary>
+        /// List of inset where items.
+        /// </summary>
+        internal List<string> Where = new List<string>();
 
         /// <summary>
         /// Is item inserted.
@@ -92,6 +94,9 @@ namespace Gurux.Service.Orm
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal GXSettingsArgs Parent = new GXSettingsArgs();
 
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        internal List<object> insertedObjects = new List<object>();
+        
         /// <summary>
         /// Generated insert SQL string.
         /// </summary>
@@ -128,26 +133,19 @@ namespace Gurux.Service.Orm
                 Parent.Updated = true;
                 Parent.Settings = value;
             }
-        }
-
-        /// <summary>
-        /// Verify that insert data is correct.
-        /// </summary>
-        internal void Verify()
-        {
-
-        }
+        }      
 
         public override string ToString()
         {
             return ToString(true);
         }
+
         public string ToString(bool addExecutionTime)
         {
             if (Parent.Updated)
             {
                 List<string> queries = new List<string>();
-                GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries);
+                GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries, null, insertedObjects);
                 sql = string.Join(" ", queries.ToArray());
             }
             return sql;
@@ -158,6 +156,52 @@ namespace Gurux.Service.Orm
             return Insert<T>(value, null);
         }
 
+        /// <summary>
+        /// Copy rows from the same table.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="select"></param>
+        /// <returns></returns>
+        public static GXInsertArgs Insert<T>(GXSelectArgs select)
+        {
+            GXInsertArgs args = new GXInsertArgs();
+            select.Parent.Settings = args.Parent.Settings;
+            args.Parent.Updated = true;
+            Expression<Func<T, object>> expression = _ => typeof(T);
+            args.Values.Add(new KeyValuePair<object, LambdaExpression>(select, expression));
+            return args;
+        }
+
+        /// <summary>
+        /// Copy rows from the table 
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="select"></param>
+        /// <returns></returns>
+        public static GXInsertArgs Insert<T>(GXSelectArgs select, Expression<Func<T, object>> columns)
+        {
+            GXInsertArgs args = new GXInsertArgs();
+            select.Parent.Settings = args.Parent.Settings;
+            args.Add(select, columns);
+            return args;
+        }
+
+        /// <summary>
+        /// Add updated column(s).
+        /// </summary>
+        /// <param name="columns">Updated columns.</param>
+        public void Add<T>(T value, Expression<Func<T, object>> columns)
+        {
+            Parent.Updated = true;
+            Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
+        }
+
+        public void Add<T>(GXSelectArgs select, Expression<Func<T, object>> columns)
+        {
+            Parent.Updated = true;
+            Values.Add(new KeyValuePair<object, LambdaExpression>(select, columns));
+        }
+
         public static GXInsertArgs Insert<T>(T[] value, Expression<Func<T, object>> columns)
         {
             return InsertRange<T>(value, columns);
@@ -165,6 +209,14 @@ namespace Gurux.Service.Orm
 
         public static GXInsertArgs Insert<T>(T value, Expression<Func<T, object>> columns)
         {
+            if (value is GXSelectArgs)
+            {
+                return Insert<T>(value as GXSelectArgs);
+            }
+            if (value is GXInsertArgs)
+            {
+                throw new ArgumentException("Can't insert GXInsertArgs.");
+            }
             if (value == null)
             {
                 throw new ArgumentNullException("Inserted item can't be null.");
@@ -172,6 +224,10 @@ namespace Gurux.Service.Orm
             if (value is IEnumerable)
             {
                 throw new ArgumentException("Use InsertRange to add a collection.");
+            }
+            if (value is GXTableBase tb)
+            {
+                tb.BeforeAdd();
             }
             GXInsertArgs args = new GXInsertArgs();
             args.Parent.Updated = true;
@@ -194,6 +250,10 @@ namespace Gurux.Service.Orm
             args.Parent.Updated = true;
             foreach (var it in collection)
             {
+                if (it is GXTableBase tb)
+                {
+                    tb.BeforeAdd();
+                }
                 args.Values.Add(new KeyValuePair<object, LambdaExpression>(it, columns));
             }
             return args;

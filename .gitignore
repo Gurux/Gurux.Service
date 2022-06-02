@@ -187,3 +187,6 @@ Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache
 *.manifest
 Development/.vs/Gurux.Service/DesignTimeBuild/.dtbcache.v2
 Gurux.Service_Simple_UnitTests/.vs/Gurux.Service_Simple_Unit_Test/DesignTimeBuild/.dtbcache.v2
+Development/.vs/
+Gurux.Service_Simple_UnitTests/.vs/
+Gurux.Service_AMI_UnitTests/.vs/

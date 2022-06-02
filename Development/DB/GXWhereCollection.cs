@@ -49,8 +49,8 @@ namespace Gurux.Service.Orm
     public class GXWhereCollection
     {
         internal List<KeyValuePair<WhereType, LambdaExpression>> List = new List<KeyValuePair<WhereType, LambdaExpression>>();
-        string sql;
-        GXSettingsArgs Parent;
+        internal string sql;
+        internal GXSettingsArgs Parent;
         internal bool Updated;
 
         /// <summary>
@@ -200,16 +200,17 @@ namespace Gurux.Service.Orm
             if (value != null)
             {
                 string str;
+                string post = null;
                 if (Settings.UseQuotationWhereColumns)
                 {
-                    str = GXDbHelpers.GetMembers(Settings, value.Body, Settings.ColumnQuotation, true)[0];
+                    str = GXDbHelpers.GetMembers(Settings, value.Body, Settings.ColumnQuotation, true, ref post)[0];
                 }
                 else
                 {
-                    str = GXDbHelpers.GetMembers(Settings, value.Body, '\'', true)[0];
+                    str = GXDbHelpers.GetMembers(Settings, value.Body, '\'', true, ref post)[0];
                 }
                 //Remove brackets.
-                if (removebrackets)
+                if (removebrackets && str.Length > 2)
                 {
                     return str.Substring(1, str.Length - 2);
                 }
@@ -242,7 +243,7 @@ namespace Gurux.Service.Orm
                     if ((it.Value.Attributes & Attributes.DefaultValue) != 0)
                     {
                         object actual = it.Value.Get(target);
-                        if (it.Value.DefaultValue == null)
+                        if (actual != null && it.Value.DefaultValue == null)
                         {
                             if (actual is DateTime d)
                             {
@@ -251,12 +252,30 @@ namespace Gurux.Service.Orm
                                     continue;
                                 }
                             }
-                            if (actual is Guid q)
+                            else if (actual is DateTimeOffset dto)
+                            {
+                                if (dto.DateTime == DateTime.MinValue)
+                                {
+                                    continue;
+                                }
+                            }
+                            else if (actual is Guid q)
                             {
                                 if (q == Guid.Empty)
                                 {
                                     continue;
                                 }
+                            }
+                            else if (!(actual is string) && 
+                                typeof(System.Collections.IEnumerable).IsAssignableFrom(actual.GetType()))
+                            {
+                                //Arrays and lists are not filtered.
+                                continue;
+                            }
+                            else if (!(actual is string) && actual.GetType().IsClass)
+                            {
+                                FilterBy(actual, exact);
+                                continue;
                             }
                         }
                         if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
@@ -271,6 +290,11 @@ namespace Gurux.Service.Orm
                                 if (exact || actual is Guid)
                                 {
                                     And<T>(q => it.Value.Target == actual);
+                                }
+                                else if (actual is bool b)
+                                {
+                                    int val = b ? 1 : 0;
+                                    And<T>(q => it.Value.Target.Equals(val));
                                 }
                                 else
                                 {

@@ -31,6 +31,7 @@
 //---------------------------------------------------------------------------
 #if !NETCOREAPP2_0 && !NETCOREAPP2_1
 
+using Gurux.Common.Db;
 using System;
 using System.Globalization;
 using System.Text;

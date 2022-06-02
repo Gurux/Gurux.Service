@@ -108,6 +108,16 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select 1test.
+        /// </summary>
+        [TestMethod]
+        public void Select1Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.One);
+            Assert.AreEqual("SELECT 1 FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
         /// Select all by id test.
         /// </summary>
         [TestMethod]
@@ -154,8 +164,40 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void CountTest()
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q));
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(GXSql.One));
             Assert.AreEqual("SELECT COUNT(1) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Count test.
+        /// </summary>
+        [TestMethod]
+        public void CountTest2()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q.Id));
+            Assert.AreEqual("SELECT COUNT(ID) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Count test.
+        /// </summary>
+        [TestMethod]
+        public void CountTest3()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Supplier>(q => GXSql.Count(q.Id));
+            arg.Joins.AddInnerJoin<Supplier, Product>(j => j.Id, j => j.SupplierID);
+            Assert.AreEqual("SELECT COUNT(Supplier.`SupplierID`) FROM Supplier INNER JOIN Product ON Supplier.`SupplierID`=Product.`TargetID`", arg.ToString());
+        }
+
+        /// <summary>
+        /// Distinct count test.
+        /// </summary>
+        [TestMethod]
+        public void DistinctCountTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Supplier>(q => GXSql.DistinctCount(q.Id));
+            arg.Joins.AddInnerJoin<Supplier, Product>(j => j.Id, j => j.SupplierID);
+            Assert.AreEqual("SELECT COUNT(DISTINCT Supplier.`SupplierID`) FROM Supplier INNER JOIN Product ON Supplier.`SupplierID`=Product.`TargetID`", arg.ToString());
         }
 
         /// <summary>
@@ -186,6 +228,30 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid, x.Text });
             Assert.AreEqual("SELECT `Guid`, `Text` FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select sub items test.
+        /// </summary>
+        [TestMethod]
+        public void SelectSubItemsTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Company>(q => q.Name);
+            arg.Columns.Add<Country>(q => q.Name);
+            arg.Joins.AddInnerJoin<Company, Country>(x => x.Country, y => y.Id);
+            Assert.AreEqual("SELECT Company.`Name`, Country.`CountryName` FROM Company INNER JOIN Country ON Company.`CountryID`=Country.`ID`", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select sub items test.
+        /// </summary>
+        [TestMethod]
+        public void SelectSubItemsTest2()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Product2>(q => q.Id);
+            arg.Columns.Add<Supplier>(q => q.Id);
+            arg.Joins.AddInnerJoin<Product2, Supplier>(x => x.Supplier, y => y.Id);
+            Assert.AreEqual("SELECT Product2.`Product2ID`, Supplier.`SupplierID` FROM Product2 INNER JOIN Supplier ON Product2.`Target2ID`=Supplier.`SupplierID`", arg.ToString());
         }
 
         /// <summary>
@@ -226,6 +292,18 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select all columns from one table when multiple tables are used.
+        /// </summary>
+        [TestMethod]
+        public void SelectOneTableFromManyTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass2>(q => "*");
+            arg.Joins.AddRightJoin<TestClass2, TestClass>(x => x.Parent, x => x.Id);
+            Assert.AreEqual("SELECT TestClass2.`Id`, TestClass2.`ParentID`, TestClass2.`Name` FROM TestClass2 RIGHT OUTER JOIN TestClass ON TestClass2.`ParentID`=TestClass.`ID`", arg.ToString());
+        }
+
+
+        /// <summary>
         /// Delete by primary key test.
         /// </summary>
         [TestMethod]
@@ -237,6 +315,26 @@ namespace Gurux.Service_Test
             Assert.AreEqual("DELETE FROM TestClass WHERE ID=1", arg.ToString());
         }
 
+        /// <summary>
+        /// Delete using where.
+        /// </summary>
+        [TestMethod]
+        public void DeleteByWhereTest()
+        {
+            GXDeleteArgs del = GXDeleteArgs.Delete<TestClass>(q => q.Text == "Gurux");
+            Assert.AreEqual("DELETE FROM TestClass WHERE TestClass.`Text` = 'Gurux'", del.ToString());
+        }
+
+        /// <summary>
+        /// Delete using select.
+        /// </summary>
+        [TestMethod]
+        public void DeleteBySelectTest()
+        {
+            GXSelectArgs sel = GXSelectArgs.Select<TestClass>(q => GXSql.One, q => q.Text == "Gurux");
+            GXDeleteArgs del = GXDeleteArgs.Delete<TestClass>(a => GXSql.Exists(sel));
+            Assert.AreEqual("DELETE FROM TestClass WHERE EXISTS (SELECT 1 FROM TestClass WHERE TestClass.`Text` = 'Gurux')", del.ToString());
+        }
         /// <summary>
         /// Select two columns test.
         /// </summary>
@@ -359,9 +457,22 @@ namespace Gurux.Service_Test
         {
             TestClass t = new TestClass();
             t.Id = 1;
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Id);
+            arg.Where.And<TestClass>(q => q.Id == t.Id);
+            Assert.AreEqual("SELECT `ID` FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where class is given as parameter.
+        /// </summary>
+        [TestMethod]
+        public void WhereClassTest2()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Id);
             arg.Where.And<TestClass>(q => t);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE `ID` = 1", arg.ToString());
+            Assert.AreEqual("SELECT `ID` FROM TestClass WHERE `ID` = 1", arg.ToString());
         }
 
         /// <summary>
@@ -438,6 +549,21 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Text.Contains("Gurux"));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%Gurux%')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where list contains Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereContains2Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            List<string> list = new List<string>();
+            list.Add("Gurux");
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => list.Contains(q.Text));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` IN ('Gurux')", arg.ToString());
         }
 
         /// <summary>
@@ -661,12 +787,38 @@ namespace Gurux.Service_Test
         /// Insert test.
         /// </summary>
         [TestMethod]
+        public void InsertAllTest()
+        {
+            Country c = new Country();
+            c.Name = "Finland";
+            GXInsertArgs args = GXInsertArgs.Insert(c);
+            Assert.AreEqual("INSERT INTO Country (`CountryName`) VALUES('Finland')", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert test.
+        /// </summary>
+        [TestMethod]
         public void InsertTest()
         {
             TestClass t = new TestClass();
             t.Text = "Gurux";
             GXInsertArgs args = GXInsertArgs.Insert(t, x => new { x.Text, x.Guid });
-            Assert.AreEqual("INSERT INTO TestClass (`Text`, `Guid`) VALUES('Gurux', '00000000000000000000000000000000')", args.ToString());
+            Assert.AreEqual("INSERT INTO TestClass (`Text`, `Guid`) VALUES('Gurux', '00000000-0000-0000-0000-000000000000')", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert test.
+        /// </summary>
+        [TestMethod]
+        public void InsertTest2()
+        {
+            Supplier supplier = new Supplier();
+            supplier.Text = "Gurux";
+            supplier.NewProducts.Add(new Product2() { Text = "Virtual-serial" });
+            GXInsertArgs args = GXInsertArgs.Insert(supplier);
+            args.ToString();
+            Assert.AreEqual("INSERT INTO Supplier (`Text`) VALUES('Gurux') INSERT INTO Product2 (`Text`, `Target2ID`) VALUES('Virtual-serial', 0)", args.ToString());
         }
 
         /// <summary>
@@ -680,8 +832,23 @@ namespace Gurux.Service_Test
             TestClass t = new TestClass();
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
-            GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
-            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+            GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Guid, x.Time });
+            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+        }
+
+        /// <summary>
+        /// Update test.
+        /// </summary>
+        [TestMethod]
+        public void UpdateTest2()
+        {
+            string format = "yyyy-MM-dd HH:mm:ss";
+            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00", format, CultureInfo.CurrentCulture);
+            GuidTestClass t = new GuidTestClass();
+            t.Id = Guid.NewGuid();
+            t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
+            GXUpdateArgs args = GXUpdateArgs.Update(t, u => u.Time);
+            Assert.AreEqual("UPDATE GuidTestClass SET `Time` = '2014-01-02 00.00.00' WHERE `Id` = '" + t.Id.ToString() + "'", args.ToString());
         }
 
         /// <summary>
@@ -778,6 +945,36 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select Guid where ID is in the array.
+        /// </summary>
+        [TestMethod]
+        public void Exists2Test()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
+            arg.Where.And<Country>(q => GXSql.Exists(arg2));
+            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX'))";
+            string actual = arg.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        /// <summary>
+        /// Select Guid where ID is in the array.
+        /// </summary>
+        [TestMethod]
+        public void Exists3Test()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => GXSql.One);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
+            arg.Where.And<Country>(q => GXSql.Exists(arg2));
+            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE EXISTS (SELECT 1 FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX'))";
+            string actual = arg.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        /// <summary>
         /// Select Guid where ID is not in the array.
         /// </summary>
         [TestMethod]
@@ -788,6 +985,21 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
             arg.Where.And<Country>(q => !GXSql.Exists<Company, Country>(a => a.Country, b => b.Id, arg2));
             string expected = "SELECT `ID`, `CountryName` FROM Country WHERE NOT EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Country.`ID` = Company.`CountryID`)";
+            string actual = arg.ToString();
+            Assert.AreEqual(expected, actual);
+        }
+
+        /// <summary>
+        /// Select Guid where ID is not in the array.
+        /// </summary>
+        [TestMethod]
+        public void NotExists2Test()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
+            arg.Where.And<Country>(q => !GXSql.Exists(arg2));
+            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE NOT EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX'))";
             string actual = arg.ToString();
             Assert.AreEqual(expected, actual);
         }
@@ -918,7 +1130,7 @@ namespace Gurux.Service_Test
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
             args.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
-            Assert.AreEqual("UPDATE TestClass SET `ID` = 2, `Guid` = '00000000000000000000000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
         }
 
         /// <summary>
@@ -934,7 +1146,7 @@ namespace Gurux.Service_Test
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t);
             args.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
-            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000000000000000000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
         }
 
         /// <summary>
@@ -947,7 +1159,7 @@ namespace Gurux.Service_Test
             t.Text = "Gurux";
             GXInsertArgs args = GXInsertArgs.Insert(t);
             args.Exclude<TestClass>(x => new { x.Time, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
-            Assert.AreEqual("INSERT INTO TestClass (`Guid`, `Text`) VALUES('00000000000000000000000000000000', 'Gurux')", args.ToString());
+            Assert.AreEqual("INSERT INTO TestClass (`Guid`, `Text`) VALUES('00000000-0000-0000-0000-000000000000', 'Gurux')", args.ToString());
         }
 
         /// <summary>
@@ -1022,7 +1234,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void FindEmptyGuid()
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid == null);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid.Equals(null));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IS NULL", arg.ToString());
             arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid.Equals(null));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IS NULL", arg.ToString());
@@ -1046,7 +1258,7 @@ namespace Gurux.Service_Test
         public void EmptyGuidTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Guid.Equals(null) || q.Guid.Equals(Guid.Empty));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Guid` IS NULL) OR (TestClass.`Guid`='00000000000000000000000000000000')", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Guid` IS NULL) OR (TestClass.`Guid`='00000000-0000-0000-0000-000000000000')", arg.ToString());
         }
 
         /// <summary>
@@ -1068,7 +1280,7 @@ namespace Gurux.Service_Test
             List<Guid> list = new List<Guid>();
             list.Add(Guid.Empty);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => list.Contains(q.Guid));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000000000000000000000000000')", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000-0000-0000-0000-000000000000')", arg.ToString());
         }
 
 
@@ -1113,9 +1325,251 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void ExcludeSelectTest2()
         {
-            GXSelectArgs args = GXSelectArgs.Select<TestClass>(q => new {q.Guid, q.Text });
+            GXSelectArgs args = GXSelectArgs.Select<TestClass>(q => new { q.Guid, q.Text });
             args.Columns.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
             Assert.AreEqual("SELECT `Guid` FROM TestClass", args.ToString());
+        }
+
+        /// <summary>
+        /// Is result empty.
+        /// </summary>
+        [TestMethod]
+        public void IsEmptyTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.IsEmpty(q), a => a.Id == 1);
+            Assert.AreEqual("SELECT COUNT(1) WHERE NOT EXISTS (SELECT 1 FROM TestClass WHERE TestClass.`ID` = 1)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Is result empty.
+        /// </summary>
+        [TestMethod]
+        public void IsEmpty2Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q), a => a.Id == 1);
+            Assert.AreEqual("SELECT COUNT(1) FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Find rows where Id count is greater than 1.
+        /// </summary>
+        [TestMethod]
+        public void WhereCountTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(a => a.Guid);
+            arg.Where.And<TestClass>(q => GXSql.Count(q.Id) > 1);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE COUNT(TestClass.`ID`) > 1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Find rows where Id count is equal to 1.
+        /// </summary>
+        [TestMethod]
+        public void WhereCountTest2()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(a => a.Guid);
+            arg.Where.And<TestClass>(q => GXSql.Count(q.Id) == 1);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE COUNT(TestClass.`ID`) = 1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Find rows that have the same value in the column.
+        /// </summary>
+        [TestMethod]
+        public void HavingTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(a => a.Guid);
+            arg.GroupBy.Add<TestClass>(g => g.Text);
+            arg.Having.And<TestClass>(q => GXSql.Count(q.Id) > 1);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass GROUP BY `Text` HAVING COUNT(TestClass.`ID`) > 1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Find rows that have the same value in the column.
+        /// </summary>
+        [TestMethod]
+        public void HavingTest2()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(a => a.Guid);
+            arg.GroupBy.Add<TestClass>(q => new { q.Text, q.Status });
+            arg.Having.And<TestClass>(q => GXSql.Count(1) > 1);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass GROUP BY `Text`, `Status` HAVING COUNT(1) > 1", arg.ToString());
+        }
+
+        /// <summary>
+        /// Copy test.
+        /// </summary>
+        [TestMethod]
+        public void CopyTest()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Name);
+            GXInsertArgs args = GXInsertArgs.Insert<Country>(arg2);
+            Assert.AreEqual("INSERT INTO Country (`CountryName`) SELECT `CountryName` FROM Country", args.ToString());
+        }
+
+        /// <summary>
+        /// Copy test.
+        /// </summary>
+        [TestMethod]
+        public void CopyTest2()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.SelectAll<Country>();
+            GXInsertArgs args = GXInsertArgs.Insert<Country>(arg2);
+            Assert.AreEqual("INSERT INTO Country (`CountryName`) SELECT `CountryName` FROM Country", args.ToString());
+        }
+
+        /// <summary>
+        /// Copy test.
+        /// </summary>
+        [TestMethod]
+        public void CopyTest3()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.SelectAll<Company>();
+            GXInsertArgs args = GXInsertArgs.Insert<Company>(arg2);
+            Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT `Name`, `CountryID` FROM Company", args.ToString());
+        }
+
+        /// <summary>
+        /// Copy values from one table to other.
+        /// </summary>
+        [TestMethod]
+        public void CopyTest4()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => new { q.Name, q.Country });
+            GXInsertArgs args = GXInsertArgs.Insert<Company2>(arg2, q => new { q.Name, q.Country });
+            Assert.AreEqual("INSERT INTO Company2 (`Name`, `CountryID`) SELECT `Name`, `CountryID` FROM Company", args.ToString());
+        }
+
+        /// <summary>
+        /// Copy values from one table to other.
+        /// </summary>
+        [TestMethod]
+        public void CopyTest5()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company2>(q => new { q.Name, q.Country });
+            GXInsertArgs args = GXInsertArgs.Insert<Company>(arg2, q => new { q.Name, q.Country });
+            Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT `Name`, `CountryID` FROM Company2", args.ToString());
+        }
+
+        /// <summary>
+        /// Copy test.
+        /// </summary>
+        [TestMethod]
+        public void CopyTest6()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.SelectAll<Company>();
+            arg2.Joins.AddInnerJoin<Company, Country>(q => q.Country, x => x.Id);
+            GXInsertArgs args = GXInsertArgs.Insert<Company>(arg2);
+            Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT Company.`Name`, Company.`CountryID` FROM Company INNER JOIN Country ON Company.`CountryID`=Country.`ID`", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert value where data is retreaved from other table.
+        /// </summary>
+        [TestMethod]
+        public void InsertSelectedValueTest()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id);
+            Company comp = new Company() { Name = "Gurux" };
+            GXInsertArgs args = GXInsertArgs.Insert<Company>(comp, q => new { q.Name });
+            args.Add<Company>(arg2, q => q.Country);
+            Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT 'Gurux', `ID` FROM Country", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert value where data is retreaved from other table.
+        /// </summary>
+        [TestMethod]
+        public void InsertSelectedValue2Test()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id);
+            Company2 comp = new Company2() { Name = "Gurux", ExtraField = "Extra" };
+            GXInsertArgs args = GXInsertArgs.Insert(comp, q => new { q.Name, q.ExtraField });
+            args.Add<Company2>(arg2, q => q.Country);
+            Assert.AreEqual("INSERT INTO Company2 (`Name`, `ExtraField`, `CountryID`) SELECT 'Gurux', 'Extra', `ID` FROM Country", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert value where data is retreaved from other table.
+        /// </summary>
+        [TestMethod]
+        public void InsertSelectedValue3Test()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id);
+            Company2 comp = new Company2() { Name = "Gurux", ExtraField = "Extra" };
+            GXInsertArgs args = GXInsertArgs.Insert(comp, q => q.Name);
+            args.Add<Company2>(arg2, q => q.Country);
+            args.Add<Company2>(comp, q => q.ExtraField);
+            Assert.AreEqual("INSERT INTO Company2 (`Name`, `CountryID`, `ExtraField`) SELECT 'Gurux', `ID` FROM Country, 'Extra'", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert value where data is retreaved from other table.
+        /// </summary>
+        [TestMethod]
+        public void InsertSelectedValue4Test()
+        {
+            Company2 comp = new Company2() { Name = "Gurux", ExtraField = "Extra" };
+            GXInsertArgs args = GXInsertArgs.Insert(comp, q => q.Name);
+            args.Add(comp, q => q.ExtraField);
+            Assert.AreEqual("INSERT INTO Company2 (`Name`, `ExtraField`) VALUES('Gurux', 'Extra')", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert value where data is retreaved from other table.
+        /// </summary>
+        [TestMethod]
+        public void InsertSelectedValue5Test()
+        {
+            List<string> list = new List<string>();
+            list.Add("Finland");
+            GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id, q => list.Contains(q.Name));
+            Company comp = new Company() { Name = "Gurux" };
+            GXInsertArgs args = GXInsertArgs.Insert(comp, q => q.Name);
+            args.Add<Company>(arg2, q => q.Country);
+            Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT 'Gurux', `ID` FROM Country WHERE Country.`CountryName` IN ('Finland')", args.ToString());
+        }       
+
+        /// <summary>
+        /// The purpose of this test is check that old column is overrided 
+        /// and CountryID is not twice.
+        /// </summary>
+        [TestMethod]
+        public void UpdateInsertParameterTest()
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id);
+            Company2 comp = new Company2() { Name = "Gurux", ExtraField = "Extra" };
+            GXInsertArgs args = GXInsertArgs.Insert(comp);
+            args.Add<Company2>(arg2, q => q.Country);
+            Assert.AreEqual("INSERT INTO Company2 (`Name`, `CountryID`, `ExtraField`) SELECT 'Gurux', `ID` FROM Country, 'Extra'", args.ToString());
+        }
+
+        /// <summary>
+        /// Where is used in update syntax.
+        /// </summary>
+        [TestMethod]
+        public void UpdateSelectedValueTest()
+        {
+            GXSelectArgs sel = GXSelectArgs.Select<Country>(q => q.Id, q => q.Id == 1);
+            Company comp = new Company() {Name = "Gurux" };
+            GXUpdateArgs update = GXUpdateArgs.Update<Company>(comp, q => q.Name);
+            update.Where.And<Company>(a => GXSql.Exists(sel));
+            Assert.AreEqual("UPDATE Company SET `Name` = 'Gurux' WHERE EXISTS (SELECT `ID` FROM Country WHERE Country.`ID` = 1)", update.ToString());
+        }
+
+        /// <summary>
+        /// Where is used in update syntax.
+        /// </summary>
+        [TestMethod]
+        public void UpdateParameterCollectionTest()
+        {
+            User2 user = new User2() {Id = 2, Name = "User1" };
+            UserGroup2 ug = new UserGroup2() { Id = 1, Name = "Gurux" };
+            ug.Users = new User2[] { user };
+            GXInsertArgs i = GXInsertArgs.Insert(ug);
+            Assert.AreEqual("INSERT INTO UserToUserGroup (`UserId`, `GroupId`) VALUES(2, 1)", i.ToString());
+            i = GXInsertArgs.Insert(ug, q => q.Users);
+            Assert.AreEqual("INSERT INTO UserToUserGroup (`UserId`, `GroupId`) VALUES(2, 1)", i.ToString());
         }
     }
 }

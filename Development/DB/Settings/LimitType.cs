@@ -30,11 +30,6 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
 namespace Gurux.Service.Orm.Settings
 {
     enum LimitType
@@ -47,6 +42,10 @@ namespace Gurux.Service.Orm.Settings
         /// DB supports only TOP.
         /// </summary>
         Top,
+        /// <summary>
+        /// DB supports Offset and fetch.
+        /// </summary>
+        Fetch,
         /// <summary>
         /// Oracle has own way to do this.
         /// </summary>

@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32505.173
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gurux.Service_Simple_Unit_Test", "Gurux.Service_Simple_Unit_Test.csproj", "{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gurux.Service_Simple_Unit_Test", "Gurux.Service_Simple_Unit_Test.csproj", "{5ACC5CE6-67FA-48C4-BCB4-9A9034E4791D}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0CE3AF51-7103-4D41-A59F-6C8F1AF8B7C6}"
 	ProjectSection(SolutionItems) = preProject
@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		Local.testsettings = Local.testsettings
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gurux.Service", "..\Development\Gurux.Service.csproj", "{55CDF86A-FB1D-4210-8C64-76645010990B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gurux.Service", "..\Development\Gurux.Service.csproj", "{55CDF86A-FB1D-4210-8C64-76645010990B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,10 +19,10 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9E30E03A-E4D3-4916-89C8-46AE4C54AE06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5ACC5CE6-67FA-48C4-BCB4-9A9034E4791D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5ACC5CE6-67FA-48C4-BCB4-9A9034E4791D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5ACC5CE6-67FA-48C4-BCB4-9A9034E4791D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5ACC5CE6-67FA-48C4-BCB4-9A9034E4791D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{55CDF86A-FB1D-4210-8C64-76645010990B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{55CDF86A-FB1D-4210-8C64-76645010990B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{55CDF86A-FB1D-4210-8C64-76645010990B}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -30,6 +30,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {07C2D383-5D67-4D28-B094-E4634F870CFE}
 	EndGlobalSection
 	GlobalSection(TestCaseManagementSettings) = postSolution
 		CategoryFile = Gurux.Service_Simple_Unit_Test.vsmdi

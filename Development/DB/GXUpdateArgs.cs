@@ -39,6 +39,8 @@ using Gurux.Common.Internal;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Collections;
+using Gurux.Common.Db;
+
 namespace Gurux.Service.Orm
 {
     /// <summary>
@@ -113,10 +115,14 @@ namespace Gurux.Service.Orm
             if (Parent.Updated)
             {
                 List<string> queries = new List<string>();
-                //Get inserted items.
-                GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries);
+                if (Where.List.Count == 0)
+                {
+                    //Get inserted items.
+                    GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries, Where, null);
+                }
+
                 //Get updated items.
-                GXDbHelpers.GetQueries(false, Parent.Settings, Values, Excluded, queries);
+                GXDbHelpers.GetQueries(false, Parent.Settings, Values, Excluded, queries, Where, null);
                 sql = string.Join(" ", queries.ToArray());
             }
             return sql;
@@ -148,6 +154,10 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentException("Use UpdateRange to update a collection.");
             }
+            if (value is GXTableBase tb)
+            {
+                tb.BeforeUpdate();
+            }
             GXUpdateArgs args = new GXUpdateArgs();
             args.Parent.Updated = true;
             args.Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
@@ -166,6 +176,10 @@ namespace Gurux.Service.Orm
             args.Parent.Updated = true;
             foreach (var it in collection)
             {
+                if (it is GXTableBase tb)
+                {
+                    tb.BeforeUpdate();
+                }
                 args.Values.Add(new KeyValuePair<object, LambdaExpression>(it, columns));
             }
             return args;

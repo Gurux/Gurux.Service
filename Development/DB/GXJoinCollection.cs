@@ -39,7 +39,6 @@ namespace Gurux.Service.Orm
     public class GXJoinCollection
     {
         internal List<KeyValuePair<JoinType, BinaryExpression>> List = new List<KeyValuePair<JoinType, BinaryExpression>>();
-        GXSettingsArgs Parent;
         internal bool Updated;
 
         /// <summary>
@@ -47,7 +46,6 @@ namespace Gurux.Service.Orm
         /// </summary>
         internal GXJoinCollection(GXSettingsArgs parent)
         {
-            Parent = parent;
         }
 
         /// <summary>
@@ -60,12 +58,28 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("sourceColumn");
             }
-            if (sourceColumn == null)
+            if (destinationColumn == null)
             {
                 throw new ArgumentNullException("destinationColumn");
             }
-            Expression t = Expression.Equal(sourceColumn.Body, destinationColumn.Body);
-            List.Add(new KeyValuePair<JoinType, BinaryExpression>(type, t as BinaryExpression));
+            Expression s, d;
+            if (sourceColumn.Body is UnaryExpression)
+            {
+                s = sourceColumn.Body;
+            }
+            else
+            {
+                s = Expression.Constant(sourceColumn.Body);
+            }
+            if (destinationColumn.Body is UnaryExpression)
+            {
+                d = destinationColumn.Body;
+            }
+            else
+            {
+                d = Expression.Constant(destinationColumn.Body);
+            }
+            List.Add(new KeyValuePair<JoinType, BinaryExpression>(type, BinaryExpression.Equal(s, d)));
             Updated = true;
         }
 
@@ -94,6 +108,15 @@ namespace Gurux.Service.Orm
             Expression<Func<TDestinationTable, object>> destinationColumn)
         {
             AddJoin(JoinType.Right, sourceColumn, destinationColumn);
+        }
+
+        /// <summary>
+        /// Append joins.
+        /// </summary>
+        /// <param name="joins"></param>
+        public void Append(GXJoinCollection joins)
+        {
+            List.AddRange(joins.List);
         }
     }
 }

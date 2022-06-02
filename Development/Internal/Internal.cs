@@ -109,7 +109,10 @@ namespace Gurux.Common.Internal
         /// Default value is set.
         /// </summary>
         DefaultValue = 0x200,
-
+        /// <summary>
+        /// Value can be null.
+        /// </summary>
+        AllowNull = 0x400
     }
 
     enum RelationType
@@ -195,7 +198,11 @@ namespace Gurux.Common.Internal
 
         public Attributes Attributes;
 
-        public GXRelationTable Relation;
+        public GXRelationTable Relation
+        {
+            get;
+            set;
+        }
 
         public GXSerializedItem Clone()
         {
@@ -428,7 +435,7 @@ namespace Gurux.Common.Internal
                             }
                             value = items;
                         }
-#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
+#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
                         else if (pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(System.Data.Linq.EntitySet<>))
                         {
                             Type listT = typeof(System.Data.Linq.EntitySet<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
@@ -631,19 +638,18 @@ namespace Gurux.Common.Internal
             }
             if (type == typeof(Guid))
             {
-                if (value is string)
+                if (value is string s)
                 {
-                    Guid g = new Guid((string)value);
-                    return g;
+                    return Guid.Parse(s);
                 }
             }
             else if (type.IsEnum)
             {
-                if (value is string)
+                if (value is string str)
                 {
-                    return Enum.Parse(type, (string)value);
+                    return Enum.Parse(type, str);
                 }
-                return Enum.Parse(type, value.ToString());
+                return Enum.ToObject(type, value);
             }
             else if (type == typeof(System.Decimal))
             {
