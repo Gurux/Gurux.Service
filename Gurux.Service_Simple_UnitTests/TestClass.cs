@@ -30,15 +30,12 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
 using System.Runtime.Serialization;
 using System.ComponentModel;
 using Gurux.Common;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Rest;
-using Gurux.Service.Orm;
-using System.Collections.Generic;
-
+using Gurux.Common.Db;
 namespace Gurux.Service_Test
 {
     class TestItem
@@ -65,7 +62,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class IndexTestClass : IUnique<int>
     {
-        [DataMember(Name="ID"), Service.Orm.Index]
+        [DataMember(Name="ID"), Index]
         public int Id
         {
             get;
@@ -76,7 +73,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class UniqueIndexTestClass : IUnique<int>
     {
-        [DataMember, Service.Orm.Index(Unique=true)]
+        [DataMember, Index(Unique=true)]
         public int Id
         {
             get;
@@ -497,7 +494,7 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [DataMember(), Gurux.Common.Ignore]
+        [DataMember(), Gurux.Common.Db.Ignore]
         public TestItem[] Items
         {
             get;

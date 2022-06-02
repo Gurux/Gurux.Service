@@ -30,13 +30,11 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
 using System.Runtime.Serialization;
 using System.Globalization;
-using System.Collections.Generic;
+using Gurux.Common.Db;
 
 namespace Gurux.Service_Test
 {
