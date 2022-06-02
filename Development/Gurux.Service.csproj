@@ -7,7 +7,7 @@
     <Copyright>Copyright (c) 1998-2022 Gurux Ltd. All rights reserved.</Copyright>
     <PackageProjectUrl>www.gurux.fi/index.php?q=Gurux.Service</PackageProjectUrl>
     <Description>Gurux.Service class implements Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.</Description>
-  <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
+    <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <TargetFrameworks>net60;net46;netcoreapp5.0;netcoreapp3.1</TargetFrameworks>
@@ -21,15 +21,11 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
     <PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
     <PackageIcon>gurux_service.png</PackageIcon>
-  </PropertyGroup>
-  <PropertyGroup>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
- <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.4.2206.201" />
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.1.2109.2401" />
+    <PackageReference Include="Gurux.Common" Version="8.4.2206.201" />
  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
