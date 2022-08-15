@@ -38,6 +38,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Collections;
 using Gurux.Common.JSon;
+using Gurux.Common.Db;
 
 namespace Gurux.Common.Internal
 {
@@ -904,6 +905,10 @@ namespace Gurux.Common.Internal
             if (types.Length == 0)
             {
                 if (target.BaseType == typeof(object))
+                {
+                    return target;
+                }
+                if (target.BaseType == typeof(GXTableBase))
                 {
                     return target;
                 }

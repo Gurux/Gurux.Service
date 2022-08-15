@@ -56,6 +56,7 @@ namespace Gurux.Service.Orm.Settings
             private set;
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             return Type.ToString();

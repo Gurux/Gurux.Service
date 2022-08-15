@@ -314,6 +314,32 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Delete by Guid primary key test.
+        /// </summary>
+        [TestMethod]
+        public void DeleteByGuidPrimaryKeyTest()
+        {
+            GuidTestClass t = new GuidTestClass();
+            t.Id = Guid.NewGuid();
+            GXDeleteArgs arg = GXDeleteArgs.Delete(t);
+            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id='" + t.Id.ToString().ToUpper() + "'", arg.ToString());
+        }
+
+        /// <summary>
+        /// Delete by Guid primary key test.
+        /// </summary>
+        [TestMethod]
+        public void DeleteByGuidRangeTest()
+        {
+            GuidTestClass t = new GuidTestClass();
+            t.Id = Guid.NewGuid();
+            GuidTestClass t2 = new GuidTestClass();
+            t2.Id = t.Id;
+            GXDeleteArgs arg = GXDeleteArgs.DeleteRange(new GuidTestClass[] {t, t2 });
+            Assert.AreEqual("DELETE FROM GuidTestClass WHERE `Id` IN('" + t.Id.ToString().ToUpper() + "', '" + t.Id.ToString().ToUpper() + "')", arg.ToString());
+        }
+
+        /// <summary>
         /// Delete using where.
         /// </summary>
         [TestMethod]
@@ -848,6 +874,23 @@ namespace Gurux.Service_Test
             GXUpdateArgs args = GXUpdateArgs.Update(t, u => u.Time);
             Assert.AreEqual("UPDATE GuidTestClass SET `Time` = '2014-01-02 00.00.00' WHERE `Id` = '" + t.Id.ToString() + "'", args.ToString());
         }
+
+        /// <summary>
+        /// Update using where.
+        /// </summary>
+        [TestMethod]
+        public void UpdateWhereTest()
+        {
+            string format = "yyyy-MM-dd HH:mm:ss";
+            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00", format, CultureInfo.CurrentCulture);
+            TestClass t = new TestClass();
+            t.Id = 2;
+            t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
+            GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Guid, x.Time });
+            args.Where.And<TestClass>(q => q.Text == "Gurux");
+            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE TestClass.`Text` = 'Gurux'", args.ToString());
+        }
+
 
         /// <summary>
         /// Update test.
@@ -1526,7 +1569,7 @@ namespace Gurux.Service_Test
             GXInsertArgs args = GXInsertArgs.Insert(comp, q => q.Name);
             args.Add<Company>(arg2, q => q.Country);
             Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT 'Gurux', `ID` FROM Country WHERE Country.`CountryName` IN ('Finland')", args.ToString());
-        }       
+        }
 
         /// <summary>
         /// The purpose of this test is check that old column is overrided 
@@ -1549,7 +1592,7 @@ namespace Gurux.Service_Test
         public void UpdateSelectedValueTest()
         {
             GXSelectArgs sel = GXSelectArgs.Select<Country>(q => q.Id, q => q.Id == 1);
-            Company comp = new Company() {Name = "Gurux" };
+            Company comp = new Company() { Name = "Gurux" };
             GXUpdateArgs update = GXUpdateArgs.Update<Company>(comp, q => q.Name);
             update.Where.And<Company>(a => GXSql.Exists(sel));
             Assert.AreEqual("UPDATE Company SET `Name` = 'Gurux' WHERE EXISTS (SELECT `ID` FROM Country WHERE Country.`ID` = 1)", update.ToString());
@@ -1561,7 +1604,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void UpdateParameterCollectionTest()
         {
-            User2 user = new User2() {Id = 2, Name = "User1" };
+            User2 user = new User2() { Id = 2, Name = "User1" };
             UserGroup2 ug = new UserGroup2() { Id = 1, Name = "Gurux" };
             ug.Users = new User2[] { user };
             GXInsertArgs i = GXInsertArgs.Insert(ug);

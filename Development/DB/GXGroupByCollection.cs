@@ -54,7 +54,7 @@ namespace Gurux.Service.Orm
             Parent = parent;
         }
 
-
+        /// <inheritdoc/>
         public override string ToString()
         {
             if (Updated || Parent.Parent.Updated)

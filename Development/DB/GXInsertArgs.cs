@@ -133,8 +133,9 @@ namespace Gurux.Service.Orm
                 Parent.Updated = true;
                 Parent.Settings = value;
             }
-        }      
+        }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             return ToString(true);

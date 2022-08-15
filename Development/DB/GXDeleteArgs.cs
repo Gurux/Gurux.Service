@@ -73,6 +73,7 @@ namespace Gurux.Service.Orm
             Where.Clear();
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             return ToString(true);

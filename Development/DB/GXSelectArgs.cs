@@ -68,6 +68,7 @@ namespace Gurux.Service.Orm
 
         internal string query;
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             return ToString(true);

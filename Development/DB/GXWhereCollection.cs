@@ -61,6 +61,7 @@ namespace Gurux.Service.Orm
             Parent = parent;
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             if (Parent.Updated || Updated)
@@ -240,7 +241,7 @@ namespace Gurux.Service.Orm
                 Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
                 foreach (var it in properties)
                 {
-                    if ((it.Value.Attributes & Attributes.DefaultValue) != 0)
+                    if ((it.Value.Attributes & Attributes.DefaultValue) != 0 && it.Value.Get != null)
                     {
                         object actual = it.Value.Get(target);
                         if (actual != null && it.Value.DefaultValue == null)
@@ -286,15 +287,14 @@ namespace Gurux.Service.Orm
                                 {
                                     actual = Convert.ToInt64(actual);
                                 }
-
-                                if (exact || actual is Guid)
-                                {
-                                    And<T>(q => it.Value.Target == actual);
-                                }
-                                else if (actual is bool b)
+                                if (actual is bool b)
                                 {
                                     int val = b ? 1 : 0;
                                     And<T>(q => it.Value.Target.Equals(val));
+                                }
+                                else if (exact || actual is Guid)
+                                {
+                                    And<T>(q => it.Value.Target == actual);
                                 }
                                 else
                                 {

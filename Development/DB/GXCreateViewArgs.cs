@@ -70,12 +70,13 @@ namespace Gurux.Service.Orm
             {
                 var e = (MemberExpression)it.Right;
                 string post = null;
-                string[] target = GXDbHelpers.GetMembers(settings, it.Left, settings.TableQuotation, false, false, ref post);
-                string[] source = GXDbHelpers.GetMembers(settings, it.Right, settings.TableQuotation, false, false, ref post);
+                string[] target = GXDbHelpers.GetMembers(settings, it.Left, settings.TableQuotation, false, false, ref post, false);
+                string[] source = GXDbHelpers.GetMembers(settings, it.Right, settings.TableQuotation, false, false, ref post, false);
                 Select.Columns.Maps.Add(source[0], target[0]);
             }
         }
 
+        /// <inheritdoc/>
         public override string ToString()
         {
             UpdateMaps(Settings, Maps, null);

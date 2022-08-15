@@ -30,14 +30,11 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
-using System.Collections.Generic;
-using Gurux.DLMS.AMI.Messages.DB.Authentication;
-using Gurux.DLMS.AMI.Messages.Rest;
-using Gurux.DLMS.AMI.Messages.DB;
+using Gurux.DLMS.AMI.Shared.Rest;
+using Gurux.DLMS.AMI.Shared.DTOs.Authentication;
+using Gurux.DLMS.AMI.Shared.DTOs;
 
 namespace Gurux.Service_Test
 {
@@ -299,6 +296,25 @@ namespace Gurux.Service_Test
             GXSelectArgs args = GXSelectArgs.Select<GXIpAddress>(s => s.Id, where => where.User == user);
             Assert.AreEqual("Mikko", args.ToString());
 
+        }
+
+        [TestMethod]
+        public void MikkoTest()
+        {
+            GXWorkflow workflow = new GXWorkflow();
+            workflow.Id = Guid.Parse("17f9f275-7dba-44a8-b9c5-5c404283cf7e");
+            GXSelectArgs arg = GXSelectArgs.SelectAll<GXJob>(q => q.Workflow == workflow && q.Removed == null);
+            arg.Columns.Add<GXModule>();
+            arg.Columns.Exclude<GXModule>(e => e.Jobs);
+            arg.Joins.AddLeftJoin<GXModule, GXJob>(j => j.Id, j => j.Module);
+            Assert.AreEqual("Mikko", arg.ToString());
+        }
+
+        [TestMethod]
+        public void Mikko2Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.SelectAll<GXScript>(q => q.Removed == null);
+            Assert.AreEqual("Mikko", arg.ToString());
         }
     }
 }

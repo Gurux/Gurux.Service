@@ -1162,7 +1162,7 @@ namespace Gurux.Service.Orm
 
         internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where, ref string post)
         {
-            return GetMembers(settings, expression, quoteSeparator, where, false, ref post);
+            return GetMembers(settings, expression, quoteSeparator, where, false, ref post, false);
         }
 
         internal static string[] HandleMethod(GXDBSettings settings, UnaryExpression unaryExpression, MethodCallExpression m, char quoteSeparator, bool where, bool getValue, ref string post)
@@ -1197,8 +1197,8 @@ namespace Gurux.Service.Orm
                 }
                 if (m.Method.Name == "In")
                 {
-                    string[] list = GetMembers(settings, m.Arguments[1], quoteSeparator, where, true, ref post);
-                    string tmp = "(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post)[0];
+                    string[] list = GetMembers(settings, m.Arguments[1], quoteSeparator, where, true, ref post, false);
+                    string tmp = "(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post, false)[0];
                     if (unaryExpression != null && unaryExpression.NodeType == ExpressionType.Not)
                     {
                         tmp += " NOT IN (";
@@ -1223,9 +1223,9 @@ namespace Gurux.Service.Orm
                         {
                             tmp = "(EXISTS (";
                         }
-                        tmp += GetMembers(settings, m.Arguments[2], quoteSeparator, where, false, ref post)[0] + " AND " +
-                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false, ref post)[0] + " = " +
-                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post)[0] + "))";
+                        tmp += GetMembers(settings, m.Arguments[2], quoteSeparator, where, false, ref post, false)[0] + " AND " +
+                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false, ref post, false)[0] + " = " +
+                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post, false)[0] + "))";
                         return new string[] { tmp };
                     }
                     if (m.Arguments.Count == 1)
@@ -1238,7 +1238,7 @@ namespace Gurux.Service.Orm
                         {
                             tmp = "(EXISTS (";
                         }
-                        tmp += GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post)[0] + "))";
+                        tmp += GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post, false)[0] + "))";
                         return new string[] { tmp };
                     }
                     else
@@ -1324,10 +1324,10 @@ namespace Gurux.Service.Orm
                     if (settings.Type == DatabaseType.Access)
                     {
                         return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where, ref post)[0] + " LIKE('" +
-                                GetMembers(settings, m.Arguments[0], '\0', where, true, ref post)[0] + "'))"};
+                                GetMembers(settings, m.Arguments[0], '\0', where, true, ref post, false)[0] + "'))"};
                     }
 #endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
-                    string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true, ref post)[0];
+                    string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true, ref post, false)[0];
                     if (tmp == null)
                     {
                         tmp = GetMembers(settings, m.Object, quoteSeparator, where, ref post)[0];
@@ -1343,7 +1343,7 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    string value = GetMembers(settings, m.Arguments[0], quoteSeparator, where, true, ref post)[0];
+                    string value = GetMembers(settings, m.Arguments[0], quoteSeparator, where, true, ref post, false)[0];
                     if (value == null)
                     {
                         return new string[] { "(" + GetMembers(settings, m.Object, quoteSeparator, where, ref post)[0] + " IS NULL)" };
@@ -1376,7 +1376,14 @@ namespace Gurux.Service.Orm
             return new string[] { settings.ConvertToString(value22, where) };
         }
 
-        internal static string[] GetMembers(GXDBSettings settings, Expression expression, char quoteSeparator, bool where, bool getValue, ref string post)
+        internal static string[] GetMembers(
+            GXDBSettings settings,
+            Expression expression,
+            char quoteSeparator,
+            bool where,
+            bool getValue,
+            ref string post,
+            bool isParameter)
         {
             if (expression == null)
             {
@@ -1614,7 +1621,7 @@ namespace Gurux.Service.Orm
                                 sb.Append('(');
                                 sb.Append(GetColumnName(it.Value.Target as PropertyInfo, settings.ColumnQuotation));
                                 sb.Append(" IN(");
-                                IEnumerator e2 = (target as System.Collections.IEnumerable).GetEnumerator();
+                                IEnumerator e2 = (target as IEnumerable).GetEnumerator();
                                 first = true;
                                 while (e2.MoveNext())
                                 {
@@ -1634,7 +1641,20 @@ namespace Gurux.Service.Orm
                                     {
                                         sb.Append(", ");
                                     }
-                                    sb.Append(value.ToString());
+                                    string str;
+                                    if (value is Guid g)
+                                    {
+                                        str = GetQuetedValue(g.ToString().ToUpper());
+                                    }
+                                    else if (value is string s)
+                                    {
+                                        str = GetQuetedValue(s);
+                                    }
+                                    else
+                                    {
+                                        str = value.ToString();
+                                    }
+                                    sb.Append(str);
                                 }
                                 sb.Append("))");
                                 return new string[] { sb.ToString() };
@@ -1653,10 +1673,10 @@ namespace Gurux.Service.Orm
                                 {
                                     return new string[] { "(" + GetColumnName(it.Value.Target as PropertyInfo, settings.ColumnQuotation) + " IS NULL)" };
                                 }
-                                if (it.Value.Type.IsClass && it.Value.Type != typeof(string))
+                                if (isParameter)
                                 {
                                     //If where => where.User == user
-                                    return new string[] { ConvertToString(value, settings, where)};
+                                    return new string[] { ConvertToString(value, settings, where) };
                                 }
                                 return new string[] { "(" + GetColumnName(it.Value.Target as PropertyInfo, settings.ColumnQuotation) + " = " + ConvertToString(value, settings, where) + ")" };
                             }
@@ -1801,7 +1821,7 @@ namespace Gurux.Service.Orm
                 {
                     return HandleMethod(settings, unaryExpression, m, quoteSeparator, where, getValue, ref post);
                 }
-                return GetMembers(settings, unaryExpression.Operand, quoteSeparator, where, getValue, ref post);
+                return GetMembers(settings, unaryExpression.Operand, quoteSeparator, where, getValue, ref post, true);
             }
 
             if (expression is NewExpression)
@@ -1923,7 +1943,8 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    tmp = GetMembers(settings, newExpression.Right, quoteSeparator, where, true, ref post)[0];
+                    bool isClass2 = newExpression.Left.Type.IsClass && newExpression.Left.Type != typeof(string);
+                    tmp = GetMembers(settings, newExpression.Right, quoteSeparator, where, true, ref post, isClass2)[0];
                 }
                 //Where string is empty is not working with oracle DB. We must use where string is null expression.
                 if (where && (tmp == null || ((settings.Type == DatabaseType.Oracle) && tmp == "''")))

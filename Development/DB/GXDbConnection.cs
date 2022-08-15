@@ -205,6 +205,7 @@ namespace Gurux.Service.Orm
             {
                 Connections[_connections] = connection;
                 ++_connections;
+                connection.Close();
             }
             ConnectionReleased.Release();
         }
@@ -236,6 +237,16 @@ namespace Gurux.Service.Orm
             }
         }
 
+        /// <inheritdoc cref="IDbConnection.BeginTransaction"/>
+        public IDbTransaction BeginTransaction()
+        {
+            IDbConnection connection = GetConnection();
+            IDbTransaction transaction = connection.BeginTransaction();
+            Transactions[connection] = transaction;
+            return transaction;
+        }
+
+        /// <inheritdoc cref="IDbConnection.BeginTransaction"/>
         public IDbTransaction BeginTransaction(IsolationLevel isolationLevel)
         {
             IDbConnection connection = GetConnection();
@@ -667,6 +678,7 @@ namespace Gurux.Service.Orm
             /// </summary>
             public List<GXTableCreateQuery> Dependencies = new List<GXTableCreateQuery>();
 
+            /// <inheritdoc/>
             public override string ToString()
             {
                 string str = null;
@@ -1017,13 +1029,13 @@ namespace Gurux.Service.Orm
                                         sb.Append(Convert.ToString(Convert.ChangeType(it.Value.DefaultValue, type2)));
                                     }
                                 }
-                                else if (it.Value.DefaultValue is string)
+                                else if (it.Value.DefaultValue is string s)
                                 {
-                                    sb.Append("'" + (string)it.Value.DefaultValue + "'");
+                                    sb.Append("'" + s + "'");
                                 }
-                                else if (it.Value.DefaultValue is bool)
+                                else if (it.Value.DefaultValue is bool b)
                                 {
-                                    sb.Append((bool)it.Value.DefaultValue ? 1 : 0);
+                                    sb.Append(b ? 1 : 0);
                                 }
                                 else
                                 {
@@ -1211,7 +1223,7 @@ namespace Gurux.Service.Orm
                         sb.Append(" ON ");
                         sb.Append(Builder.GetTableName(type, true));
                         sb.Append("(");
-                        sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));                        
+                        sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
                         sb.Append(")");
                         tableItem.Queries.Add(sb.ToString());
                     }
@@ -2280,6 +2292,63 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        public async Task<T> SelectByIdAsync<T>(string id, CancellationToken cancellationToken)
+        {
+            return await SelectByIdAsync<T>(id, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public async Task<T> SelectByIdAsync<T>(string id, Expression<Func<T, object>> columns, CancellationToken cancellationToken)
+        {
+            List<T> list;
+            GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
+            args.Settings = this.Builder.Settings;
+            IDbConnection connection = TryGetConnection(1000);
+            if (connection != null)
+            {
+                try
+                {
+                    list = Select<T>(connection, args, cancellationToken);
+                    if (list.Count == 0)
+                    {
+                        return default(T);
+                    }
+                    if (list.Count == 1)
+                    {
+                        return list[0];
+                    }
+                    throw new Exception("There are multiple items with same ID when id should be unique.");
+                }
+                finally
+                {
+                    ReleaseConnection(connection);
+                }
+            }
+            return await new TaskFactory().StartNew(() =>
+            {
+                list = Select<T>(null, args, cancellationToken);
+                if (list.Count == 0)
+                {
+                    return default(T);
+                }
+                if (list.Count == 1)
+                {
+                    return list[0];
+                }
+                throw new Exception("There are multiple items with same ID when id should be unique.");
+            });
+        }
+
+        /// <summary>
         /// Select item by Id.
         /// </summary>
         /// <param name="id">Item's ID.</param>
@@ -2309,6 +2378,64 @@ namespace Gurux.Service.Orm
             }
             throw new Exception("There are multiple items with same ID when id should be unique.");
         }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        public async Task<T> SelectByIdAsync<T>(Guid id, CancellationToken cancellationToken)
+        {
+            return await SelectByIdAsync<T>(id, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public async Task<T> SelectByIdAsync<T>(Guid id, Expression<Func<T, object>> columns, CancellationToken cancellationToken)
+        {
+            List<T> list;
+            GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
+            args.Settings = this.Builder.Settings;
+            IDbConnection connection = TryGetConnection(1000);
+            if (connection != null)
+            {
+                try
+                {
+                    list = Select<T>(connection, args, cancellationToken);
+                    if (list.Count == 0)
+                    {
+                        return default(T);
+                    }
+                    if (list.Count == 1)
+                    {
+                        return list[0];
+                    }
+                    throw new Exception("There are multiple items with same ID when id should be unique.");
+                }
+                finally
+                {
+                    ReleaseConnection(connection);
+                }
+            }
+            return await new TaskFactory().StartNew(() =>
+            {
+                list = Select<T>(null, args, cancellationToken);
+                if (list.Count == 0)
+                {
+                    return default(T);
+                }
+                if (list.Count == 1)
+                {
+                    return list[0];
+                }
+                throw new Exception("There are multiple items with same ID when id should be unique.");
+            });
+        }
+
 
         /// <summary>
         /// Select item by Id.
@@ -2342,6 +2469,63 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        public async Task<T> SelectByIdAsync<T>(long id, CancellationToken cancellationToken)
+        {
+            return await SelectByIdAsync<T>(id, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public async Task<T> SelectByIdAsync<T>(long id, Expression<Func<T, object>> columns, CancellationToken cancellationToken)
+        {
+            List<T> list;
+            GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
+            args.Settings = this.Builder.Settings;
+            IDbConnection connection = TryGetConnection(1000);
+            if (connection != null)
+            {
+                try
+                {
+                    list = Select<T>(connection, args, cancellationToken);
+                    if (list.Count == 0)
+                    {
+                        return default(T);
+                    }
+                    if (list.Count == 1)
+                    {
+                        return list[0];
+                    }
+                    throw new Exception("There are multiple items with same ID when id should be unique.");
+                }
+                finally
+                {
+                    ReleaseConnection(connection);
+                }
+            }
+            return await new TaskFactory().StartNew(() =>
+            {
+                list = Select<T>(null, args, cancellationToken);
+                if (list.Count == 0)
+                {
+                    return default(T);
+                }
+                if (list.Count == 1)
+                {
+                    return list[0];
+                }
+                throw new Exception("There are multiple items with same ID when id should be unique.");
+            });
+        }
+
+        /// <summary>
         /// Select item by Id.
         /// </summary>
         /// <param name="id">Item's ID.</param>
@@ -2371,6 +2555,64 @@ namespace Gurux.Service.Orm
             }
             throw new Exception("There are multiple items with same ID when id should be unique.");
         }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        public async Task<T> SelectByIdAsync<T>(UInt64 id, CancellationToken cancellationToken)
+        {
+            return await SelectByIdAsync<T>(id, null, cancellationToken);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        public async Task<T> SelectByIdAsync<T>(UInt64 id, Expression<Func<T, object>> columns, CancellationToken cancellationToken)
+        {
+            List<T> list;
+            GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
+            args.Settings = this.Builder.Settings;
+            IDbConnection connection = TryGetConnection(1000);
+            if (connection != null)
+            {
+                try
+                {
+                    list = Select<T>(connection, args, cancellationToken);
+                    if (list.Count == 0)
+                    {
+                        return default(T);
+                    }
+                    if (list.Count == 1)
+                    {
+                        return list[0];
+                    }
+                    throw new Exception("There are multiple items with same ID when id should be unique.");
+                }
+                finally
+                {
+                    ReleaseConnection(connection);
+                }
+            }
+            return await new TaskFactory().StartNew(() =>
+            {
+                list = Select<T>(null, args, cancellationToken);
+                if (list.Count == 0)
+                {
+                    return default(T);
+                }
+                if (list.Count == 1)
+                {
+                    return list[0];
+                }
+                throw new Exception("There are multiple items with same ID when id should be unique.");
+            });
+        }
+
 
 
         /// <summary>
@@ -2423,6 +2665,7 @@ namespace Gurux.Service.Orm
             /// </summary>
             public GXSerializedItem Setter;
 
+            /// <inheritdoc/>
             public override string ToString()
             {
                 return Table + "." + Name;
@@ -3021,7 +3264,7 @@ namespace Gurux.Service.Orm
         public List<T> Select<T>(GXSelectArgs arg)
         {
             return Select<T>(null, arg, CancellationToken.None);
-        }      
+        }
 
         private List<T> Select<T>(IDbConnection connection, GXSelectArgs arg, CancellationToken cancellationToken)
         {
@@ -3236,6 +3479,7 @@ namespace Gurux.Service.Orm
                 com.CommandText = query;
                 try
                 {
+                    var start = DateTime.Now;
                     using (IDataReader reader = com.ExecuteReader())
                     {
                         while (reader.Read())
