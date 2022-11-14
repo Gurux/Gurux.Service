@@ -550,6 +550,20 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select Guid where Text starts with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereStartsWith2Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            t.Text = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => q.Text.StartsWith(t.Text));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('Gurux%')", arg.ToString());
+        }
+
+        /// <summary>
         /// Select Guid where Text ends with Gurux.
         /// </summary>
         [TestMethod]
@@ -588,6 +602,20 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => list.Contains(q.Text));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` IN ('Gurux')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where Text contains with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereContains3Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            t.Text = "Gurux";
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => q.Text.Contains(t.Text));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%Gurux%')", arg.ToString());
         }
 
         /// <summary>
@@ -668,6 +696,17 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => q.Id == 1 || q.Id == 2 || q.Id == 3);
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE ((TestClass.`ID` = 1) OR (TestClass.`ID` = 2)) OR (TestClass.`ID` = 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID = -1.
+        /// </summary>
+        [TestMethod]
+        public void WhereMinusTest()
+        {
+            int value = -1919693511;
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid, q => q.Id == value);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` = -1919693511", arg.ToString());
         }
 
         /// <summary>
@@ -843,6 +882,32 @@ namespace Gurux.Service_Test
             GXInsertArgs args = GXInsertArgs.Insert(supplier);
             args.ToString();
             Assert.AreEqual("INSERT INTO Supplier (`Text`) VALUES('Gurux') INSERT INTO Product2 (`Text`, `Target2ID`) VALUES('Virtual-serial', 0)", args.ToString());
+        }
+
+        /// <summary>
+        /// Create table test.
+        /// </summary>
+        [TestMethod]
+        public void CreateNullableTableTest()
+        {
+            NullableTestClass c = new NullableTestClass();
+            c.Active = false;
+            c.Text = "Gurux";
+            GXInsertArgs args = GXInsertArgs.Insert(c);
+            Assert.AreEqual("INSERT INTO NullableTestClass (`Text`) VALUES('Gurux')", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert test.
+        /// </summary>
+        [TestMethod]
+        public void InsertNullableTest()
+        {
+            NullableTestClass c = new NullableTestClass();
+            c.Active = false;
+            c.Text = "Gurux";
+            GXInsertArgs args = GXInsertArgs.Insert(c);
+            Assert.AreEqual("INSERT INTO NullableTestClass (`Text`) VALUES('Gurux')", args.ToString());
         }
 
         /// <summary>
@@ -1265,7 +1330,7 @@ namespace Gurux.Service_Test
             filter.Status = State.OK;
             filter.Time = new DateTime(2020, 4, 1);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
-            arg.Where.FilterBy(filter, false);
+            arg.Where.FilterBy(filter);
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` >= '2020-04-01 00.00.00'", arg.ToString());
         }
 

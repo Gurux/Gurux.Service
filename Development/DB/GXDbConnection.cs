@@ -41,16 +41,12 @@ using System.Reflection;
 using System.Collections;
 using Gurux.Common.Internal;
 using System.Runtime.Serialization;
-using System.Data.OleDb;
-using System.Data.Odbc;
 using Gurux.Service.Orm.Settings;
 using System.IO;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Data.SqlClient;
 using System.Threading.Tasks;
 using System.Threading;
-using Gurux.Common;
 using Gurux.Common.JSon;
 using Gurux.Common.Db;
 
@@ -77,7 +73,6 @@ namespace Gurux.Service.Orm
         /// MySql settings are default settings because of MariaDB (https://mariadb.org/).
         /// </remarks>
         public static DatabaseType DefaultDatabaseType = DatabaseType.MySQL;
-
         private SqlExecutedEventHandler sql;
         private Hashtable Transactions = new Hashtable();
 
@@ -298,7 +293,7 @@ namespace Gurux.Service.Orm
         {
             if (connections == null || connections.Length == 0)
             {
-                throw new ArgumentNullException(nameof(connections));
+                throw new ArgumentException(nameof(connections));
             }
             Type tp = connections[0].GetType();
             foreach (DbConnection it in connections)
@@ -441,6 +436,9 @@ namespace Gurux.Service.Orm
             }
         }
 
+        /// <summary>
+        /// Create new table.
+        /// </summary>
         public void CreateTable<T>()
         {
             CreateTable<T>(true, true);
@@ -963,12 +961,16 @@ namespace Gurux.Service.Orm
                                     required = attr[0].IsRequired;
                                 }
                             }
+                            if (!required && it.Value.Type.IsGenericType && it.Value.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                            {
+                                required = (it.Value.Attributes & Attributes.AllowNull) == 0;
+                            }
                             if (!(Builder.Settings.Type == DatabaseType.Oracle &&
                                 (it.Value.DefaultValue != null || (it.Value.Attributes & (Attributes.AutoIncrement | Attributes.PrimaryKey)) != 0)))
                             {
                                 if ((it.Value.Attributes & Attributes.PrimaryKey) == 0 &&
+                                    it.Value.DefaultValue == null &&
                                     (!required ||
-                                    (it.Value.Type.IsGenericType && it.Value.Type.GetGenericTypeDefinition() == typeof(Nullable<>)) ||
                                     it.Value.Type.IsArray))
                                 {
                                     //If nullable.
@@ -1208,6 +1210,13 @@ namespace Gurux.Service.Orm
                         {
                             sb.Append("UNIQUE ");
                         }
+                        if (index.Clustered && (
+                            Builder.Settings.Type == DatabaseType.MSSQL ||
+                            Builder.Settings.Type == DatabaseType.MySQL))
+                        {
+                            //Create clustered index for MSSQL or MySQL.
+                            sb.Append("CLUSTERED ");
+                        }
                         sb.Append("INDEX ");
                         if (Builder.Settings.UpperCase)
                         {
@@ -1224,7 +1233,27 @@ namespace Gurux.Service.Orm
                         sb.Append(Builder.GetTableName(type, true));
                         sb.Append("(");
                         sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                        if (index.Descend)
+                        {
+                            sb.Append(" DESC");
+                        }
                         sb.Append(")");
+                        if (index.IncludeOnlyNull && index.ExcludeNull)
+                        {
+                            throw new Exception("IncludeOnlyNull and ExcludeNull are both set.");
+                        }
+                        else if (index.IncludeOnlyNull)
+                        {
+                            sb.Append(" WHERE( ");
+                            sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                            sb.Append(" IS NULL)");
+                        }
+                        else if (index.ExcludeNull)
+                        {
+                            sb.Append(" WHERE( ");
+                            sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                            sb.Append(" IS NOT NULL)");
+                        }
                         tableItem.Queries.Add(sb.ToString());
                     }
                 }
@@ -1238,6 +1267,11 @@ namespace Gurux.Service.Orm
                 if (coll.Unique)
                 {
                     sb.Append("UNIQUE ");
+                }
+                if (coll.Clustered && Builder.Settings.Type == DatabaseType.MSSQL)
+                {
+                    //Create clustered index for MSSQL.
+                    sb.Append("CLUSTERED ");
                 }
                 sb.Append("INDEX ");
                 name = coll.Name;
@@ -2143,7 +2177,7 @@ namespace Gurux.Service.Orm
                 type = Nullable.GetUnderlyingType(type);
             }
             //100 character is allocated for type.
-            else if (type == typeof(Type))
+            if (type == typeof(Type))
             {
                 return this.Builder.Settings.StringColumnDefinition(100);
             }
@@ -2217,7 +2251,7 @@ namespace Gurux.Service.Orm
         /// <param name="items">List of items to remove.</param>
         public async Task DeleteAsync(GXDeleteArgs arg, CancellationToken cancellationToken)
         {
-            await new TaskFactory().StartNew(() =>
+            await Task.Run(() =>
             {
                 Delete(arg);
             });
@@ -2333,7 +2367,7 @@ namespace Gurux.Service.Orm
                     ReleaseConnection(connection);
                 }
             }
-            return await new TaskFactory().StartNew(() =>
+            return await Task.Run(() =>
             {
                 list = Select<T>(null, args, cancellationToken);
                 if (list.Count == 0)
@@ -2421,7 +2455,7 @@ namespace Gurux.Service.Orm
                     ReleaseConnection(connection);
                 }
             }
-            return await new TaskFactory().StartNew(() =>
+            return await Task.Run(() =>
             {
                 list = Select<T>(null, args, cancellationToken);
                 if (list.Count == 0)
@@ -2510,7 +2544,7 @@ namespace Gurux.Service.Orm
                     ReleaseConnection(connection);
                 }
             }
-            return await new TaskFactory().StartNew(() =>
+            return await Task.Run(() =>
             {
                 list = Select<T>(null, args, cancellationToken);
                 if (list.Count == 0)
@@ -2598,7 +2632,7 @@ namespace Gurux.Service.Orm
                     ReleaseConnection(connection);
                 }
             }
-            return await new TaskFactory().StartNew(() =>
+            return await Task.Run(() =>
             {
                 list = Select<T>(null, args, cancellationToken);
                 if (list.Count == 0)
@@ -3320,7 +3354,7 @@ namespace Gurux.Service.Orm
                     ReleaseConnection(connection);
                 }
             }
-            return await new TaskFactory().StartNew(() =>
+            return await Task.Run(() =>
             {
                 return Select<T>(null, arg, cancellationToken);
             });
@@ -3459,7 +3493,7 @@ namespace Gurux.Service.Orm
             }
             cancellationToken.ThrowIfCancellationRequested();
             Dictionary<Type, List<string>> excluded = null;
-            if (arg.Columns.Excluded.Count != 0)
+            if (arg.Columns.Excluded.Any())
             {
                 //Add excluded columns.
                 excluded = new Dictionary<Type, List<string>>();
@@ -3946,7 +3980,7 @@ namespace Gurux.Service.Orm
         {
             if (arg == null)
             {
-                throw new ArgumentNullException("Insert failed. There is nothing to insert.");
+                throw new ArgumentException("Insert failed. There is nothing to insert.");
             }
             arg.Settings = Builder.Settings;
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
@@ -3984,7 +4018,16 @@ namespace Gurux.Service.Orm
         /// <param name="arg"></param>
         public async Task InsertAsync(GXInsertArgs arg)
         {
-            await InsertAsync(arg, CancellationToken.None);
+            await InsertAsync(null, arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Insert new object as async.
+        /// </summary>
+        /// <param name="arg"></param>
+        public async Task InsertAsync(IDbTransaction transaction, GXInsertArgs arg)
+        {
+            await InsertAsync(null, arg, CancellationToken.None);
         }
 
         /// <summary>
@@ -3993,9 +4036,18 @@ namespace Gurux.Service.Orm
         /// <param name="arg"></param>
         public async Task InsertAsync(GXInsertArgs arg, CancellationToken cancellationToken)
         {
+            await InsertAsync(null, arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Insert new object as async.
+        /// </summary>
+        /// <param name="arg"></param>
+        public async Task InsertAsync(IDbTransaction transaction, GXInsertArgs arg, CancellationToken cancellationToken)
+        {
             if (arg == null)
             {
-                throw new ArgumentNullException("Insert failed. There is nothing to insert.");
+                throw new ArgumentException("Insert failed. There is nothing to insert.");
             }
             arg.Settings = Builder.Settings;
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
@@ -4004,28 +4056,48 @@ namespace Gurux.Service.Orm
                 GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded, true, false,
                     Builder.Settings.ColumnQuotation, false, null, null, arg.insertedObjects);
             }
-            IDbConnection connection = GetConnection();
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
+            if (tranactionOnProgress)
+            {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
+            }
             try
             {
-                await UpdateOrInsertAsync(connection, list, true);
+                await UpdateOrInsert(connection, list, true);
             }
             finally
             {
-                ReleaseConnection(connection);
+                if (!tranactionOnProgress)
+                {
+                    ReleaseConnection(connection);
+                }
             }
         }
 
         /// <summary>
         /// Update object.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="value"></param>
-        /// <param name="columns"></param>
+        /// <param name="arg">Update arguments.</param>
         public void Update(GXUpdateArgs arg)
+        {
+            Update(null, arg);
+        }
+
+        /// <summary>
+        /// Update object.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="arg">Update arguments.</param>
+        public void Update(IDbTransaction transaction, GXUpdateArgs arg)
         {
             if (arg == null)
             {
-                throw new ArgumentNullException("Update failed. There is nothing to update.");
+                throw new ArgumentException("Update failed. There is nothing to update.");
             }
             arg.Settings = Builder.Settings;
             //Get values to insert first.
@@ -4039,7 +4111,16 @@ namespace Gurux.Service.Orm
                         Builder.Settings.ColumnQuotation, false, arg.Where, handledObjects, null);
                 }
             }
-            IDbConnection connection = GetConnection();
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
+            if (tranactionOnProgress)
+            {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
+            }
             try
             {
                 UpdateOrInsert(connection, list, true);
@@ -4054,7 +4135,10 @@ namespace Gurux.Service.Orm
             }
             finally
             {
-                ReleaseConnection(connection);
+                if (!tranactionOnProgress)
+                {
+                    ReleaseConnection(connection);
+                }
             }
         }
 
@@ -4062,20 +4146,41 @@ namespace Gurux.Service.Orm
         /// Update object as async.
         /// </summary>
         /// <param name="arg"></param>
-        public async Task UpdateAsync(GXUpdateArgs arg)
+        public Task UpdateAsync(GXUpdateArgs arg)
         {
-            await UpdateAsync(arg, CancellationToken.None);
+            return UpdateAsync(null, arg, CancellationToken.None);
         }
 
         /// <summary>
         /// Update object as async.
         /// </summary>
-        /// <param name="arg"></param>
-        public async Task UpdateAsync(GXUpdateArgs arg, CancellationToken cancellationToken)
+        /// <param name="transaction">Transaction</param>
+        /// <param name="arg">Update arguments.</param>
+        public Task UpdateAsync(IDbTransaction transaction, GXUpdateArgs arg)
+        {
+            return UpdateAsync(transaction, arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Update object as async.
+        /// </summary>
+        /// <param name="arg">Update arguments.</param>
+        public Task UpdateAsync(GXUpdateArgs arg, CancellationToken cancellationToken)
+        {
+            return UpdateAsync(null, arg, cancellationToken);
+        }
+
+        /// <summary>
+        /// Update object as async.
+        /// </summary>
+        /// <param name="transaction">Transaction</param>
+        /// <param name="arg">Update arguments.</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        public async Task UpdateAsync(IDbTransaction transaction, GXUpdateArgs arg, CancellationToken cancellationToken)
         {
             if (arg == null)
             {
-                throw new ArgumentNullException("Update failed. There is nothing to update.");
+                throw new ArgumentException("Update failed. There is nothing to update.");
             }
             arg.Settings = Builder.Settings;
             //Get values to insert first.
@@ -4089,7 +4194,16 @@ namespace Gurux.Service.Orm
                         true, false, Builder.Settings.ColumnQuotation, false, arg.Where, handledObjects, null);
                 }
             }
-            IDbConnection connection = GetConnection();
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
+            if (tranactionOnProgress)
+            {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
+            }
             try
             {
                 await UpdateOrInsert(connection, list, true);
@@ -4104,13 +4218,16 @@ namespace Gurux.Service.Orm
             }
             finally
             {
-                ReleaseConnection(connection);
+                if (!tranactionOnProgress)
+                {
+                    ReleaseConnection(connection);
+                }
             }
         }
 
-        private async Task UpdateOrInsertAsync(IDbConnection connection, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
+        private Task UpdateOrInsertAsync(IDbConnection connection, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
         {
-            await new TaskFactory().StartNew(() => UpdateOrInsert(connection, list, insert));
+            return Task.Run(() => UpdateOrInsert(connection, list, insert));
         }
 
         /// <summary>

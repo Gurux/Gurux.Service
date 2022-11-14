@@ -34,8 +34,9 @@ using System.Runtime.Serialization;
 using System.ComponentModel;
 using Gurux.Common;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Gurux.Service.Rest;
 using Gurux.Common.Db;
+using System.ComponentModel.DataAnnotations;
+
 namespace Gurux.Service_Test
 {
     class TestItem
@@ -62,7 +63,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class IndexTestClass : IUnique<int>
     {
-        [DataMember(Name="ID"), Index]
+        [DataMember(Name = "ID"), Index]
         public int Id
         {
             get;
@@ -73,7 +74,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class UniqueIndexTestClass : IUnique<int>
     {
-        [DataMember, Index(Unique=true)]
+        [DataMember, Index(Unique = true)]
         public int Id
         {
             get;
@@ -84,7 +85,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class AutoIncreamentTestClass : IUnique<int>
     {
-        [DataMember(Name="ID"), AutoIncrement]
+        [DataMember(Name = "ID"), AutoIncrement]
         public int Id
         {
             get;
@@ -399,7 +400,7 @@ namespace Gurux.Service_Test
             }
         }
 
-        [DataMember(Name="ID"), AutoIncrement]
+        [DataMember(Name = "ID"), AutoIncrement]
         public int Id
         {
             get;
@@ -415,7 +416,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
-        [DefaultValue(null)]
+        [Filter(FilterType.GreaterOrEqual)]
         public DateTime Time
         {
             get;
@@ -430,7 +431,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember(Name = "SimpleText")]
-        [DefaultValue("")]
+        [Filter(FilterType.Exact)]
         public String Text2
         {
             get;
@@ -439,6 +440,7 @@ namespace Gurux.Service_Test
 
         [DataMember()]
         [DefaultValue(null)]
+        [Filter(FilterType.Exact)]
         public String Text3
         {
             get;
@@ -502,7 +504,8 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
-        [DefaultValue(State.OK)]
+        //        [DefaultValue(State.OK)]
+        [Filter(FilterType.Exact, State.OK)]
         public State Status
         {
             get;
@@ -513,7 +516,7 @@ namespace Gurux.Service_Test
     [DataContract]
     public class Supplier : IUnique<int>
     {
-        [DataMember(Name="SupplierID"), AutoIncrement]
+        [DataMember(Name = "SupplierID"), AutoIncrement]
         public int Id
         {
             get;
@@ -608,7 +611,7 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [DataMember(Name="ParentID"), ForeignKey(typeof(TestClass))]
+        [DataMember(Name = "ParentID"), ForeignKey(typeof(TestClass))]
         public int Parent
         {
             get;
@@ -642,44 +645,6 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
-    }
-
-    [DataContract]
-    public class GXEchoServer : GXRestService
-    {
-        public GXEchoResponse Post(GXEchoRequest request)
-        {
-            GXEchoResponse res = new GXEchoResponse();
-            res.Id = request.Id;
-            return res;
-        }
-
-
-        public GXEchoResponse Get(GXEchoRequest request)
-        {
-            GXEchoResponse res = new GXEchoResponse();
-            res.Id = request.Id;
-            return res;
-        }
-
-        public GXEchoResponse Put(GXEchoRequest request)
-        {
-            GXEchoResponse res = new GXEchoResponse();
-            if (request.Id == -1)
-            {
-                throw new ArgumentOutOfRangeException("Put");
-            }
-            res.Id = request.Id;
-            return res;
-        }
-
-        [Authenticate]
-        public GXEchoResponse Delete(GXEchoRequest request)
-        {
-            GXEchoResponse res = new GXEchoResponse();
-            res.Id = request.Id;
-            return res;
         }
     }
 
@@ -746,7 +711,7 @@ namespace Gurux.Service_Test
     [DataContract]
     class Country : IUnique<int>
     {
-        [DataMember(Name="ID")]
+        [DataMember(Name = "ID")]
         [AutoIncrement]
         public int Id
         {
@@ -772,7 +737,7 @@ namespace Gurux.Service_Test
             get;
             set;
         }
-        [DataMember(Name= "ParentName")]
+        [DataMember(Name = "ParentName")]
         public string Name
         {
             get;
@@ -799,7 +764,7 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [DataMember, ForeignKey(typeof(Parent), OnDelete=ForeignKeyDelete.Cascade)]
+        [DataMember, ForeignKey(typeof(Parent), OnDelete = ForeignKeyDelete.Cascade)]
         public int ParentId
         {
             get;
@@ -1106,6 +1071,27 @@ namespace Gurux.Service_Test
 
         [DataMember()]
         public bool BooleanTest
+        {
+            get;
+            set;
+        }
+    }
+
+    class NullableTestClass : IUnique<Guid>
+    {
+        public Guid Id
+        {
+            get;
+            set;
+        }
+
+        [Required]
+        public bool? Active
+        {
+            get;
+            set;
+        }
+        public string Text
         {
             get;
             set;

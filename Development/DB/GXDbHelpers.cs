@@ -145,7 +145,8 @@ namespace Gurux.Service.Orm
         /// <param name="useEpochTimeFormat">Is epoch time format used.</param>
         /// <param name="useEnumStringValue">Is Enum value saved by name or by integer value.</param>
         /// <returns>Converted value.</returns>
-        static internal string ConvertToString(object value, GXDBSettings settings, bool where)
+        static internal string ConvertToString(object value, GXDBSettings settings,
+            bool where, bool addQueted = true)
         {
             string str;
             if (value == null)
@@ -156,7 +157,10 @@ namespace Gurux.Service.Orm
             {
                 str = value as string;
                 str = str.Replace("\\", "\\\\").Replace("'", @"\''");
-                str = GetQuetedValue(str);
+                if (addQueted)
+                {
+                    str = GetQuetedValue(str);
+                }
             }
             else if (value is Type)
             {
@@ -244,7 +248,7 @@ namespace Gurux.Service.Orm
                 StringBuilder sb = new StringBuilder();
                 foreach (object it in (System.Collections.IEnumerable)value)
                 {
-                    sb.Append(Convert.ToString(it, CultureInfo.InvariantCulture));
+                    sb.Append(ConvertToString(it, settings, where, true));
                     sb.Append(';');
                 }
                 if (sb.Length != 0)
@@ -366,7 +370,7 @@ namespace Gurux.Service.Orm
                         {
                             value = it;
                         }
-                        sb.Append(GXDbHelpers.ConvertToString(value, settings, false));
+                        sb.Append(GXDbHelpers.ConvertToString(value, settings, false, true));
                         ++index;
                     }
                     if (table.Value.Where.Count != 0)
@@ -549,12 +553,21 @@ namespace Gurux.Service.Orm
                             if (row.Get != null)
                             {
                                 value = row.Get(it.Key);
-                                if ((row.Attributes & Attributes.ForeignKey) != 0 &&
-                                    IsZeroOrEmpty(value))
+                                if ((row.Attributes & Attributes.AllowNull) == 0)
                                 {
-                                    if ((row.Attributes & Attributes.AllowNull) == 0)
+                                    if ((row.Attributes & Attributes.ForeignKey) != 0 &&
+                                        IsZeroOrEmpty(value))
                                     {
-                                        throw new ArgumentException("Foreign key can't be null.");
+                                        if (row.Target is PropertyInfo pi)
+                                        {
+                                            throw new ArgumentException("Foreign key can't be null. " + table.Key.Name + "." + pi.Name);
+                                        }
+                                        throw new ArgumentException("Foreign key can't be null. + " + table.Key.Name);
+                                    }
+                                    if (value == null)
+                                    {
+                                        //Get the dafault value.
+                                        value = row.DefaultValue;
                                     }
                                 }
                             }
@@ -583,7 +596,7 @@ namespace Gurux.Service.Orm
                     {
                         value = it;
                     }
-                    sb.Append(GXDbHelpers.ConvertToString(value, settings, false));
+                    sb.Append(GXDbHelpers.ConvertToString(value, settings, false, true));
                 }
                 if (!select)
                 {
@@ -1256,6 +1269,36 @@ namespace Gurux.Service.Orm
                     post = ")";
                     return new string[] { "COUNT(1) WHERE NOT EXISTS (SELECT 1" };
                 }
+                if (m.Method.Name == "Greater")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0] + " > " +
+                            GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
+                }
+                if (m.Method.Name == "Less")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0] + " < " +
+                            GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
+                }
+                if (m.Method.Name == "GreaterOrEqual")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0] + " >= " +
+                            GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
+                }
+                if (m.Method.Name == "LessOrEqual")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0] + " <= " +
+                            GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
+                }
+                if (m.Method.Name == "Null")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0] + " <= " +
+                            GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
+                }
+                if (m.Method.Name == "NotNull")
+                {
+                    return new string[] {"(" + GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0] + " <= " +
+                            GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
+                }
             }
             if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
             {
@@ -1376,14 +1419,33 @@ namespace Gurux.Service.Orm
             return new string[] { settings.ConvertToString(value22, where) };
         }
 
+        /// <summary>
+        /// Convert value to string.
+        /// </summary>
+        /// <remarks>
+        /// This method is added because some languages are using invalid minus sign and it must convert to -.
+        /// </remarks>
+        public static string GetString(object value)
+        {
+            if (value is Int16 ||
+                value is Int32 ||
+                value is Int64 ||
+                value is float ||
+                value is double)
+            {
+                return Convert.ToString(value, CultureInfo.InvariantCulture);
+            }
+            return Convert.ToString(value);
+        }
+
         internal static string[] GetMembers(
-            GXDBSettings settings,
-            Expression expression,
-            char quoteSeparator,
-            bool where,
-            bool getValue,
-            ref string post,
-            bool isParameter)
+                GXDBSettings settings,
+                Expression expression,
+                char quoteSeparator,
+                bool where,
+                bool getValue,
+                ref string post,
+                bool isParameter)
         {
             if (expression == null)
             {
@@ -1484,7 +1546,7 @@ namespace Gurux.Service.Orm
                             }
                             else
                             {
-                                sb.Append(Convert.ToString(it));
+                                sb.Append(ConvertToString(it, settings, where));
                             }
                         }
                         return new string[] { sb.ToString() };
@@ -1506,7 +1568,7 @@ namespace Gurux.Service.Orm
                     }
                     if (quoteSeparator == '\0')
                     {
-                        return new string[] { Convert.ToString(value) };
+                        return new string[] { ConvertToString(value, settings, where, false) };
                     }
                     if (value != null && value.GetType().IsClass)
                     {
@@ -1588,13 +1650,13 @@ namespace Gurux.Service.Orm
                             ((GXSelectArgs)target).Settings = settings;
                         }
                         string str;
-                        if (target is DateTime)
+                        if (target is DateTime || target is DateTimeOffset)
                         {
                             str = settings.ConvertToString(target, where);
                         }
                         else
                         {
-                            str = Convert.ToString(target);
+                            str = GetString(target);
                         }
                         if (where && getValue && target is string)
                         {
@@ -1809,7 +1871,7 @@ namespace Gurux.Service.Orm
                 {
                     return new string[] { settings.ConvertToString(value, where) };
                 }
-                return new string[] { Convert.ToString(value) };
+                return new string[] { ConvertToString(value, settings, where) };
             }
 
             if (expression is UnaryExpression)
@@ -1969,26 +2031,27 @@ namespace Gurux.Service.Orm
 
             if (expression is ConstantExpression ce)
             {
-                if (ce.Value is string)
+                if (ce.Value is string str)
                 {
                     if ("*".Equals(ce.Value))
                     {
-                        return new string[] { (string)ce.Value };
+                        return new string[] { str };
                     }
-                    return new string[] { AddQuotes((string)ce.Value, quoteSeparator) };
+                    return new string[] { AddQuotes(str, quoteSeparator) };
                 }
-                else if (ce.Value == null)
+                if (ce.Value == null)
                 {
                     return new string[] { null };
                 }
-                else if (ce.Value is bool)
+                if (ce.Value is bool)
                 {
                     return new string[] { ((bool)ce.Value) ? "1" : "0" };
                 }
-                else
+                if (ce.Value is Enum e)
                 {
-                    return new string[] { ce.Value.ToString() };
+                    return new string[] { Convert.ToUInt32(e).ToString() };
                 }
+                return new string[] { ce.Value.ToString() };
             }
 
             throw new ArgumentException("Invalid expression");

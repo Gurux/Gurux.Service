@@ -37,6 +37,7 @@ using System.Linq.Expressions;
 using Gurux.Service.Orm.Settings;
 using Gurux.Common.Internal;
 using System.Reflection;
+using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm
 {
@@ -229,22 +230,21 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Update where condition. The DefaultValue attribute is used as a filter.
+        /// Update where condition.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="target"></param>
-        /// <param name="exact">Is compared value exact or containing given value.</param>
-        public void FilterBy<T>(T target, bool exact)
+        public void FilterBy<T>(T target)
         {
             if (target != null)
             {
                 Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
                 foreach (var it in properties)
                 {
-                    if ((it.Value.Attributes & Attributes.DefaultValue) != 0 && it.Value.Get != null)
+                    if ((it.Value.Attributes & Attributes.Filter) != 0 && it.Value.Get != null)
                     {
                         object actual = it.Value.Get(target);
-                        if (actual != null && it.Value.DefaultValue == null)
+                        if (actual != null && it.Value.FilterValue == null)
                         {
                             if (actual is DateTime d)
                             {
@@ -255,7 +255,7 @@ namespace Gurux.Service.Orm
                             }
                             else if (actual is DateTimeOffset dto)
                             {
-                                if (dto.DateTime == DateTime.MinValue)
+                                if (dto == DateTimeOffset.MinValue)
                                 {
                                     continue;
                                 }
@@ -267,19 +267,24 @@ namespace Gurux.Service.Orm
                                     continue;
                                 }
                             }
-                            else if (!(actual is string) && 
-                                typeof(System.Collections.IEnumerable).IsAssignableFrom(actual.GetType()))
+                            else if (!(actual is string))
                             {
-                                //Arrays and lists are not filtered.
-                                continue;
-                            }
-                            else if (!(actual is string) && actual.GetType().IsClass)
-                            {
-                                FilterBy(actual, exact);
-                                continue;
+                                if (typeof(System.Collections.IEnumerable).IsAssignableFrom(actual.GetType()))
+                                {
+                                    foreach(var e1 in (System.Collections.IEnumerable) actual)
+                                    {
+                                        FilterBy(e1);
+                                    }
+                                    continue;
+                                }
+                                else if (actual.GetType().IsClass)
+                                {
+                                    FilterBy(actual);
+                                    continue;
+                                }
                             }
                         }
-                        if (Convert.ToString(it.Value.DefaultValue) != Convert.ToString(actual))
+                        if (Convert.ToString(it.Value.FilterValue) != Convert.ToString(actual))
                         {
                             if (actual != null)
                             {
@@ -292,43 +297,65 @@ namespace Gurux.Service.Orm
                                     int val = b ? 1 : 0;
                                     And<T>(q => it.Value.Target.Equals(val));
                                 }
-                                else if (exact || actual is Guid)
+                                else if (actual is Guid)
                                 {
                                     And<T>(q => it.Value.Target == actual);
                                 }
                                 else
                                 {
-                                    if (actual is DateTime d)
+                                    switch (it.Value.FilterType)
                                     {
-                                        if (d == DateTime.MinValue || d == DateTime.MaxValue)
-                                        {
+                                        case FilterType.Exact:
                                             And<T>(q => it.Value.Target == actual);
-                                        }
-                                        else
-                                        {
-                                            And<T>(q => (DateTime)it.Value.Target >= d);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        And<T>(q => GXSql.Contains(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.Equals:
+                                            And<T>(q => it.Value.Target.Equals(actual));
+                                            break;
+                                        case FilterType.Greater:
+                                            And<T>(q => GXSql.Greater(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.Less:
+                                            And<T>(q => GXSql.Less(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.GreaterOrEqual:
+                                            And<T>(q => GXSql.GreaterOrEqual(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.LessOrEqual:
+                                            And<T>(q => GXSql.LessOrEqual(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.StartsWith:
+                                            And<T>(q => GXSql.StartsWith(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.EndsWith:
+                                            And<T>(q => GXSql.EndsWith(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.Contains:
+                                            And<T>(q => GXSql.Contains(it.Value.Target, actual));
+                                            break;
+                                        case FilterType.Null:
+                                            //Value is not null if filter value is given.
+                                            //This can be used with remove time.
+                                            And<T>(q => it.Value.Target != null);
+                                            break;
+                                        case FilterType.NotNull:
+                                            //Value must be null if filter value is given.
+                                            //This can be used with remove time.
+                                            And<T>(q => it.Value.Target == null);
+                                            break;
+                                        default:
+                                            throw new ArgumentOutOfRangeException(nameof(it.Value.FilterType));
                                     }
                                 }
                             }
                         }
+                        else if (it.Value.FilterType == FilterType.Null)
+                        {
+                            //If value must be null. This can be used with remove time.
+                            And<T>(q => it.Value.Target == null);
+                        }
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// Update where condition. The DefaultValue attribute is used as a filter.
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="target"></param>
-        public void FilterBy<T>(T target)
-        {
-            FilterBy<T>(target, true);
         }
     }
 }

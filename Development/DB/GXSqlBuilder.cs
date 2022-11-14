@@ -334,7 +334,7 @@ namespace Gurux.Service.Orm
         /// <param name="attributes"></param>
         /// <param name="s"></param>
         private static void UpdateAttributes(Type type, object[] attributes, GXSerializedItem s)
-        {          
+        {
             int value = 0;
             PropertyInfo pi = s.Target as PropertyInfo;
             if (pi != null && pi.Name == "Id")
@@ -347,6 +347,17 @@ namespace Gurux.Service.Orm
                         break;
                     }
                 }
+            }
+            if (s.Type.IsGenericType && s.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            {
+                //If value is nullable.
+                value |= (int)Attributes.AllowNull;
+            }
+            else if ((value & (int)(Attributes.Id | Attributes.PrimaryKey)) == 0 &&
+                s.Type.IsClass)
+            {
+                //If value is nullable.
+                value |= (int)Attributes.AllowNull;
             }
             foreach (object att in attributes)
             {
@@ -368,34 +379,31 @@ namespace Gurux.Service.Orm
                         value |= (int)Attributes.Index;
                     }
                     //Is property auto indexed value.
-                    else if (att is AutoIncrementAttribute)
+                    if (att is AutoIncrementAttribute)
                     {
                         value |= (int)Attributes.AutoIncrement;
                     }
                     //Primary key value.
-                    else if (att is PrimaryKeyAttribute)
+                    if (att is PrimaryKeyAttribute)
                     {
                         value |= (int)Attributes.PrimaryKey;
                     }
                     //Foreign key value.
-                    else if (att is ForeignKeyAttribute fk)
+                    if (att is ForeignKeyAttribute fk)
                     {
                         value |= (int)Attributes.ForeignKey;
-                        if (fk.AllowNull)
-                        {
-                            value |= (int)Attributes.AllowNull;
-                        }
+                        value |= (int)Attributes.AllowNull;
                     }
                     //Relation field.
                     else if (att is RelationAttribute)
                     {
                         value |= (int)Attributes.Relation;
                     }
-                    else if (att is StringLengthAttribute)
+                    if (att is StringLengthAttribute)
                     {
                         value |= (int)Attributes.StringLength;
                     }
-                    else if (att is DataMemberAttribute)
+                    if (att is DataMemberAttribute)
                     {
                         DataMemberAttribute n = att as DataMemberAttribute;
                         if (n.IsRequired)
@@ -403,10 +411,20 @@ namespace Gurux.Service.Orm
                             value |= (int)Attributes.IsRequired;
                         }
                     }
-                    else if (att is DefaultValueAttribute)
+                    if (att is FilterAttribute fa)
                     {
-                        value |= (int)Attributes.DefaultValue;
+                        value |= (int)Attributes.Filter;
+                        s.FilterType = fa.FilterType;
+                        s.FilterValue = fa.DefaultValue;
                     }
+                    if (att is IsRequiredAttribute ra)
+                    {
+                        if (ra.IsRequired)
+                        {
+                            value &= ~(int)Attributes.AllowNull;
+                        }
+                    }
+
                 }
             }
             s.Attributes = (Attributes)value;
@@ -486,7 +504,7 @@ namespace Gurux.Service.Orm
             else
             {
                 properties = (Dictionary<string, GXSerializedItem>)GXInternal.GetValues(type, false, UpdateAttributes);
-                SerializedObjects.Add(type, properties);
+                SerializedObjects[type] = properties;
                 foreach (var it in properties)
                 {
                     //Check is this ForeignKey if not set.

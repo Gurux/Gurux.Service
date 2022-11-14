@@ -25,7 +25,8 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.4.2206.201" />
+    <PackageReference Include="Gurux.Common" Version="8.4.2210.1201" />
+    <PackageReference Include="System.Data.Odbc" Version="6.0.1" />
  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">

@@ -168,5 +168,62 @@ namespace Gurux.Service.Orm
         {
             return true;
         }
+
+        /// <summary>
+        /// Is value starts with expression.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool StartsWith<T>(T value, object expression)
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Is value ends with expression.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool EndsWith<T>(T value, object expression)
+        {
+            return true;
+        }
+
+        /// <summary>
+        /// Is value ends with expression.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool Greater<T>(T value, object expression)
+        {
+            return true;
+        }
+        /// <summary>
+        /// Is value ends with expression.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool Less<T>(T value, object expression)
+        {
+            return true;
+        }
+        /// <summary>
+        /// Is value ends with expression.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool GreaterOrEqual<T>(T value, object expression)
+        {
+            return true;
+        }
+        /// <summary>
+        /// Is value ends with expression.
+        /// </summary>
+        /// <param name="args">Selection arguments.</param>
+        /// <returns>True, if value exists.</returns>
+        public static bool LessOrEqual<T>(T value, object expression)
+        {
+            return true;
+        }
     }
 }
