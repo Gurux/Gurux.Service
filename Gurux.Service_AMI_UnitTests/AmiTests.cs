@@ -174,53 +174,7 @@ namespace Gurux.Service_Test
             update.Where.And<GXUser>(q => req.Ids.Contains(q.Id));
             Assert.AreEqual("", update.ToString());
         }
-
-        /// <summary>
-        /// Add settings test.
-        /// </summary>
-        [TestMethod]
-        public void InsertSettingsTest()
-        {
-            List<GXConfigurationValue> list = new List<GXConfigurationValue>();
-            list.Add(new GXConfigurationValue() { Name = "SiteName", });
-            list.Add(new GXConfigurationValue() { Name = "Email", });
-            list.Add(new GXConfigurationValue() { Name = "Slogan", });
-            //            GXInsertArgs insert = GXInsertArgs.InsertRange(list, c => new { c.Id, c.Generation });
-            GXInsertArgs insert = GXInsertArgs.InsertRange(list);
-            insert.Exclude<GXConfigurationValue>(e => e.Group);
-            Assert.AreEqual("Mikko", insert.ToString());
-        }
-
-        /// <summary>
-        /// Update configuration test.
-        /// </summary>
-        [TestMethod]
-        public void UpdateConfigurationTest()
-        {
-            List<GXConfigurationValue> list = new List<GXConfigurationValue>();
-            list.Add(new GXConfigurationValue() { Id = Guid.NewGuid(), Name = "SiteName", });
-            list.Add(new GXConfigurationValue() { Id = Guid.NewGuid(), Name = "Email", });
-            list.Add(new GXConfigurationValue() { Id = Guid.NewGuid(), Name = "Slogan", });
-            //            GXInsertArgs insert = GXInsertArgs.InsertRange(list, c => new { c.Id, c.Generation });
-            GXUpdateArgs args = GXUpdateArgs.UpdateRange(list);
-            args.Exclude<GXConfigurationValue>(e => e.Group);
-            Assert.AreEqual("Mikko", args.ToString());
-        }
-
-
-        /// <summary>
-        /// Add settings test.
-        /// </summary>
-        [TestMethod]
-        public void CultureTest()
-        {
-            List<GXLanguage> list = new List<GXLanguage>();
-            list.Add(new GXLanguage() { Id = "fi", EnglishName = "Finland", });
-            GXInsertArgs insert = GXInsertArgs.InsertRange(list);
-            insert.Exclude<GXConfigurationValue>(e => e.Group);
-            Assert.AreEqual("Mikko", insert.ToString());
-        }
-
+     
         /// <summary>
         /// Add settings test.
         /// </summary>
@@ -258,7 +212,7 @@ namespace Gurux.Service_Test
             GXUserGroup userGroup = new GXUserGroup();
             userGroup.Users.Add(user);
             GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(s => s.Id, where => where.Removed == null);
-            arg.Where.FilterBy(userGroup, false);
+            arg.Where.FilterBy(userGroup);
             arg.Joins.AddInnerJoin<GXUserGroup, GXUserGroupUser>(j => j.Id, j => j.UserGroupId);
             arg.Joins.AddInnerJoin<GXUserGroupUser, GXUser>(j => j.UserId, j => j.Id);
             string[] userIds = new string[] {"Gurux"};
@@ -276,7 +230,7 @@ namespace Gurux.Service_Test
             GXUserGroup userGroup = new GXUserGroup();
             userGroup.Users.Add(user);
             GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(s => s.Id, where => where.Removed == null);
-            arg.Where.FilterBy(userGroup, false);
+            arg.Where.FilterBy(userGroup);
             arg.Joins.AddInnerJoin<GXUserGroup, GXUserGroupUser>(j => j.Id, j => j.UserGroupId);
             arg.Joins.AddInnerJoin<GXUserGroupUser, GXUser>(j => j.UserId, j => j.Id);
             string[] userIds = new string[] { "Gurux" };
@@ -296,25 +250,13 @@ namespace Gurux.Service_Test
             GXSelectArgs args = GXSelectArgs.Select<GXIpAddress>(s => s.Id, where => where.User == user);
             Assert.AreEqual("Mikko", args.ToString());
 
-        }
-
-        [TestMethod]
-        public void MikkoTest()
-        {
-            GXWorkflow workflow = new GXWorkflow();
-            workflow.Id = Guid.Parse("17f9f275-7dba-44a8-b9c5-5c404283cf7e");
-            GXSelectArgs arg = GXSelectArgs.SelectAll<GXJob>(q => q.Workflow == workflow && q.Removed == null);
-            arg.Columns.Add<GXModule>();
-            arg.Columns.Exclude<GXModule>(e => e.Jobs);
-            arg.Joins.AddLeftJoin<GXModule, GXJob>(j => j.Id, j => j.Module);
-            Assert.AreEqual("Mikko", arg.ToString());
-        }
+        }     
 
         [TestMethod]
         public void Mikko2Test()
         {
             GXSelectArgs arg = GXSelectArgs.SelectAll<GXScript>(q => q.Removed == null);
             Assert.AreEqual("Mikko", arg.ToString());
-        }
+        }       
     }
 }

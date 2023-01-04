@@ -37,7 +37,6 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Collections;
-using Gurux.Common.JSon;
 using Gurux.Common.Db;
 
 namespace Gurux.Common.Internal
@@ -451,7 +450,7 @@ namespace Gurux.Common.Internal
                         else if (pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(System.Data.Linq.EntitySet<>))
                         {
                             Type listT = typeof(System.Data.Linq.EntitySet<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
-                            IList list = (IList)GXJsonParser.CreateInstance(listT);
+                            IList list = (IList)Activator.CreateInstance(listT);
                             foreach (object it in (IList)value)
                             {
                                 list.Add(it);
@@ -462,7 +461,7 @@ namespace Gurux.Common.Internal
                         else
                         {
                             Type listT = typeof(List<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
-                            IList list = (IList)GXJsonParser.CreateInstance(listT);
+                            IList list = (IList)Activator.CreateInstance(listT);
                             foreach (object it in (IList)value)
                             {
                                 list.Add(it);

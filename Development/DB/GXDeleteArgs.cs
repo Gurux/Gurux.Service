@@ -32,7 +32,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -40,8 +39,6 @@ using Gurux.Service.Orm.Settings;
 using System.Collections;
 using Gurux.Common.Internal;
 using System.Diagnostics;
-using Gurux.Common.JSon;
-using Gurux.Common;
 using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm
@@ -241,7 +238,7 @@ namespace Gurux.Service.Orm
                 collectionId = si.Relation.RelationMapTable.Relation.ForeignId.Get(c);
                 foreach (TItem it in items)
                 {
-                    object target = GXJsonParser.CreateInstance(si.Relation.RelationMapTable.Relation.PrimaryTable);
+                    object target = Activator.CreateInstance(si.Relation.RelationMapTable.Relation.PrimaryTable);
                     si.Relation.RelationMapTable.Relation.PrimaryId.Set(target, collectionId);
                     //Get item id.
                     id = siItem.Relation.RelationMapTable.Relation.ForeignId.Get(it);

@@ -47,7 +47,6 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using System.Threading;
-using Gurux.Common.JSon;
 using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm
@@ -76,6 +75,9 @@ namespace Gurux.Service.Orm
         private SqlExecutedEventHandler sql;
         private Hashtable Transactions = new Hashtable();
 
+        /// <summary>
+        /// Used database.
+        /// </summary>
         public DatabaseType DatabaseType
         {
             get
@@ -3076,7 +3078,7 @@ namespace Gurux.Service.Orm
                                         {
                                             if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
                                             {
-                                                item = GXJsonParser.CreateInstance(col.TableType);
+                                                item = Activator.CreateInstance(col.TableType);
                                                 if (item != null && item.GetType() == typeof(T))
                                                 {
                                                     list.Add((T)item);
@@ -3625,7 +3627,7 @@ namespace Gurux.Service.Orm
                                         {
                                             if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
                                             {
-                                                item = GXJsonParser.CreateInstance(col.TableType);
+                                                item = Activator.CreateInstance(col.TableType);
                                                 if (allObjects != null)
                                                 {
                                                     if (!allObjects.ContainsKey(col.TableType))

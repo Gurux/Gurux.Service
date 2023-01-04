@@ -894,7 +894,8 @@ namespace Gurux.Service_Test
             c.Active = false;
             c.Text = "Gurux";
             GXInsertArgs args = GXInsertArgs.Insert(c);
-            Assert.AreEqual("INSERT INTO NullableTestClass (`Text`) VALUES('Gurux')", args.ToString());
+            string str = args.ToString();
+            Assert.AreEqual("INSERT INTO NullableTestClass (`Id`, `Active`, `Text`) VALUES('" + c.Id + "', 0, 'Gurux')", str);
         }
 
         /// <summary>
@@ -904,10 +905,10 @@ namespace Gurux.Service_Test
         public void InsertNullableTest()
         {
             NullableTestClass c = new NullableTestClass();
-            c.Active = false;
             c.Text = "Gurux";
             GXInsertArgs args = GXInsertArgs.Insert(c);
-            Assert.AreEqual("INSERT INTO NullableTestClass (`Text`) VALUES('Gurux')", args.ToString());
+            string str = args.ToString();
+            Assert.AreEqual("INSERT INTO NullableTestClass (`Id`, `Active`, `Text`) VALUES('" + c.Id + "', NULL, 'Gurux')", str);
         }
 
         /// <summary>

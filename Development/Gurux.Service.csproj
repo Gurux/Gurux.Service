@@ -4,7 +4,7 @@
     <AssemblyName>Gurux.Service</AssemblyName>
     <Company>Gurux Ltd</Company>
     <Authors>Gurux Ltd</Authors>
-    <Copyright>Copyright (c) 1998-2022 Gurux Ltd. All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 1998-2023 Gurux Ltd. All rights reserved.</Copyright>
     <PackageProjectUrl>www.gurux.fi/index.php?q=Gurux.Service</PackageProjectUrl>
     <Description>Gurux.Service class implements Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.</Description>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
@@ -23,9 +23,10 @@
     <PackageIcon>gurux_service.png</PackageIcon>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Common" Version="8.4.2210.1201" />
+    <PackageReference Include="Gurux.Common" Version="8.4.2301.401" />
     <PackageReference Include="System.Data.Odbc" Version="6.0.1" />
  </ItemGroup>
 
