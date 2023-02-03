@@ -411,12 +411,12 @@ namespace Gurux.Service.Orm.Settings
         {
             if (value is DateTime)
             {
-                string format = "yyyyMMdd HH:mm:ss";
+                string format = "yyyyMMdd HH:mm:ss.fff";
                 return GetQuetedValue(((DateTime)value).ToString(format, CultureInfo.InvariantCulture));
             }
             if (value is DateTimeOffset)
             {
-                string format = "yyyyMMdd HH:mm:ss zzz";
+                string format = "yyyyMMdd HH:mm:ss.fff zzz";
                 return GetQuetedValue(((DateTimeOffset)value).ToString(format, CultureInfo.InvariantCulture));
             }
             return base.ConvertToString(value, where);

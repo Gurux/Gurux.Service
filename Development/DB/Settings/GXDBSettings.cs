@@ -443,12 +443,12 @@ namespace Gurux.Service.Orm.Settings
         {
             if (value is DateTime)
             {
-                string format = "yyyy-MM-dd HH:mm:ss";
+                string format = "yyyy-MM-dd HH:mm:ss.fff";
                 return GetQuetedValue(((DateTime)value).ToString(format));
             }
             if (value is DateTimeOffset)
             {
-                string format = "yyyy-MM-dd HH:mm:sszzz";
+                string format = "yyyy-MM-dd HH:mm:ss.fff zzz";
                 return GetQuetedValue(((DateTimeOffset)value).ToString(format));
             }
             if (value is float)

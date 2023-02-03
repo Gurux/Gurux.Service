@@ -32,6 +32,7 @@
 
 using Gurux.Common.Db;
 using System;
+using System.Globalization;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -231,7 +232,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "DATETIME";
+                return "datetime(3)";
             }
         }
 
@@ -249,7 +250,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "DATETIME";
+                return "datetime(3)";
             }
         }
 
@@ -370,5 +371,18 @@ namespace Gurux.Service.Orm.Settings
                 return "BLOB";
             }
         }
+
+        /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
+        public override string ConvertToString(object value, bool where)
+        {
+            //MYSQL doesn't support time zone so all values are saving using current time zone.
+            if (value is DateTimeOffset)
+            {
+                string format = "yyyy-MM-dd HH:mm:ss.fff";
+                return GetQuetedValue(((DateTimeOffset)value).ToString(format, CultureInfo.InvariantCulture));
+            }
+            return base.ConvertToString(value, where);
+        }
+
     }
 }

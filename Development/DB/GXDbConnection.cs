@@ -202,7 +202,12 @@ namespace Gurux.Service.Orm
             {
                 Connections[_connections] = connection;
                 ++_connections;
-                connection.Close();
+                if (!(DatabaseType == DatabaseType.SqLite &&
+                    connection.ConnectionString == "Data Source=:memory:"))
+                {
+                    //SQLite will destroy all tables when the connection is closed.
+                    connection.Close();
+                }
             }
             ConnectionReleased.Release();
         }
