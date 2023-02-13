@@ -622,9 +622,23 @@ namespace Gurux.Service.Orm
                         sb.Append("ALTER TABLE ");
                         sb.Append(GXDbHelpers.AddQuotes(tableName, Builder.Settings.TableQuotation));
                         sb.Append(" ADD ");
-                        sb.Append(it.Key);
+                        sb.Append(GXDbHelpers.AddQuotes(it.Key, Builder.Settings.ColumnQuotation));
                         sb.Append(" ");
                         sb.Append(GetDataBaseType(it.Value.Type, it.Value.Target));
+                        sb.Append(" ");
+                        //If nullable.
+                        if ((it.Value.Attributes & (Attributes.AllowNull)) != 0)
+                        {
+                            sb.Append(" NULL");
+                        }
+                        else
+                        {
+                            sb.Append(" NOT NULL");
+                        }
+                        if (it.Value.DefaultValue != null)
+                        {
+                            GetDefaultValue(sb, it.Value.DefaultValue);
+                        }
                         ExecuteNonQuery(transaction, sb.ToString());
                     }
                 }
@@ -1025,31 +1039,7 @@ namespace Gurux.Service.Orm
                             else if (it.Value.DefaultValue != null)
                             {
                                 //Set default values.
-                                sb.Append(" DEFAULT ");
-                                if (it.Value.DefaultValue is Enum)
-                                {
-                                    if (this.Builder.Settings.UseEnumStringValue)
-                                    {
-                                        sb.Append("'" + Convert.ToString(it.Value.DefaultValue) + "'");
-                                    }
-                                    else
-                                    {
-                                        Type type2 = Enum.GetUnderlyingType(it.Value.DefaultValue.GetType());
-                                        sb.Append(Convert.ToString(Convert.ChangeType(it.Value.DefaultValue, type2)));
-                                    }
-                                }
-                                else if (it.Value.DefaultValue is string s)
-                                {
-                                    sb.Append("'" + s + "'");
-                                }
-                                else if (it.Value.DefaultValue is bool b)
-                                {
-                                    sb.Append(b ? 1 : 0);
-                                }
-                                else
-                                {
-                                    sb.Append(Convert.ToString(it.Value.DefaultValue));
-                                }
+                                GetDefaultValue(sb, it.Value.DefaultValue);
                             }
                             if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type &&
                                     it.Value.Relation.RelationType == RelationType.OneToOne)
@@ -1189,6 +1179,36 @@ namespace Gurux.Service.Orm
             }
             return tableItem;
         }
+
+        private void GetDefaultValue(StringBuilder sb, object value)
+        {
+            sb.Append(" DEFAULT ");
+            if (value is Enum)
+            {
+                if (Builder.Settings.UseEnumStringValue)
+                {
+                    sb.Append("'" + Convert.ToString(value) + "'");
+                }
+                else
+                {
+                    Type type2 = Enum.GetUnderlyingType(value.GetType());
+                    sb.Append(Convert.ToString(Convert.ChangeType(value, type2)));
+                }
+            }
+            else if (value is string s)
+            {
+                sb.Append("'" + s + "'");
+            }
+            else if (value is bool b)
+            {
+                sb.Append(b ? 1 : 0);
+            }
+            else
+            {
+                sb.Append(Convert.ToString(value));
+            }
+        }
+
 
         /// <summary>
         /// Create indexes.
