@@ -68,12 +68,17 @@ namespace Gurux.Service.Orm
 
         internal string query;
 
-        /// <inheritdoc/>
+        /// <inheritdoc />
         public override string ToString()
         {
             return ToString(true);
         }
 
+        /// <summary>
+        /// Convert selection clause to string.
+        /// </summary>
+        /// <param name="addExecutionTime">Is execution time added to the string.</param>
+        /// <returns>Selection clause as a string.</returns>
         public string ToString(bool addExecutionTime)
         {
             StringBuilder sb = new StringBuilder();
@@ -478,6 +483,6 @@ namespace Gurux.Service.Orm
             {
                 Parent.Count = value;
             }
-        }       
+        }
     }
 }

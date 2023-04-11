@@ -635,7 +635,7 @@ namespace Gurux.Service.Orm
                         {
                             sb.Append(" NOT NULL");
                         }
-                        if (it.Value.DefaultValue != null)
+                        if ((it.Value.Attributes & (Attributes.DefaultValue)) != 0 && it.Value.DefaultValue != null)
                         {
                             GetDefaultValue(sb, it.Value.DefaultValue);
                         }

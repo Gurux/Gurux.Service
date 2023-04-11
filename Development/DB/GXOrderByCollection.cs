@@ -195,7 +195,7 @@ namespace Gurux.Service.Orm
         /// Add new order by expression.
         /// </summary>
         /// <typeparam name="T"></typeparam>
-        /// <param name="expression"></param>
+        /// <param name="expression">LINQ expression.</param>
         public void Add<T>(Expression<Func<T, object>> expression)
         {
             if (expression == null)
@@ -204,6 +204,36 @@ namespace Gurux.Service.Orm
             }
             List.Add(expression);
             Updated = true;
+        }
+
+        /// <summary>
+        /// Add new order by expression.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="name">Column name.</param>
+        public void Add<T>(string name)
+        {
+            if (name == null)
+            {
+                throw new ArgumentException(nameof(name));
+            }
+            bool found = false;
+            foreach (var it in GXSqlBuilder.GetProperties<T>())
+            {
+                if (((PropertyInfo)it.Value.Target).Name == name)
+                {
+                    found = true;
+                    name = it.Key;
+                    Expression<Func<T, object>> expression = q => name;
+                    List.Add(expression);
+                    Updated = true;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                throw new ArgumentException(string.Format("Order by failed. Unknown property {0}", name ));
+            }
         }
     }
 }

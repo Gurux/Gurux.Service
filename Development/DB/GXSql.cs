@@ -114,7 +114,6 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select 1 FROM table.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         public static bool One
         {
