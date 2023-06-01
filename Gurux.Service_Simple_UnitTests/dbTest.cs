@@ -35,6 +35,7 @@ using Gurux.Service.Orm;
 using System.Runtime.Serialization;
 using System.Globalization;
 using Gurux.Common.Db;
+using System.Collections.Generic;
 
 namespace Gurux.Service_Test
 {
@@ -335,7 +336,7 @@ namespace Gurux.Service_Test
             t.Id = Guid.NewGuid();
             GuidTestClass t2 = new GuidTestClass();
             t2.Id = t.Id;
-            GXDeleteArgs arg = GXDeleteArgs.DeleteRange(new GuidTestClass[] {t, t2 });
+            GXDeleteArgs arg = GXDeleteArgs.DeleteRange(new GuidTestClass[] { t, t2 });
             Assert.AreEqual("DELETE FROM GuidTestClass WHERE `Id` IN('" + t.Id.ToString().ToUpper() + "', '" + t.Id.ToString().ToUpper() + "')", arg.ToString());
         }
 
@@ -869,6 +870,37 @@ namespace Gurux.Service_Test
             GXInsertArgs args = GXInsertArgs.Insert(c);
             Assert.AreEqual("INSERT INTO Country (`CountryName`) VALUES('Finland')", args.ToString());
         }
+
+        /// <summary>
+        /// Insert range test.
+        /// </summary>
+        [TestMethod]
+        public void InsertRangeTest()
+        {
+            List<Parameter2> list = new List<Parameter2>()
+                {
+                new Parameter2()
+                {
+                    Name = "Name1",
+                    Value = "Value1"
+                },
+                new Parameter2()
+                {
+                    Name = "Name2",
+                    Value = "Value2"
+                },
+                new Parameter2()
+                {
+                    Name = "Name3",
+                    Value = "Value3"
+                }
+                    };
+            GXInsertArgs args = GXInsertArgs.InsertRange(list);
+            Assert.AreEqual("INSERT INTO Parameter2 (`Name`, `Value`, `DeviceID`) VALUES('Name1', 'Value1', 0), ('Name2', 'Value2', 0), ('Name3', 'Value3', 0)", args.ToString());
+            args = GXInsertArgs.InsertRange(list, c => new { c.Name, c.Value });
+            Assert.AreEqual("INSERT INTO Parameter2 (`Name`, `Value`) VALUES('Name1', 'Value1'), ('Name2', 'Value2'), ('Name3', 'Value3')", args.ToString());
+        }
+
 
         /// <summary>
         /// Insert test.
@@ -1590,7 +1622,7 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id);
             Company comp = new Company() { Name = "Gurux" };
-            GXInsertArgs args = GXInsertArgs.Insert<Company>(comp, q => new { q.Name });
+            GXInsertArgs args = GXInsertArgs.Insert<Company>(comp, q => new { q.Name, q.Country });
             args.Add<Company>(arg2, q => q.Country);
             Assert.AreEqual("INSERT INTO Company (`Name`, `CountryID`) SELECT 'Gurux', `ID` FROM Country", args.ToString());
         }
@@ -1616,10 +1648,9 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg2 = GXSelectArgs.Select<Country>(q => q.Id);
             Company2 comp = new Company2() { Name = "Gurux", ExtraField = "Extra" };
-            GXInsertArgs args = GXInsertArgs.Insert(comp, q => q.Name);
+            GXInsertArgs args = GXInsertArgs.Insert(comp, q => new { q.Name, q.ExtraField });
             args.Add<Company2>(arg2, q => q.Country);
-            args.Add<Company2>(comp, q => q.ExtraField);
-            Assert.AreEqual("INSERT INTO Company2 (`Name`, `CountryID`, `ExtraField`) SELECT 'Gurux', `ID` FROM Country, 'Extra'", args.ToString());
+            Assert.AreEqual("INSERT INTO Company2 (`Name`, `ExtraField`, `CountryID`) SELECT 'Gurux', 'Extra', `ID` FROM Country", args.ToString());
         }
 
         /// <summary>
@@ -1629,8 +1660,7 @@ namespace Gurux.Service_Test
         public void InsertSelectedValue4Test()
         {
             Company2 comp = new Company2() { Name = "Gurux", ExtraField = "Extra" };
-            GXInsertArgs args = GXInsertArgs.Insert(comp, q => q.Name);
-            args.Add(comp, q => q.ExtraField);
+            GXInsertArgs args = GXInsertArgs.Insert(comp, q => new { q.Name, q.ExtraField });
             Assert.AreEqual("INSERT INTO Company2 (`Name`, `ExtraField`) VALUES('Gurux', 'Extra')", args.ToString());
         }
 
@@ -1689,6 +1719,48 @@ namespace Gurux.Service_Test
             Assert.AreEqual("INSERT INTO UserToUserGroup (`UserId`, `GroupId`) VALUES(2, 1)", i.ToString());
             i = GXInsertArgs.Insert(ug, q => q.Users);
             Assert.AreEqual("INSERT INTO UserToUserGroup (`UserId`, `GroupId`) VALUES(2, 1)", i.ToString());
+        }
+
+        /// <summary>
+        /// Data quota where test.
+        /// </summary>
+        [TestMethod]
+        public void DataQuotaWhereTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q), q => q.Text == "Gurux'");
+            Assert.AreEqual("SELECT COUNT(1) FROM TestClass WHERE TestClass.`Text` = 'Gurux\''", arg.ToString());
+        }
+
+        /// <summary>
+        /// Data quota insert test.
+        /// </summary>
+        [TestMethod]
+        public void DataQuotaInsertTest()
+        {
+            User2 user = new User2() { Name = "Gurux'" };
+            GXInsertArgs i = GXInsertArgs.Insert(user);
+            Assert.AreEqual("INSERT INTO User2 (`Name`) VALUES('Gurux\'')", i.ToString());
+        }
+
+        /// <summary>
+        /// Data quota update test.
+        /// </summary>
+        [TestMethod]
+        public void DataQuotaUpdateTest()
+        {
+            User2 user = new User2() { Id = 2, Name = "Gurux'" };
+            GXUpdateArgs args = GXUpdateArgs.Update(user, x => x.Name);
+            Assert.AreEqual("UPDATE User2 SET `Name` = 'Gurux\'' WHERE `Id` = 2", args.ToString());
+        }
+
+        /// <summary>
+        /// Data quota delete test.
+        /// </summary>
+        [TestMethod]
+        public void DataQuotaDeleteTest()
+        {
+            GXDeleteArgs args = GXDeleteArgs.Delete<TestClass>(q => q.Text == "Gurux'");
+            Assert.AreEqual("DELETE FROM TestClass WHERE TestClass.`Text` = 'Gurux''", args.ToString());
         }
     }
 }

@@ -175,7 +175,9 @@ namespace Gurux.Service.Orm
                             sb.Append('.');
                         }
                     }
-                    sb.Append(GXDbHelpers.AddQuotes(it.Column, parent.Settings.ColumnQuotation));
+                    sb.Append(GXDbHelpers.AddQuotes(it.Column,
+                        null,
+                        parent.Settings.ColumnQuotation));
                 }              
             }
         }

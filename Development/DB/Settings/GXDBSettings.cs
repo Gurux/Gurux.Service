@@ -276,6 +276,13 @@ namespace Gurux.Service.Orm.Settings
         /// <returns>Column data type query.</returns>
         public abstract string GetColumnTypeQuery(string schema, string tableName, string columnName);
 
+        /// <summary>
+        /// Used data quotation replacement.
+        /// </summary>
+        public abstract string DataQuotaReplacement
+        {
+            get;
+        }
 
         /// <summary>
         /// Used column quotation mark.

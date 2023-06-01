@@ -613,16 +613,21 @@ namespace Gurux.Service.Orm
                         if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type)
                         {
                             if (it.Value.Relation.RelationType == RelationType.OneToOne ||
-                                it.Value.Relation.RelationType == RelationType.OneToMany)
+                                it.Value.Relation.RelationType == RelationType.OneToMany ||
+                                it.Value.Relation.RelationType == RelationType.ManyToMany)
                             {
                                 continue;
                             }
                         }
                         StringBuilder sb = new StringBuilder();
                         sb.Append("ALTER TABLE ");
-                        sb.Append(GXDbHelpers.AddQuotes(tableName, Builder.Settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(tableName,
+                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.TableQuotation));
                         sb.Append(" ADD ");
-                        sb.Append(GXDbHelpers.AddQuotes(it.Key, Builder.Settings.ColumnQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(it.Key, 
+                            Builder.Settings.DataQuotaReplacement,                             
+                            Builder.Settings.ColumnQuotation));
                         sb.Append(" ");
                         sb.Append(GetDataBaseType(it.Value.Type, it.Value.Target));
                         sb.Append(" ");
@@ -793,14 +798,18 @@ namespace Gurux.Service.Orm
                     if (!create)//Drop table.
                     {
                         sb.Append("DROP TABLE ");
-                        sb.Append(GXDbHelpers.AddQuotes(tableName, Builder.Settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(tableName,
+                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.TableQuotation));
                         tableItem.Queries.Add(sb.ToString());
                         sb.Length = 0;
                     }
                     else//Create table.
                     {
                         sb.Append("CREATE TABLE ");
-                        sb.Append(GXDbHelpers.AddQuotes(tableName, Builder.Settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(tableName,
+                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.TableQuotation));
                         sb.Append('(');
                         //Get relation tables and remove them.
                         if (GXDbHelpers.IsSharedTable(type))
@@ -925,7 +934,9 @@ namespace Gurux.Service.Orm
                             {
                                 name = it.Key;
                             }
-                            sb.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(name,
+                                Builder.Settings.DataQuotaReplacement, 
+                                Builder.Settings.ColumnQuotation));
                             sb.Append(" ");
                             if (!((it.Value.Attributes & (Attributes.AutoIncrement)) != 0 &&
                                 (
@@ -1081,9 +1092,13 @@ namespace Gurux.Service.Orm
 
                                 //Name is generated automatically at the moment. Use CONSTRAINT to give name to the Foreign key.
                                 fkStr.Append(" FOREIGN KEY (");
-                                fkStr.Append(GXDbHelpers.AddQuotes(name, Builder.Settings.ColumnQuotation));
+                                fkStr.Append(GXDbHelpers.AddQuotes(name,
+                                    Builder.Settings.DataQuotaReplacement, 
+                                    Builder.Settings.ColumnQuotation));
                                 fkStr.Append(") REFERENCES ");
-                                fkStr.Append(GXDbHelpers.AddQuotes(table2, Builder.Settings.TableQuotation));
+                                fkStr.Append(GXDbHelpers.AddQuotes(table2,
+                                    Builder.Settings.DataQuotaReplacement, 
+                                    Builder.Settings.TableQuotation));
                                 fkStr.Append("(");
                                 fkStr.Append(pk);
                                 fkStr.Append(")");
@@ -1259,7 +1274,9 @@ namespace Gurux.Service.Orm
                         sb.Append(" ON ");
                         sb.Append(Builder.GetTableName(type, true));
                         sb.Append("(");
-                        sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(name,
+                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.ColumnQuotation));
                         if (index.Descend)
                         {
                             sb.Append(" DESC");
@@ -1272,13 +1289,17 @@ namespace Gurux.Service.Orm
                         else if (index.IncludeOnlyNull)
                         {
                             sb.Append(" WHERE( ");
-                            sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(name,
+                                Builder.Settings.DataQuotaReplacement, 
+                                Builder.Settings.ColumnQuotation));
                             sb.Append(" IS NULL)");
                         }
                         else if (index.ExcludeNull)
                         {
                             sb.Append(" WHERE( ");
-                            sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(name,
+                                Builder.Settings.DataQuotaReplacement, 
+                                Builder.Settings.ColumnQuotation));
                             sb.Append(" IS NOT NULL)");
                         }
                         tableItem.Queries.Add(sb.ToString());
@@ -1317,7 +1338,9 @@ namespace Gurux.Service.Orm
                         name += it2;
                     }
                 }
-                sb.Append(GXDbHelpers.AddQuotes(name, this.Builder.Settings.ColumnQuotation));
+                sb.Append(GXDbHelpers.AddQuotes(name,
+                    Builder.Settings.DataQuotaReplacement, 
+                    Builder.Settings.ColumnQuotation));
                 sb.Append(" ON ");
                 sb.Append(Builder.GetTableName(type, true));
                 sb.Append(" (");

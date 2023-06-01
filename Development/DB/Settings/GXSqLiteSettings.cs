@@ -48,87 +48,87 @@ namespace Gurux.Service.Orm.Settings
 
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnConstraints"/>
+        /// <inheritdoc />
         public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnConstraintsQuery"/>
+        /// <inheritdoc />
         public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.IsNullable"/>
+        /// <inheritdoc />
         public override bool IsNullable(object value)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnNullableQuery"/>
+        /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnIndexQuery"/>
+        /// <inheritdoc />
         public override string GetColumnIndexQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.IsPrimaryKey"/>
+        /// <inheritdoc />
         public override bool IsPrimaryKey(object value)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetPrimaryKeyQuery"/>
+        /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetReferenceTablesQuery"/>
+        /// <inheritdoc />
         public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
 
-        /// <inheritdoc cref="GXDBSettings.IsAutoIncrement"/>
+        /// <inheritdoc />
         public override bool IsAutoIncrement(object value)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetAutoIncrementQuery"/>
+        /// <inheritdoc />
         public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnTypeQuery"/>
+        /// <inheritdoc />
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnTypeQuery"/>
+        /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
             throw new System.NotImplementedException();
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnsQuery"/>
+        /// <inheritdoc />
         public override string GetColumnsQuery(string schema, string name, out int index)
         {
             index = 1;
             return string.Format("PRAGMA table_info('{0}')", name);
         }
 
-        /// <inheritdoc cref="GXDBSettings.ColumnQuotation"/>
+        /// <inheritdoc />
         override public char ColumnQuotation
         {
             get
@@ -137,7 +137,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.UseQuotationWithSelectColumns"/>
+        /// <inheritdoc />
         public override bool UseQuotationWithSelectColumns
         {
             get
@@ -146,7 +146,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.MaximumRowUpdate"/>
+        /// <inheritdoc />
         override public int MaximumRowUpdate
         {
             get
@@ -155,7 +155,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.TableNameMaximumLength"/>
+        /// <inheritdoc />
         override public int TableNameMaximumLength
         {
             get
@@ -164,7 +164,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ColumnNameMaximumLength"/>
+        /// <inheritdoc />
         override public int ColumnNameMaximumLength
         {
             get
@@ -173,7 +173,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.AutoIncrementFirst"/>
+        /// <inheritdoc />
         override public bool AutoIncrementFirst
         {
             get
@@ -182,7 +182,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.AutoIncrementDefinition"/>
+        /// <inheritdoc />
         override public string AutoIncrementDefinition
         {
             get
@@ -191,7 +191,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.StringColumnDefinition"/>
+        /// <inheritdoc />
         override public string StringColumnDefinition(int maxLength)
         {
             if (maxLength == 0)
@@ -202,7 +202,7 @@ namespace Gurux.Service.Orm.Settings
             return "VARCHAR(" + maxLength.ToString() + ")";
         }
 
-        /// <inheritdoc cref="GXDBSettings.CharColumnDefinition"/>
+        /// <inheritdoc />
         override public string CharColumnDefinition
         {
             get
@@ -211,7 +211,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.BoolColumnDefinition"/>
+        /// <inheritdoc />
         override public string BoolColumnDefinition
         {
             get
@@ -220,7 +220,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.GuidColumnDefinition"/>
+        /// <inheritdoc />
         override public string GuidColumnDefinition
         {
             get
@@ -229,7 +229,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DateTimeColumnDefinition"/>
+        /// <inheritdoc />
         override public string DateTimeColumnDefinition
         {
             get
@@ -238,7 +238,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.TimeSpanColumnDefinition"/>
+        /// <inheritdoc />
         override public string TimeSpanColumnDefinition
         {
             get
@@ -247,7 +247,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DateTimeOffsetColumnDefinition"/>
+        /// <inheritdoc />
         override public string DateTimeOffsetColumnDefinition
         {
             get
@@ -256,7 +256,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ByteColumnDefinition"/>
+        /// <inheritdoc />
         override public string ByteColumnDefinition
         {
             get
@@ -265,7 +265,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.SByteColumnDefinition"/>
+        /// <inheritdoc />
         override public string SByteColumnDefinition
         {
             get
@@ -274,7 +274,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ShortColumnDefinition"/>
+        /// <inheritdoc />
         override public string ShortColumnDefinition
         {
             get
@@ -283,7 +283,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.UShortColumnDefinition"/>
+        /// <inheritdoc />
         override public string UShortColumnDefinition
         {
             get
@@ -292,7 +292,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.IntColumnDefinition"/>
+        /// <inheritdoc />
         override public string IntColumnDefinition
         {
             get
@@ -301,7 +301,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.UIntColumnDefinition"/>
+        /// <inheritdoc />
         override public string UIntColumnDefinition
         {
             get
@@ -310,7 +310,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.LongColumnDefinition"/>
+        /// <inheritdoc />
         override public string LongColumnDefinition
         {
             get
@@ -319,7 +319,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ULongColumnDefinition"/>
+        /// <inheritdoc />
         override public string ULongColumnDefinition
         {
             get
@@ -328,7 +328,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.FloatColumnDefinition"/>
+        /// <inheritdoc />
         override public string FloatColumnDefinition
         {
             get
@@ -346,7 +346,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DesimalColumnDefinition"/>
+        /// <inheritdoc />
         override public string DesimalColumnDefinition
         {
             get
@@ -355,7 +355,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ByteArrayColumnDefinition"/>
+        /// <inheritdoc />
         override public string ByteArrayColumnDefinition
         {
             get
@@ -364,12 +364,21 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ObjectColumnDefinition"/>
+        /// <inheritdoc />
         override public string ObjectColumnDefinition
         {
             get
             {
                 return "BLOB";
+            }
+        }
+
+        /// <inheritdoc />
+        public override string DataQuotaReplacement
+        {
+            get
+            {
+                return null;
             }
         }
     }

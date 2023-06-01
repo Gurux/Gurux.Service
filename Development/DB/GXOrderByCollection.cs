@@ -164,7 +164,9 @@ namespace Gurux.Service.Orm
                     if (parent.Settings.Type == DatabaseType.MSSQL && parent.Count != 0)
                     {
                         string table = GXDbHelpers.GetTableName(it.Table, true, '\0', parent.Settings.TablePrefix);
-                        sb.Append(GXDbHelpers.AddQuotes(table + '.' + it.Column, parent.Settings.ColumnQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(table + '.' + it.Column,
+                            parent.Settings.DataQuotaReplacement,
+                            parent.Settings.ColumnQuotation));
                         continue;
                     }
                     //Add table name always until there is a way to check are multiple tables used. if (joinList.Count != 0)
@@ -173,7 +175,9 @@ namespace Gurux.Service.Orm
                         sb.Append(table);
                         sb.Append('.');
                     }
-                    sb.Append(GXDbHelpers.AddQuotes(it.Column, parent.Settings.ColumnQuotation));
+                    sb.Append(GXDbHelpers.AddQuotes(it.Column,
+                        null,
+                        parent.Settings.ColumnQuotation));
                 }
                 if (parent.Descending)
                 {
@@ -232,7 +236,7 @@ namespace Gurux.Service.Orm
             }
             if (!found)
             {
-                throw new ArgumentException(string.Format("Order by failed. Unknown property {0}", name ));
+                throw new ArgumentException(string.Format("Order by failed. Unknown property {0}", name));
             }
         }
     }

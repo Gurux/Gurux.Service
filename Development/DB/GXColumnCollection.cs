@@ -429,7 +429,9 @@ namespace Gurux.Service.Orm
                             foreach (string col in removed)
                             {
                                 bool includeQuery = false;
-                                string col2 = GXDbHelpers.AddQuotes(col, Parent.Settings.ColumnQuotation);
+                                string col2 = GXDbHelpers.AddQuotes(col, 
+                                    Parent.Settings.DataQuotaReplacement, 
+                                    Parent.Settings.ColumnQuotation);
                                 //Joins are not removed from the qyery or 1:1 doesn't work.
                                 foreach (var j in joinList)
                                 {
@@ -624,7 +626,9 @@ namespace Gurux.Service.Orm
                 }
                 if (GXDbHelpers.IsSharedTable(it.Key) || GXDbHelpers.IsAliasName(it.Key))
                 {
-                    table = GXDbHelpers.AddQuotes(GXDbHelpers.OriginalTableName(it.Key), settings.TableQuotation);
+                    table = GXDbHelpers.AddQuotes(GXDbHelpers.OriginalTableName(it.Key),
+                        Parent.Settings.DataQuotaReplacement,
+                        settings.TableQuotation);
                 }
                 else
                 {
@@ -664,19 +668,25 @@ namespace Gurux.Service.Orm
                         }
                         else
                         {
-                            name = GXDbHelpers.AddQuotes(col, settings.ColumnQuotation);
+                            name = GXDbHelpers.AddQuotes(col,
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.ColumnQuotation);
                             sb.Append(name);
                         }
                         if (tableAs != null)
                         {
                             sb.Append(" AS ");
-                            name = GXDbHelpers.AddQuotes(tableAs + "." + col, settings.ColumnQuotation);
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col,
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.ColumnQuotation);
                             sb.Append(name);
                         }
                         else if (settings.SelectUsingAs && index == 0)
                         {
                             sb.Append(" AS ");
-                            name = GXDbHelpers.AddQuotes(tableAs + "." + col, settings.ColumnQuotation);
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col,
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.ColumnQuotation);
                             sb.Append(name);
                         }
                     }
@@ -706,7 +716,9 @@ namespace Gurux.Service.Orm
                                 {
                                     pos = 14;
                                 }
-                                name = table + "." + GXDbHelpers.AddQuotes(col.Substring(pos + 1, col.Length - pos - 2), settings.ColumnQuotation);
+                                name = table + "." + GXDbHelpers.AddQuotes(col.Substring(pos + 1, col.Length - pos - 2),
+                                    Parent.Settings.DataQuotaReplacement,
+                                    settings.ColumnQuotation);
                                 name = col.Substring(0, pos + 1) + name + ")";
                                 sb.Append(name);
 
@@ -718,7 +730,9 @@ namespace Gurux.Service.Orm
                             if (i == -1)
                             {
                                 sb.Append(" AS ");
-                                name = GXDbHelpers.AddQuotes(tableAs + "." + col.Substring(0, pos), settings.ColumnQuotation);
+                                name = GXDbHelpers.AddQuotes(tableAs + "." + col.Substring(0, pos),
+                                    Parent.Settings.DataQuotaReplacement, 
+                                    settings.ColumnQuotation);
                                 sb.Append(name);
                             }
                             else
@@ -727,7 +741,9 @@ namespace Gurux.Service.Orm
                                 sb.Append(col.Substring(0, i));
                                 name = col.Substring(i + 4);
                                 sb.Append(" AS ");
-                                name = GXDbHelpers.AddQuotes(tableAs + "." + name, settings.ColumnQuotation);
+                                name = GXDbHelpers.AddQuotes(tableAs + "." + name,
+                                    Parent.Settings.DataQuotaReplacement, 
+                                    settings.ColumnQuotation);
                                 sb.Append(name);
                             }
                         }
@@ -735,7 +751,9 @@ namespace Gurux.Service.Orm
                     if (Maps.ContainsKey(col))
                     {
                         sb.Append(" AS ");
-                        sb.Append(GXDbHelpers.AddQuotes(Maps[col], settings.ColumnQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(Maps[col],
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.ColumnQuotation));
                     }
                 }
             }
@@ -761,7 +779,9 @@ namespace Gurux.Service.Orm
                     if (asTable.ContainsKey(it.Key))
                     {
                         sb.Append(" ");
-                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Key], settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Key],
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                     }
                 }
             }
@@ -782,11 +802,15 @@ namespace Gurux.Service.Orm
                 {
                     if (first)
                     {
-                        sb.Append(GXDbHelpers.AddQuotes(it.Table1, settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(it.Table1, 
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                         if (asTable.ContainsKey(it.Table1Type))
                         {
                             sb.Append(" ");
-                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type], settings.TableQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type],
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.TableQuotation));
                         }
                         else
                         {
@@ -813,22 +837,30 @@ namespace Gurux.Service.Orm
                         default:
                             throw new ArgumentOutOfRangeException("Invalid join type.");
                     }
-                    sb.Append(GXDbHelpers.AddQuotes(it.Table2, settings.TableQuotation));
+                    sb.Append(GXDbHelpers.AddQuotes(it.Table2,
+                        Parent.Settings.DataQuotaReplacement, 
+                        settings.TableQuotation));
                     //Add alias if used and it is not same as table name.
                     if (asTable.ContainsKey(it.Table2Type))
                     {
                         sb.Append(" ");
-                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type], settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type], 
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                     }
                     sb.Append(" ON ");
                     if (asTable.ContainsKey(it.Table1Type))
                     {
                         sb.Append(" ");
-                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type], settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type],
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                     }
                     else
                     {
-                        sb.Append(GXDbHelpers.AddQuotes(it.Table1, settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(it.Table1,
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                     }
                     sb.Append('.');
                     sb.Append(it.Column1);
@@ -837,11 +869,15 @@ namespace Gurux.Service.Orm
                     if (asTable.ContainsKey(it.Table2Type))
                     {
                         //sb.Append(it.Table2);
-                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type], settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type],
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                     }
                     else
                     {
-                        sb.Append(GXDbHelpers.AddQuotes(it.Table2, settings.TableQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(it.Table2,
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation));
                         if (it.Alias2 == null && it.Index != 0)
                         {
                             sb.Append(it.Index);
@@ -855,11 +891,15 @@ namespace Gurux.Service.Orm
                         //Add alias if used.
                         if (asTable.ContainsKey(it.Table1Type))
                         {
-                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type], settings.TableQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type],
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.TableQuotation));
                         }
                         else
                         {
-                            sb.Append(GXDbHelpers.AddQuotes(it.Table1, settings.TableQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(it.Table1,
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.TableQuotation));
                         }
                         sb.Append('.');
                         sb.Append(it.Column1);
@@ -872,11 +912,15 @@ namespace Gurux.Service.Orm
                         //Add alias if used.
                         if (asTable.ContainsKey(it.Table2Type))
                         {
-                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type], settings.TableQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type],
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.TableQuotation));
                         }
                         else
                         {
-                            sb.Append(GXDbHelpers.AddQuotes(it.Table2, settings.TableQuotation));
+                            sb.Append(GXDbHelpers.AddQuotes(it.Table2,
+                                Parent.Settings.DataQuotaReplacement, 
+                                settings.TableQuotation));
                         }
                         sb.Append('.');
                         sb.Append(it.Column2);
@@ -913,7 +957,9 @@ namespace Gurux.Service.Orm
                     //Add alias if used.
                     if (asTable.ContainsKey((si.Target as PropertyInfo).ReflectedType))
                     {
-                        id = GXDbHelpers.AddQuotes(asTable[(si.Target as PropertyInfo).ReflectedType] + "." + GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0'), settings.TableQuotation);
+                        id = GXDbHelpers.AddQuotes(asTable[(si.Target as PropertyInfo).ReflectedType] + "." + GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0'),
+                            Parent.Settings.DataQuotaReplacement, 
+                            settings.TableQuotation);
                     }
                     else
                     {

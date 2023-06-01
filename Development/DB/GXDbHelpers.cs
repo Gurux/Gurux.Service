@@ -52,10 +52,16 @@ namespace Gurux.Service.Orm
         /// Add quotes around the value.
         /// </summary>
         /// <param name="value"></param>
+        /// <param name="dataQuote"></param>
         /// <param name="quoteSeparator"></param>
         /// <returns></returns>
-        internal static string AddQuotes(string value, char quoteSeparator)
+        internal static string AddQuotes(string value, string dataQuote, char quoteSeparator)
         {
+            if (!string.IsNullOrEmpty(dataQuote) &&
+                string.IsNullOrEmpty(value))
+            {
+                value = value.Replace("'", dataQuote);
+            }
             if (quoteSeparator != '\0')
             {
                 if (quoteSeparator == '[')
@@ -129,13 +135,13 @@ namespace Gurux.Service.Orm
                 {
                     return tablePrefix + type.Name;
                 }
-                return GXDbHelpers.AddQuotes(tablePrefix + type.Name, tableQuotation);
+                return GXDbHelpers.AddQuotes(tablePrefix + type.Name, null, tableQuotation);
             }
             if (!addQuotation)
             {
                 return tablePrefix + attr[0].Name;
             }
-            return GXDbHelpers.AddQuotes(tablePrefix + attr[0].Name, tableQuotation);
+            return GXDbHelpers.AddQuotes(tablePrefix + attr[0].Name, null, tableQuotation);
         }
 
         /// <summary>
@@ -156,7 +162,11 @@ namespace Gurux.Service.Orm
             else if (value is string)
             {
                 str = value as string;
-                str = str.Replace("\\", "\\\\").Replace("'", @"\''");
+                str = str.Replace("\\", "\\\\");
+                if (!string.IsNullOrEmpty(settings.DataQuotaReplacement))
+                {
+                    str = str.Replace("'", settings.DataQuotaReplacement);
+                }
                 if (addQueted)
                 {
                     str = GetQuetedValue(str);
@@ -269,9 +279,9 @@ namespace Gurux.Service.Orm
             DataMemberAttribute[] attr = (DataMemberAttribute[])info.GetCustomAttributes(typeof(DataMemberAttribute), true);
             if (attr.Length == 0 || attr[0].Name == null)
             {
-                return GXDbHelpers.AddQuotes(info.Name, quoteSeparator);
+                return GXDbHelpers.AddQuotes(info.Name, null, quoteSeparator);
             }
-            return GXDbHelpers.AddQuotes(attr[0].Name, quoteSeparator);
+            return GXDbHelpers.AddQuotes(attr[0].Name, null, quoteSeparator);
         }
 
         /// <summary>
@@ -337,7 +347,9 @@ namespace Gurux.Service.Orm
                         {
                             sb.Append(", ");
                         }
-                        sb.Append(GXDbHelpers.AddQuotes(table.Value.Columns[index], settings.ColumnQuotation));
+                        sb.Append(GXDbHelpers.AddQuotes(table.Value.Columns[index],
+                            null,
+                            settings.ColumnQuotation));
                         sb.Append(" = ");
                         GXSerializedItem row = it.Value as GXSerializedItem;
                         if (row != null)
@@ -427,7 +439,9 @@ namespace Gurux.Service.Orm
                 {
                     sb.Append(", ");
                 }
-                sb.Append(GXDbHelpers.AddQuotes(col, settings.ColumnQuotation));
+                sb.Append(GXDbHelpers.AddQuotes(col,
+                    null,
+                    settings.ColumnQuotation));
             }
             if (select)
             {
@@ -798,41 +812,7 @@ namespace Gurux.Service.Orm
                         u = it.Value;
                         if (!inserted)
                         {
-                            if (columns != null)
-                            {
-                                row = it.Value.Rows[0];
-                                string post = null;
-                                updatedProperty = GetMembers(null, columns.Body, '\0', false, ref post);
-                                //Check if column is updated earlier and remove old update.
-                                if (!u.Columns.Any(x => updatedProperty.Any(y => y == x)))
-                                {
-                                    u.Columns.AddRange(updatedProperty);
-                                }
-                                else
-                                {
-                                    List<string> updated = new List<string>();
-                                    foreach (string p in updatedProperty)
-                                    {
-                                        int pos = u.Columns.IndexOf(p);
-                                        if (pos != -1)
-                                        {
-                                            KeyValuePair<object, GXSerializedItem> old = row[pos];
-                                            row.RemoveAt(pos);
-                                            row.Insert(pos, new KeyValuePair<object, GXSerializedItem>(value, old.Value));
-                                        }
-                                        else
-                                        {
-                                            u.Columns.Add(p);
-                                            updated.Add(p);
-                                        }
-                                    }
-                                    updatedProperty = updated.ToArray();
-                                }
-                            }
-                            else
-                            {
-                                u.Rows.Add(row);
-                            }
+                            u.Rows.Add(row);
                         }
                         update = true;
                         break;
@@ -889,6 +869,40 @@ namespace Gurux.Service.Orm
                     Dictionary<Type, List<string>> cols = null;
                     if (value is GXSelectArgs s)
                     {
+                        if (columns != null)
+                        {
+                            //Remove last row.
+                            u.Rows.RemoveAt(u.Rows.Count - 1);
+                            row = u.Rows.Last();
+                            string post = null;
+                            updatedProperty = GetMembers(null, columns.Body, '\0', false, ref post);
+                            //Check if column is updated earlier and remove old update.
+                            if (!u.Columns.Any(s => updatedProperty.Contains(s)))
+                            {
+                                u.Columns.AddRange(updatedProperty);
+                            }
+                            else
+                            {
+                                List<string> updated = new List<string>();
+                                foreach (string p in updatedProperty)
+                                {
+                                    int pos = u.Columns.IndexOf(p);
+                                    if (pos != -1)
+                                    {
+                                        KeyValuePair<object, GXSerializedItem> old = row[pos];
+                                        row.RemoveAt(pos);
+                                        row.Insert(pos, new KeyValuePair<object, GXSerializedItem>(value, old.Value));
+                                        inserted = true;
+                                    }
+                                    else
+                                    {
+                                        u.Columns.Add(p);
+                                        updated.Add(p);
+                                    }
+                                }
+                                updatedProperty = updated.ToArray();
+                            }
+                        }
                         //ToString is called to update the ColumnList.
                         //Do not remove!
                         try
@@ -1189,7 +1203,7 @@ namespace Gurux.Service.Orm
                     {
                         value = GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0];
                     }
-                    if (value == null || value == AddQuotes("*", quoteSeparator))
+                    if (value == null || value == AddQuotes("*", null, quoteSeparator))
                     {
                         return new string[] { "COUNT(1)" };
                     }
@@ -1202,7 +1216,7 @@ namespace Gurux.Service.Orm
                     {
                         value = GetMembers(settings, m.Arguments[0], quoteSeparator, where, ref post)[0];
                     }
-                    if (value == null || value == AddQuotes("*", quoteSeparator))
+                    if (value == null || value == AddQuotes("*", null, quoteSeparator))
                     {
                         return new string[] { "COUNT(DISTINCT 1)" };
                     }
@@ -1831,7 +1845,9 @@ namespace Gurux.Service.Orm
                         {
                             if (settings.UseQuotationWhereColumns)
                             {
-                                sb.Append(GXDbHelpers.AddQuotes(it.Key, settings.ColumnQuotation));
+                                sb.Append(GXDbHelpers.AddQuotes(it.Key,
+                                    null,
+                                    settings.ColumnQuotation));
                             }
                             else
                             {
@@ -1861,11 +1877,13 @@ namespace Gurux.Service.Orm
                 object value = Expression.Lambda(methodCallExpression).Compile().DynamicInvoke();
                 if (where && getValue && value is string)
                 {
-                    return new string[] { AddQuotes((string)value, '\'') };
+                    return new string[] { AddQuotes((string)value,
+                        settings.DataQuotaReplacement, '\'') };
                 }
                 else if (where && getValue && value is Guid)
                 {
-                    return new string[] { AddQuotes(value.ToString(), '\'') };
+                    return new string[] { AddQuotes(value.ToString(),
+                        settings.DataQuotaReplacement, '\'') };
                 }
                 else if (where && getValue && value is DateTime)
                 {
@@ -2000,7 +2018,7 @@ namespace Gurux.Service.Orm
                     if (settings.UseEnumStringValue)
                     {
                         tmp = Enum.Parse(u.Operand.Type, tmp, true).ToString();
-                        tmp = AddQuotes(tmp, '\'');
+                        tmp = AddQuotes(tmp, null, '\'');
                     }
                 }
                 else
@@ -2037,7 +2055,8 @@ namespace Gurux.Service.Orm
                     {
                         return new string[] { str };
                     }
-                    return new string[] { AddQuotes(str, quoteSeparator) };
+                    return new string[] { AddQuotes(str,
+                        settings.DataQuotaReplacement, quoteSeparator) };
                 }
                 if (ce.Value == null)
                 {
