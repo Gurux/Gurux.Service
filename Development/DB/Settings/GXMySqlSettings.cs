@@ -389,7 +389,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "\'";
+                return "''";
             }
         }
     }

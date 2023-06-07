@@ -372,6 +372,7 @@ namespace Gurux.Service.Orm
                     {
                         DefaultValueAttribute def = att as DefaultValueAttribute;
                         s.DefaultValue = def.Value;
+                        value |= (int)Attributes.DefaultValue;
                     }
                     //Is property indexed.
                     if (att is IndexAttribute || att is IndexCollectionAttribute)
