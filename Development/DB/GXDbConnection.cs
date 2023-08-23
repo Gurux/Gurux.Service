@@ -239,7 +239,7 @@ namespace Gurux.Service.Orm
             }
         }
 
-        /// <inheritdoc cref="IDbConnection.BeginTransaction"/>
+        /// <inheritdoc>
         public IDbTransaction BeginTransaction()
         {
             IDbConnection connection = GetConnection();
@@ -248,7 +248,7 @@ namespace Gurux.Service.Orm
             return transaction;
         }
 
-        /// <inheritdoc cref="IDbConnection.BeginTransaction"/>
+        /// <inheritdoc>
         public IDbTransaction BeginTransaction(IsolationLevel isolationLevel)
         {
             IDbConnection connection = GetConnection();
@@ -295,7 +295,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="connection"></param>
+        /// <param name="connections"></param>
         public GXDbConnection(DbConnection[] connections, string tablePrefix)
         {
             if (connections == null || connections.Length == 0)
@@ -622,11 +622,11 @@ namespace Gurux.Service.Orm
                         StringBuilder sb = new StringBuilder();
                         sb.Append("ALTER TABLE ");
                         sb.Append(GXDbHelpers.AddQuotes(tableName,
-                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.DataQuotaReplacement,
                             Builder.Settings.TableQuotation));
                         sb.Append(" ADD ");
-                        sb.Append(GXDbHelpers.AddQuotes(it.Key, 
-                            Builder.Settings.DataQuotaReplacement,                             
+                        sb.Append(GXDbHelpers.AddQuotes(it.Key,
+                            Builder.Settings.DataQuotaReplacement,
                             Builder.Settings.ColumnQuotation));
                         sb.Append(" ");
                         sb.Append(GetDataBaseType(it.Value.Type, it.Value.Target));
@@ -799,7 +799,7 @@ namespace Gurux.Service.Orm
                     {
                         sb.Append("DROP TABLE ");
                         sb.Append(GXDbHelpers.AddQuotes(tableName,
-                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.DataQuotaReplacement,
                             Builder.Settings.TableQuotation));
                         tableItem.Queries.Add(sb.ToString());
                         sb.Length = 0;
@@ -808,7 +808,7 @@ namespace Gurux.Service.Orm
                     {
                         sb.Append("CREATE TABLE ");
                         sb.Append(GXDbHelpers.AddQuotes(tableName,
-                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.DataQuotaReplacement,
                             Builder.Settings.TableQuotation));
                         sb.Append('(');
                         //Get relation tables and remove them.
@@ -935,7 +935,7 @@ namespace Gurux.Service.Orm
                                 name = it.Key;
                             }
                             sb.Append(GXDbHelpers.AddQuotes(name,
-                                Builder.Settings.DataQuotaReplacement, 
+                                Builder.Settings.DataQuotaReplacement,
                                 Builder.Settings.ColumnQuotation));
                             sb.Append(" ");
                             if (!((it.Value.Attributes & (Attributes.AutoIncrement)) != 0 &&
@@ -1093,11 +1093,11 @@ namespace Gurux.Service.Orm
                                 //Name is generated automatically at the moment. Use CONSTRAINT to give name to the Foreign key.
                                 fkStr.Append(" FOREIGN KEY (");
                                 fkStr.Append(GXDbHelpers.AddQuotes(name,
-                                    Builder.Settings.DataQuotaReplacement, 
+                                    Builder.Settings.DataQuotaReplacement,
                                     Builder.Settings.ColumnQuotation));
                                 fkStr.Append(") REFERENCES ");
                                 fkStr.Append(GXDbHelpers.AddQuotes(table2,
-                                    Builder.Settings.DataQuotaReplacement, 
+                                    Builder.Settings.DataQuotaReplacement,
                                     Builder.Settings.TableQuotation));
                                 fkStr.Append("(");
                                 fkStr.Append(pk);
@@ -1275,7 +1275,7 @@ namespace Gurux.Service.Orm
                         sb.Append(Builder.GetTableName(type, true));
                         sb.Append("(");
                         sb.Append(GXDbHelpers.AddQuotes(name,
-                            Builder.Settings.DataQuotaReplacement, 
+                            Builder.Settings.DataQuotaReplacement,
                             Builder.Settings.ColumnQuotation));
                         if (index.Descend)
                         {
@@ -1290,7 +1290,7 @@ namespace Gurux.Service.Orm
                         {
                             sb.Append(" WHERE( ");
                             sb.Append(GXDbHelpers.AddQuotes(name,
-                                Builder.Settings.DataQuotaReplacement, 
+                                Builder.Settings.DataQuotaReplacement,
                                 Builder.Settings.ColumnQuotation));
                             sb.Append(" IS NULL)");
                         }
@@ -1298,7 +1298,7 @@ namespace Gurux.Service.Orm
                         {
                             sb.Append(" WHERE( ");
                             sb.Append(GXDbHelpers.AddQuotes(name,
-                                Builder.Settings.DataQuotaReplacement, 
+                                Builder.Settings.DataQuotaReplacement,
                                 Builder.Settings.ColumnQuotation));
                             sb.Append(" IS NOT NULL)");
                         }
@@ -1339,7 +1339,7 @@ namespace Gurux.Service.Orm
                     }
                 }
                 sb.Append(GXDbHelpers.AddQuotes(name,
-                    Builder.Settings.DataQuotaReplacement, 
+                    Builder.Settings.DataQuotaReplacement,
                     Builder.Settings.ColumnQuotation));
                 sb.Append(" ON ");
                 sb.Append(Builder.GetTableName(type, true));
@@ -2298,7 +2298,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
-        /// <param name="items">List of items to remove.</param>
+        /// <param name="arg">Delete arguments.</param>
+        /// <param name="cancellationToken">Cancellation token</param>
         public async Task DeleteAsync(GXDeleteArgs arg, CancellationToken cancellationToken)
         {
             await Task.Run(() =>
@@ -2310,25 +2311,58 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
-        /// <param name="items">List of items to remove.</param>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="arg">Delete arguments.</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        public async Task DeleteAsync(IDbTransaction transaction, GXDeleteArgs arg, CancellationToken cancellationToken = default)
+        {
+            await Task.Run(() =>
+            {
+                Delete(transaction, arg);
+            });
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="arg">Delete arguments.</param>
         public void Delete(GXDeleteArgs arg)
         {
-            IDbConnection connection = GetConnection();
-            IDbTransaction transaction = (IDbTransaction)Transactions[connection];
-            bool autoTransaction = transaction == null;
-            try
+            Delete(null, arg);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="arg">Delete arguments.</param>
+        public void Delete(IDbTransaction transaction, GXDeleteArgs arg)
+        {
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
+            if (tranactionOnProgress)
             {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
                 if (AutoTransaction)
                 {
                     transaction = connection.BeginTransaction();
                 }
+            }
+            try
+            {
                 arg.Settings = Builder.Settings;
                 ExecuteNonQuery(connection, transaction, arg.ToString());
-                transaction.Commit();
+                if (!tranactionOnProgress && AutoTransaction)
+                {
+                    transaction.Commit();
+                }
             }
             catch (Exception)
             {
-                if (autoTransaction && transaction != null)
+                if (!tranactionOnProgress && AutoTransaction)
                 {
                     transaction.Rollback();
                 }
@@ -2336,11 +2370,10 @@ namespace Gurux.Service.Orm
             }
             finally
             {
-                if (autoTransaction && transaction != null)
+                if (!tranactionOnProgress)
                 {
-                    transaction.Dispose();
+                    ReleaseConnection(connection);
                 }
-                ReleaseConnection(connection);
             }
         }
 
