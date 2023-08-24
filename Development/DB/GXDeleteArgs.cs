@@ -89,6 +89,11 @@ namespace Gurux.Service.Orm
                     sb.Append(" ");
                     sb.Append(str);
                 }
+                if (Count != 0)
+                {
+                    sb.Append("LIMIT ");
+                    sb.Append(Count);
+                }
                 Updated = false;
                 return sb.ToString();
             }
@@ -260,6 +265,24 @@ namespace Gurux.Service.Orm
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem item, TDestination collection)
         {
             return Remove<TItem, TDestination>(new TItem[] { item }, new TDestination[] { collection });
+        }
+
+        /// <summary>
+        /// How many items are deleted.
+        /// </summary>
+        /// <remarks>
+        /// If value is zero there are no limitations.
+        /// </remarks>
+        public UInt32 Count
+        {
+            get
+            {
+                return Parent.Count;
+            }
+            set
+            {
+                Parent.Count = value;
+            }
         }
     }
 }

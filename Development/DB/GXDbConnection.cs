@@ -73,7 +73,6 @@ namespace Gurux.Service.Orm
         /// </remarks>
         public static DatabaseType DefaultDatabaseType = DatabaseType.MySQL;
         private SqlExecutedEventHandler sql;
-        private Hashtable Transactions = new Hashtable();
 
         /// <summary>
         /// Used database.
@@ -244,7 +243,6 @@ namespace Gurux.Service.Orm
         {
             IDbConnection connection = GetConnection();
             IDbTransaction transaction = connection.BeginTransaction();
-            Transactions[connection] = transaction;
             return transaction;
         }
 
@@ -253,7 +251,6 @@ namespace Gurux.Service.Orm
         {
             IDbConnection connection = GetConnection();
             IDbTransaction transaction = connection.BeginTransaction(isolationLevel);
-            Transactions[connection] = transaction;
             return transaction;
         }
 
@@ -266,7 +263,6 @@ namespace Gurux.Service.Orm
             //Commit will clear connection
             IDbConnection connection = transaction.Connection;
             transaction.Commit();
-            Transactions.Remove(connection);
             ReleaseConnection(connection);
         }
 
@@ -279,7 +275,6 @@ namespace Gurux.Service.Orm
             //Commit will clear connection
             IDbConnection connection = transaction.Connection;
             transaction.Rollback();
-            Transactions.Remove(connection);
             ReleaseConnection(connection);
         }
 
@@ -490,14 +485,23 @@ namespace Gurux.Service.Orm
             }
             return list.ToArray();
         }
+        /// <summary>
+        /// Create new table.
+        /// </summary>
+        /// <param name="relations">Are relation tables created also.</param>
+        /// <param name="overwrite">Old table is dropped first if exists.</param>
+        public void CreateTable(Type type, bool relations, bool overwrite)
+        {
+            CreateTable(null, type, relations, overwrite);
+        }
 
         /// <summary>
         /// Create new table.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <param name="transaction">Transaction.</param>
         /// <param name="relations">Are relation tables created also.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
-        public void CreateTable(Type type, bool relations, bool overwrite)
+        public void CreateTable(IDbTransaction transaction, Type type, bool relations, bool overwrite)
         {
             Dictionary<Type, GXSerializedItem> tables = new Dictionary<Type, GXSerializedItem>();
             if (relations)
@@ -508,9 +512,20 @@ namespace Gurux.Service.Orm
             {
                 tables.Add(type, null);
             }
-            IDbConnection connection = GetConnection();
-            IDbTransaction transaction = (IDbTransaction)Transactions[connection];
-            bool autoTransaction = transaction == null;
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
+            if (tranactionOnProgress)
+            {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
+                if (AutoTransaction)
+                {
+                    transaction = connection.BeginTransaction();
+                }
+            }
             try
             {
                 //Find dropped tables.
@@ -539,10 +554,6 @@ namespace Gurux.Service.Orm
                         }
                     }
                 }
-                if (AutoTransaction)
-                {
-                    transaction = connection.BeginTransaction();
-                }
                 foreach (var it in tables)
                 {
                     //If table do not have relations.
@@ -557,14 +568,14 @@ namespace Gurux.Service.Orm
                 }
 
                 CreateTable(connection, transaction, type, tables);
-                if (autoTransaction && transaction != null)
+                if (!tranactionOnProgress && AutoTransaction)
                 {
                     transaction.Commit();
                 }
             }
             catch (Exception)
             {
-                if (autoTransaction && transaction != null)
+                if (!tranactionOnProgress && AutoTransaction)
                 {
                     transaction.Rollback();
                 }
@@ -572,11 +583,10 @@ namespace Gurux.Service.Orm
             }
             finally
             {
-                if (autoTransaction && transaction != null)
+                if (!tranactionOnProgress)
                 {
-                    transaction.Dispose();
+                    ReleaseConnection(connection);
                 }
-                ReleaseConnection(connection);
             }
         }
 
@@ -595,16 +605,34 @@ namespace Gurux.Service.Orm
         /// <param name="type">Table type.</param>
         public void UpdateTable(Type type)
         {
+            UpdateTable(null, type);
+        }
+
+        /// <summary>
+        /// Update table.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="type">Table type.</param>
+        public void UpdateTable(IDbTransaction transaction, Type type)
+        {
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
             string[] cols = GetColumns(type);
             string tableName = Builder.GetTableName(type, false);
-            IDbConnection connection = GetConnection();
-            IDbTransaction transaction = (IDbTransaction)Transactions[connection];
-            try
+            if (tranactionOnProgress)
             {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
                 if (AutoTransaction)
                 {
                     transaction = connection.BeginTransaction();
                 }
+            }
+            try
+            {
                 //Add new columns.
                 foreach (var it in GXSqlBuilder.GetProperties(type))
                 {
@@ -670,10 +698,9 @@ namespace Gurux.Service.Orm
             }
             finally
             {
-                ReleaseConnection(connection);
-                if (AutoTransaction && transaction != null)
+                if (!tranactionOnProgress)
                 {
-                    transaction.Dispose();
+                    ReleaseConnection(connection);
                 }
             }
         }
@@ -1506,14 +1533,34 @@ namespace Gurux.Service.Orm
         /// <param name="relations">Are relation tables dropped also.</param>
         public void DropTable(Type type, bool relations)
         {
+            DropTable(null, type, relations);
+        }
+
+        /// <summary>
+        /// Drop selected table.
+        /// </summary>
+        /// <param name="relations">Are relation tables dropped also.</param>
+        public void DropTable(IDbTransaction transaction, Type type, bool relations)
+        {
             string table = Builder.GetTableName(type, false);
-            IDbConnection connection = GetConnection();
+            IDbConnection connection;
+            bool tranactionOnProgress = transaction != null;
+            if (tranactionOnProgress)
+            {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = GetConnection();
+                if (AutoTransaction)
+                {
+                    transaction = connection.BeginTransaction();
+                }
+            }
             try
             {
                 if (TableExist(connection, table))
                 {
-                    IDbTransaction transaction = (IDbTransaction)Transactions[connection];
-                    bool autoTransaction = transaction == null;
                     try
                     {
                         Dictionary<Type, GXSerializedItem> tables = new Dictionary<Type, GXSerializedItem>();
@@ -1556,14 +1603,14 @@ namespace Gurux.Service.Orm
                                 }
                             }
                         }
-                        if (transaction != null && autoTransaction)
+                        if (!tranactionOnProgress && AutoTransaction)
                         {
                             transaction.Commit();
                         }
                     }
                     catch (Exception)
                     {
-                        if (autoTransaction && transaction != null)
+                        if (!tranactionOnProgress && AutoTransaction)
                         {
                             transaction.Rollback();
                         }
@@ -1571,9 +1618,9 @@ namespace Gurux.Service.Orm
                     }
                     finally
                     {
-                        if (autoTransaction && transaction != null)
+                        if (!tranactionOnProgress)
                         {
-                            transaction.Dispose();
+                            ReleaseConnection(connection);
                         }
                     }
                 }
@@ -4058,7 +4105,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object.
         /// </summary>
-        /// <param name="arg"></param>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="arg">Insert arguments.</param>
         public void Insert(IDbTransaction transaction, GXInsertArgs arg)
         {
             if (arg == null)
@@ -4084,7 +4132,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                UpdateOrInsert(connection, list, true);
+                UpdateOrInsert(connection, transaction, list, true);
             }
             finally
             {
@@ -4151,7 +4199,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                await UpdateOrInsert(connection, list, true);
+                await UpdateOrInsert(connection, transaction, list, true);
             }
             finally
             {
@@ -4206,7 +4254,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                UpdateOrInsert(connection, list, true);
+                UpdateOrInsert(connection, transaction, list, true);
                 list.Clear();
                 //Get updated values.
                 foreach (var it in arg.Values)
@@ -4214,7 +4262,7 @@ namespace Gurux.Service.Orm
                     GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded,
                         false, false, Builder.Settings.ColumnQuotation, true, arg.Where, handledObjects, null);
                 }
-                UpdateOrInsert(connection, list, false);
+                UpdateOrInsert(connection, transaction, list, false);
             }
             finally
             {
@@ -4289,7 +4337,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                await UpdateOrInsert(connection, list, true);
+                await UpdateOrInsert(connection, transaction, list, true);
                 list.Clear();
                 //Get updated values.
                 foreach (var it in arg.Values)
@@ -4310,7 +4358,7 @@ namespace Gurux.Service.Orm
 
         private Task UpdateOrInsertAsync(IDbConnection connection, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
         {
-            return Task.Run(() => UpdateOrInsert(connection, list, insert));
+            return Task.Run(() => UpdateOrInsert(connection, null, list, insert));
         }
 
         /// <summary>
@@ -4318,7 +4366,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="list">List of tables to update.</param>
         /// <param name="insert">Insert or update.</param>
-        private Task UpdateOrInsert(IDbConnection connection, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
+        private Task UpdateOrInsert(IDbConnection connection, IDbTransaction transaction, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
         {
             if (list.Count == 0)
             {
@@ -4329,7 +4377,6 @@ namespace Gurux.Service.Orm
             ulong id;
             int total = 0;
             Type type;
-            IDbTransaction transaction = (IDbTransaction)Transactions[connection];
             bool transactionUninitialized = transaction == null;
             List<string> queries = new List<string>();
             try
@@ -4448,7 +4495,7 @@ namespace Gurux.Service.Orm
                     transaction.Commit();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 if (transaction != null && transactionUninitialized)
                 {
@@ -4778,32 +4825,17 @@ namespace Gurux.Service.Orm
             else
             {
                 IDbConnection connection = GetConnection();
-                IDbTransaction transaction = (IDbTransaction)Transactions[connection];
-                bool autoTransaction = transaction == null;
                 try
                 {
-                    if (AutoTransaction)
-                    {
-                        transaction = connection.BeginTransaction();
-                    }
                     string query = "TRUNCATE TABLE " + Builder.GetTableName(typeof(T), true);
-                    ExecuteNonQuery(connection, transaction, query);
-                    transaction.Commit();
+                    ExecuteNonQuery(connection, null, query);
                 }
                 catch (Exception)
                 {
-                    if (autoTransaction && transaction != null)
-                    {
-                        transaction.Rollback();
-                    }
                     throw;
                 }
                 finally
                 {
-                    if (autoTransaction && transaction != null)
-                    {
-                        transaction.Dispose();
-                    }
                     ReleaseConnection(connection);
                 }
             }
