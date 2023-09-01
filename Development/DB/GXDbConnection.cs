@@ -533,7 +533,7 @@ namespace Gurux.Service.Orm
                 foreach (var it in tables)
                 {
                     Type tmp = it.Key;
-                    if (TableExist(connection, Builder.GetTableName(tmp, false)))
+                    if (TableExist(connection, transaction, Builder.GetTableName(tmp, false)))
                     {
                         if (!overwrite)
                         {
@@ -1559,7 +1559,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                if (TableExist(connection, table))
+                if (TableExist(connection, transaction, table))
                 {
                     try
                     {
@@ -1575,7 +1575,7 @@ namespace Gurux.Service.Orm
                         for (int pos = 0; pos != tables.Count; ++pos)
                         {
                             Type it = tables.Keys.ElementAt(pos);
-                            if (!TableExist(connection, Builder.GetTableName(it, false)))
+                            if (!TableExist(connection, transaction, Builder.GetTableName(it, false)))
                             {
                                 tables.Remove(it);
                                 --pos;
@@ -2193,9 +2193,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Check is table empty.
         /// </summary>
-        /// <typeparam name=""></typeparam>
-        /// <param name="tableName"></param>
-        /// <returns></returns>
+        /// <returns>True, if thable is empty.</returns>
         public bool IsEmpty<T>()
         {
             string tableName = Builder.GetTableName(typeof(T), false);
@@ -2212,12 +2210,17 @@ namespace Gurux.Service.Orm
             }
         }
 
+        /// <summary>
+        /// Check if table exists.
+        /// </summary>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Returns true if table exists.</returns>
         public bool TableExist(string tableName)
         {
             IDbConnection connection = GetConnection();
             try
             {
-                return TableExist(connection, tableName);
+                return TableExist(connection, null, tableName);
             }
             finally
             {
@@ -2225,11 +2228,13 @@ namespace Gurux.Service.Orm
             }
         }
         /// <summary>
-        /// Table exists.
+        /// Check if table exists.
         /// </summary>
+        /// <param name="connection">Connection.</param>
+        /// <param name="transaction">Transaction.</param>
         /// <param name="tableName">Table name.</param>
         /// <returns>Returns true if table exists.</returns>
-        private bool TableExist(IDbConnection connection, string tableName)
+        private bool TableExist(IDbConnection connection, IDbTransaction transaction, string tableName)
         {
             string query;
             switch (Builder.Settings.Type)
@@ -2264,7 +2269,7 @@ namespace Gurux.Service.Orm
                 default:
                     throw new ArgumentOutOfRangeException("TableExist failed. Unknown database connection.");
             }
-            return (int)ExecuteScalarInternal(connection, null, query, typeof(int)) != 0;
+            return (int)ExecuteScalarInternal(connection, transaction, query, typeof(int)) != 0;
         }
 
         private string GetDataBaseType(Type type, object target)
