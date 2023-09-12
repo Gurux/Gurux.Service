@@ -1561,73 +1561,62 @@ namespace Gurux.Service.Orm
             {
                 if (TableExist(connection, transaction, table))
                 {
-                    try
+                    Dictionary<Type, GXSerializedItem> tables = new Dictionary<Type, GXSerializedItem>();
+                    if (relations)
                     {
-                        Dictionary<Type, GXSerializedItem> tables = new Dictionary<Type, GXSerializedItem>();
-                        if (relations)
+                        GetTables(type, tables);
+                    }
+                    if (!tables.ContainsKey(type))
+                    {
+                        tables.Add(type, null);
+                    }
+                    for (int pos = 0; pos != tables.Count; ++pos)
+                    {
+                        Type it = tables.Keys.ElementAt(pos);
+                        if (!TableExist(connection, transaction, Builder.GetTableName(it, false)))
                         {
-                            GetTables(type, tables);
+                            tables.Remove(it);
+                            --pos;
                         }
-                        if (!tables.ContainsKey(type))
-                        {
-                            tables.Add(type, null);
-                        }
-                        for (int pos = 0; pos != tables.Count; ++pos)
-                        {
-                            Type it = tables.Keys.ElementAt(pos);
-                            if (!TableExist(connection, transaction, Builder.GetTableName(it, false)))
-                            {
-                                tables.Remove(it);
-                                --pos;
-                            }
-                        }
-                        if (AutoTransaction)
-                        {
-                            transaction = connection.BeginTransaction();
-                        }
-                        DropTable(connection, transaction, type, tables);
+                    }
+                    DropTable(connection, transaction, type, tables);
 
-                        //Drop auto increments that are not supported by DB.
-                        foreach (var it in GXSqlBuilder.GetProperties(type))
+                    //Drop auto increments that are not supported by DB.
+                    foreach (var it in GXSqlBuilder.GetProperties(type))
+                    {
+                        //If field is marked as an auto increment.
+                        if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                         {
-                            //If field is marked as an auto increment.
-                            if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
+                            string[] arr = Builder.Settings.DropAutoIncrement(table, it.Key);
+                            if (arr != null)
                             {
-                                string[] arr = Builder.Settings.DropAutoIncrement(table, it.Key);
-                                if (arr != null)
+                                foreach (string it2 in arr)
                                 {
-                                    foreach (string it2 in arr)
-                                    {
-                                        ExecuteNonQuery(transaction, it2);
-                                    }
+                                    ExecuteNonQuery(transaction, it2);
                                 }
                             }
                         }
-                        if (!tranactionOnProgress && AutoTransaction)
-                        {
-                            transaction.Commit();
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        if (!tranactionOnProgress && AutoTransaction)
-                        {
-                            transaction.Rollback();
-                        }
-                        throw;
-                    }
-                    finally
-                    {
-                        if (!tranactionOnProgress)
-                        {
-                            ReleaseConnection(connection);
-                        }
                     }
                 }
+                if (!tranactionOnProgress && AutoTransaction)
+                {
+                    transaction.Commit();
+                }
+            }
+            catch (Exception)
+            {
+                if (!tranactionOnProgress && AutoTransaction)
+                {
+                    transaction.Rollback();
+                }
+                throw;
             }
             finally
             {
-                ReleaseConnection(connection);
+                if (!tranactionOnProgress)
+                {
+                    ReleaseConnection(connection);
+                }
             }
         }
 
@@ -1811,7 +1800,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
