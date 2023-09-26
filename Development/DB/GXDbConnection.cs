@@ -3993,7 +3993,6 @@ namespace Gurux.Service.Orm
         /// <param name="mapTables"></param>
         /// <param name="UpdatedReferences"></param>
         /// <param name="manyToManyObjects"></param>
-        /// <param name="col"></param>
         private static void UpdateReferences(object item,
             Dictionary<Type, Dictionary<Type, GXSerializedItem>> relationDataSetters,
             Dictionary<Type, List<object>> mapTables,
@@ -4060,6 +4059,11 @@ namespace Gurux.Service.Orm
             }
         }
 
+        /// <summary>
+        /// Select object by ID and create empty object if it's not found from the database.
+        /// </summary>
+        /// <param name="arg">Selection arguments.</param>
+        /// <returns>Database object.</returns>
         public T SingleOrDefault<T>(GXSelectArgs arg)
         {
             List<T> list = Select<T>(arg);
@@ -4070,11 +4074,22 @@ namespace Gurux.Service.Orm
             return list[0];
         }
 
+        /// <summary>
+        /// Select object by ID and create empty object if it's not found from the database.
+        /// </summary>
+        /// <param name="arg">Selection arguments.</param>
+        /// <returns>Database object.</returns>
         public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg)
         {
             return await SingleOrDefaultAsync<T>(arg, CancellationToken.None);
         }
 
+        /// <summary>
+        /// Select object by ID and create empty object if it's not found from the database.
+        /// </summary>
+        /// <param name="arg">Selection arguments.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Database object.</returns>
         public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -4140,7 +4155,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object as async.
         /// </summary>
-        /// <param name="arg"></param>
+        /// <param name="arg">Insert argument.</param>
         public async Task InsertAsync(GXInsertArgs arg)
         {
             await InsertAsync(null, arg, CancellationToken.None);
@@ -4149,25 +4164,29 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object as async.
         /// </summary>
-        /// <param name="arg"></param>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="arg">Insert argument.</param>
         public async Task InsertAsync(IDbTransaction transaction, GXInsertArgs arg)
         {
-            await InsertAsync(null, arg, CancellationToken.None);
+            await InsertAsync(transaction, arg, CancellationToken.None);
         }
 
         /// <summary>
         /// Insert new object as async.
         /// </summary>
-        /// <param name="arg"></param>
+        /// <param name="arg">Insert argument.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public async Task InsertAsync(GXInsertArgs arg, CancellationToken cancellationToken)
         {
-            await InsertAsync(null, arg, CancellationToken.None);
+            await InsertAsync(null, arg, cancellationToken);
         }
 
         /// <summary>
         /// Insert new object as async.
         /// </summary>
-        /// <param name="arg"></param>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="arg">Insert argument.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
         public async Task InsertAsync(IDbTransaction transaction, GXInsertArgs arg, CancellationToken cancellationToken)
         {
             if (arg == null)
