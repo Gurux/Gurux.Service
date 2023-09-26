@@ -394,6 +394,18 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Full join test
+        /// </summary>
+        [TestMethod]
+        public void FullJoinTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.SelectAll<TestClass>();
+            arg.Columns.Add<TestClass2>();
+            arg.Joins.AddFullJoin<TestClass2, TestClass>(x => x.Parent, x => x.Id);
+            Assert.AreEqual("SELECT TestClass.`ID`, TestClass.`Guid`, TestClass.`Time`, TestClass.`Text`, TestClass.`SimpleText`, TestClass.`Text3`, TestClass.`Text4`, TestClass.`BooleanTest`, TestClass.`IntTest`, TestClass.`DoubleTest`, TestClass.`FloatTest`, TestClass.`Span`, TestClass.`Object`, TestClass.`Status`, TestClass2.`Id`, TestClass2.`ParentID`, TestClass2.`Name` FROM TestClass2 FULL OUTER JOIN TestClass ON TestClass2.`ParentID`=TestClass.`ID`", arg.ToString());
+        }
+
+        /// <summary>
         /// Select Guid where ID = 1.
         /// </summary>
         [TestMethod]
@@ -1739,7 +1751,7 @@ namespace Gurux.Service_Test
         {
             User2 user = new User2() { Name = "Gurux'" };
             GXInsertArgs i = GXInsertArgs.Insert(user);
-            Assert.AreEqual("INSERT INTO User2 (`Name`) VALUES('Gurux\'')", i.ToString());
+            Assert.AreEqual("INSERT INTO User2 (`Name`) VALUES('Gurux''')", i.ToString());
         }
 
         /// <summary>
@@ -1750,7 +1762,7 @@ namespace Gurux.Service_Test
         {
             User2 user = new User2() { Id = 2, Name = "Gurux'" };
             GXUpdateArgs args = GXUpdateArgs.Update(user, x => x.Name);
-            Assert.AreEqual("UPDATE User2 SET `Name` = 'Gurux\'' WHERE `Id` = 2", args.ToString());
+            Assert.AreEqual("UPDATE User2 SET `Name` = 'Gurux''' WHERE `Id` = 2", args.ToString());
         }
 
         /// <summary>

@@ -32,10 +32,26 @@
 
 namespace Gurux.Service.Orm
 {
+    /// <summary>
+    /// Join types.
+    /// </summary>
     enum JoinType
     {
+        /// <summary>
+        /// Left join.
+        /// </summary>
         Left,
+        /// <summary>
+        /// Inner join.
+        /// </summary>
         Inner,        
+        /// <summary>
+        /// Right join.
+        /// </summary>
         Right,
+        /// <summary>
+        /// Full join.
+        /// </summary>
+        Full
     }
 }

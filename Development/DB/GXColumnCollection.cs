@@ -834,6 +834,9 @@ namespace Gurux.Service.Orm
                         case JoinType.Right:
                             sb.Append(" RIGHT OUTER JOIN ");
                             break;
+                        case JoinType.Full:
+                            sb.Append(" FULL OUTER JOIN ");
+                            break;
                         default:
                             throw new ArgumentOutOfRangeException("Invalid join type.");
                     }

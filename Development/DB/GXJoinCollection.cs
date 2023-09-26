@@ -111,6 +111,15 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Add full join.
+        /// </summary>
+        public void AddFullJoin<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> sourceColumn,
+            Expression<Func<TDestinationTable, object>> destinationColumn)
+        {
+            AddJoin(JoinType.Full, sourceColumn, destinationColumn);
+        }
+
+        /// <summary>
         /// Append joins.
         /// </summary>
         /// <param name="joins"></param>
