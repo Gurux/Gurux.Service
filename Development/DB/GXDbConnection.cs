@@ -2475,7 +2475,7 @@ namespace Gurux.Service.Orm
             {
                 try
                 {
-                    list = Select<T>(connection, args, cancellationToken);
+                    list = SelectInternal<T>(connection, null, args, cancellationToken);
                     if (list.Count == 0)
                     {
                         return default(T);
@@ -2563,7 +2563,7 @@ namespace Gurux.Service.Orm
             {
                 try
                 {
-                    list = Select<T>(connection, args, cancellationToken);
+                    list = SelectInternal<T>(connection, null, args, cancellationToken);
                     if (list.Count == 0)
                     {
                         return default(T);
@@ -2652,7 +2652,7 @@ namespace Gurux.Service.Orm
             {
                 try
                 {
-                    list = Select<T>(connection, args, cancellationToken);
+                    list = SelectInternal<T>(connection, null, args, cancellationToken);
                     if (list.Count == 0)
                     {
                         return default(T);
@@ -2740,7 +2740,7 @@ namespace Gurux.Service.Orm
             {
                 try
                 {
-                    list = Select<T>(connection, args, cancellationToken);
+                    list = SelectInternal<T>(connection, null, args, cancellationToken);
                     if (list.Count == 0)
                     {
                         return default(T);
@@ -3424,7 +3424,21 @@ namespace Gurux.Service.Orm
             return Select<T>(null, arg, CancellationToken.None);
         }
 
-        private List<T> Select<T>(IDbConnection connection, GXSelectArgs arg, CancellationToken cancellationToken)
+        public List<T> Select<T>(GXSelectArgs arg, CancellationToken cancellationToken)
+        {
+            return Select<T>(null, arg, cancellationToken);
+        }
+
+        public List<T> Select<T>(IDbTransaction transaction, GXSelectArgs arg, CancellationToken cancellationToken)
+        {
+            return SelectInternal<T>(transaction?.Connection, transaction, arg, cancellationToken);
+        }
+
+        private List<T> SelectInternal<T>(
+            IDbConnection connection,
+            IDbTransaction? transaction,
+            GXSelectArgs arg,
+            CancellationToken cancellationToken)
         {
             if (arg == null)
             {
@@ -3434,15 +3448,19 @@ namespace Gurux.Service.Orm
             arg.Parent.Settings = Builder.Settings;
             arg.ExecutionTime = 0;
             DateTime tm = DateTime.Now;
-            bool release = connection == null;
+            bool release = connection == null && transaction == null;
             if (release)
             {
                 connection = GetConnection();
             }
+            if (transaction != null)
+            {
+                connection = transaction.Connection;
+            }
             List<T> value;
             try
             {
-                value = (List<T>)SelectInternal2<T>(connection, arg, cancellationToken);
+                value = (List<T>)SelectInternal2<T>(connection, transaction, arg, cancellationToken);
             }
             finally
             {
@@ -3459,6 +3477,43 @@ namespace Gurux.Service.Orm
             return value;
         }
 
+        public async Task<List<T>> SelectAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
+        {
+            return await SelectAsync<T>(transaction, arg, CancellationToken.None);
+        }
+
+        public async Task<List<T>> SelectAsync<T>(IDbTransaction transaction, GXSelectArgs arg, CancellationToken cancellationToken)
+        {
+            bool useTransaction = transaction != null;
+            IDbConnection connection;
+            if (useTransaction)
+            {
+                connection = transaction.Connection;
+            }
+            else
+            {
+                connection = TryGetConnection(1000);
+            }
+            if (connection != null)
+            {
+                try
+                {
+                    return SelectInternal<T>(connection, transaction, arg, cancellationToken);
+                }
+                finally
+                {
+                    if (!useTransaction)
+                    {
+                        ReleaseConnection(connection);
+                    }
+                }
+            }
+            return await Task.Run(() =>
+            {
+                return SelectInternal<T>(transaction?.Connection, transaction, arg, cancellationToken);
+            });
+        }
+
         public async Task<List<T>> SelectAsync<T>(GXSelectArgs arg)
         {
             return await SelectAsync<T>(arg, CancellationToken.None);
@@ -3471,7 +3526,7 @@ namespace Gurux.Service.Orm
             {
                 try
                 {
-                    return Select<T>(connection, arg, cancellationToken);
+                    return SelectInternal<T>(connection, null, arg, cancellationToken);
                 }
                 finally
                 {
@@ -3480,12 +3535,13 @@ namespace Gurux.Service.Orm
             }
             return await Task.Run(() =>
             {
-                return Select<T>(null, arg, cancellationToken);
+                return SelectInternal<T>(null, null, arg, cancellationToken);
             });
         }
 
         private object SelectInternal2<T>(
             IDbConnection connection,
+            IDbTransaction? transaction,
             GXSelectArgs arg,
             CancellationToken cancellationToken)
         {
@@ -3633,6 +3689,7 @@ namespace Gurux.Service.Orm
             }
             using (IDbCommand com = connection.CreateCommand())
             {
+                com.Transaction = transaction;
                 com.CommandType = CommandType.Text;
                 com.CommandText = query;
                 try
@@ -4092,8 +4149,29 @@ namespace Gurux.Service.Orm
         /// <returns>Database object.</returns>
         public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg, CancellationToken cancellationToken)
         {
+            return await SingleOrDefaultAsync<T>(null, arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Select object by ID and create empty object if it's not found from the database.
+        /// </summary>
+        /// <param name="arg">Selection arguments.</param>
+        /// <returns>Database object.</returns>
+        public async Task<T> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
+        {
+            return await SingleOrDefaultAsync<T>(transaction, arg, CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Select object by ID and create empty object if it's not found from the database.
+        /// </summary>
+        /// <param name="arg">Selection arguments.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Database object.</returns>
+        public async Task<T> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg, CancellationToken cancellationToken)
+        {
             cancellationToken.ThrowIfCancellationRequested();
-            List<T> list = await SelectAsync<T>(arg, cancellationToken);
+            List<T> list = await SelectAsync<T>(transaction, arg, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (list.Count == 0)
             {
@@ -4101,6 +4179,7 @@ namespace Gurux.Service.Orm
             }
             return list[0];
         }
+
 
         /// <summary>
         /// Insert new object.

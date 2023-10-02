@@ -2072,7 +2072,10 @@ namespace Gurux.Service.Orm
                 }
                 return new string[] { ce.Value.ToString() };
             }
-
+            if (expression is ParameterExpression pe)
+            {                
+                return new string[] { AddQuotes(pe.Name, settings.DataQuotaReplacement, quoteSeparator) };
+            }
             throw new ArgumentException("Invalid expression");
         }
     }

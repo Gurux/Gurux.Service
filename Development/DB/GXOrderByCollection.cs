@@ -36,6 +36,8 @@ using System.Linq.Expressions;
 using System.Text;
 using Gurux.Service.Orm.Settings;
 using System.Reflection;
+using System.Xml.Linq;
+using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm
 {
@@ -77,7 +79,9 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Order values by.
         /// </summary>
+        /// <param name="settings">DB settings.</param>
         /// <param name="sourceColumn">Columns order by.</param>
+        /// <param name="OrderList">Order list.</param>
         internal static void OrderBy(GXDBSettings settings, LambdaExpression sourceColumn, List<GXOrder> OrderList)
         {
             string post = null;
@@ -85,7 +89,14 @@ namespace Gurux.Service.Orm
             foreach (string it in list)
             {
                 GXOrder o = new GXOrder();
-                o.Table = sourceColumn.Parameters[0].Type;
+                if (sourceColumn.Parameters.Count == 0)
+                {
+                    o.Table = sourceColumn.ReturnType;
+                }
+                else
+                {
+                    o.Table = sourceColumn.Parameters[0].Type;
+                }
                 o.Column = it;
                 OrderList.Add(o);
             }
@@ -209,6 +220,33 @@ namespace Gurux.Service.Orm
             List.Add(expression);
             Updated = true;
         }
+        private bool Find(Type type, List<string> path, int index)
+        {
+            bool found = false;
+            foreach (var it in GXSqlBuilder.GetProperties(type))
+            {
+                if (((PropertyInfo)it.Value.Target).Name == path[index])
+                {
+                    if (path.Count != 1 + index)
+                    {
+                        found = Find((it.Value.Target as PropertyInfo).PropertyType, path, ++index);
+                    }
+                    else
+                    {
+                        found = true;
+                        var expression = MethodCallExpression.Parameter(type, path[index]);
+                        List.Add(Expression.Lambda(expression));
+                        Updated = true;
+                    }
+                    break;
+                }
+            }
+            if (!found)
+            {
+                throw new ArgumentException(string.Format("Order by failed. Unknown property {0}", path[index]));
+            }
+            return found;
+        }
 
         /// <summary>
         /// Add new order by expression.
@@ -221,23 +259,8 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentException(nameof(name));
             }
-            bool found = false;
-            foreach (var it in GXSqlBuilder.GetProperties<T>())
-            {
-                if (((PropertyInfo)it.Value.Target).Name == name)
-                {
-                    found = true;
-                    name = it.Key;
-                    Expression<Func<T, object>> expression = q => name;
-                    List.Add(expression);
-                    Updated = true;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                throw new ArgumentException(string.Format("Order by failed. Unknown property {0}", name));
-            }
+            List<string> path = new List<string>(name.Split('.'));
+            Find(typeof(T), path, 0);            
         }
     }
 }
