@@ -1413,7 +1413,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Create or drop selected table and it's dependencies.
         /// </summary>
-        /// <param name="transaction"></param>
+        /// <param name="transaction">Transaction.</param>
         /// <param name="table"></param>
         private void TableCreation(IDbConnection connection, bool create, IDbTransaction transaction, GXTableCreateQuery table, List<Type> created)
         {
@@ -4437,7 +4437,7 @@ namespace Gurux.Service.Orm
                     GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded,
                         false, false, Builder.Settings.ColumnQuotation, true, arg.Where, handledObjects, null);
                 }
-                await UpdateOrInsertAsync(connection, list, false);
+                await UpdateOrInsertAsync(connection, transaction, list, false);
             }
             finally
             {
@@ -4448,9 +4448,12 @@ namespace Gurux.Service.Orm
             }
         }
 
-        private Task UpdateOrInsertAsync(IDbConnection connection, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
+        private Task UpdateOrInsertAsync(IDbConnection connection, 
+            IDbTransaction transaction, 
+            List<KeyValuePair<Type, GXUpdateItem>> list, 
+            bool insert)
         {
-            return Task.Run(() => UpdateOrInsert(connection, null, list, insert));
+            return Task.Run(() => UpdateOrInsert(connection, transaction, list, insert));
         }
 
         /// <summary>
@@ -4458,7 +4461,10 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="list">List of tables to update.</param>
         /// <param name="insert">Insert or update.</param>
-        private Task UpdateOrInsert(IDbConnection connection, IDbTransaction transaction, List<KeyValuePair<Type, GXUpdateItem>> list, bool insert)
+        private Task UpdateOrInsert(IDbConnection connection, 
+            IDbTransaction transaction, 
+            List<KeyValuePair<Type, GXUpdateItem>> list, 
+            bool insert)
         {
             if (list.Count == 0)
             {
