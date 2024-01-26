@@ -125,7 +125,7 @@ namespace Gurux.Service.Orm.Settings
             return string.Format("SELECT COUNT(1) FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE OBJECTPROPERTY(OBJECT_ID(CONSTRAINT_SCHEMA + '.' + QUOTENAME(CONSTRAINT_NAME)), 'IsPrimaryKey') = 1 AND TABLE_CATALOG = '{0}' AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
         }
 
-        /// <inheritdoc cref="GXDBSettings.GetColumnDefaultValueQuery"/>
+        /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
             return string.Format("SELECT object_definition(default_object_id) AS definition FROM sys.columns WHERE object_id = object_id('{0}.{1}') AND name = '{2}'", schema, tableName, columnName);
@@ -153,7 +153,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.SelectUsingAs"/>
+        /// <inheritdoc/>
         public override bool SelectUsingAs
         {
             get
@@ -162,7 +162,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.TableQuotation"/>
+        /// <inheritdoc/>
         public override char TableQuotation
         {
             get
@@ -207,7 +207,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.LimitType"/>
+        /// <inheritdoc/>
         internal override LimitType LimitType
         {
             get
@@ -258,7 +258,7 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "CHAR(36)";
+                return "UNIQUEIDENTIFIER";
             }
         }
 
@@ -370,7 +370,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DoubleColumnDefinition"/>
+        /// <inheritdoc/>
         override public string DoubleColumnDefinition
         {
             get
@@ -378,8 +378,8 @@ namespace Gurux.Service.Orm.Settings
                 return "FLOAT(53)";
             }
         }
-
-        /// <inheritdoc cref="GXDBSettings.DesimalColumnDefinition"/>
+      
+        /// <inheritdoc/>
         override public string DesimalColumnDefinition
         {
             get
@@ -388,7 +388,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ByteArrayColumnDefinition"/>
+        /// <inheritdoc/>
         override public string ByteArrayColumnDefinition
         {
             get
@@ -397,7 +397,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ObjectColumnDefinition"/>
+        /// <inheritdoc/>
         override public string ObjectColumnDefinition
         {
             get
@@ -406,7 +406,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
+        /// <inheritdoc/>
         public override string ConvertToString(object value, bool where)
         {
             if (value is DateTime)
@@ -430,6 +430,5 @@ namespace Gurux.Service.Orm.Settings
                 return "''";
             }
         }
-
     }
 }

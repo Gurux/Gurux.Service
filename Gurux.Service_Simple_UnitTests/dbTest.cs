@@ -1774,5 +1774,86 @@ namespace Gurux.Service_Test
             GXDeleteArgs args = GXDeleteArgs.Delete<TestClass>(q => q.Text == "Gurux'");
             Assert.AreEqual("DELETE FROM TestClass WHERE TestClass.`Text` = 'Gurux''", args.ToString());
         }
+
+        /// <summary>
+        /// Sum test.
+        /// </summary>
+        [TestMethod]
+        public void SumTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Sum(q.DoubleTest));
+            Assert.AreEqual("SELECT SUM(`DoubleTest`) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Sum columns test.
+        /// </summary>
+        [TestMethod]
+        public void SumColumnsTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Sum(new { q.DoubleTest, q.FloatTest }));
+            Assert.AreEqual("SELECT SUM(`DoubleTest` + `FloatTest`) FROM TestClass", arg.ToString());
+        }
+
+
+        /// <summary>
+        /// Min test.
+        /// </summary>
+        [TestMethod]
+        public void MinTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Min(q.DoubleTest));
+            Assert.AreEqual("SELECT MIN(`DoubleTest`) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Min columns test.
+        /// </summary>
+        [TestMethod]
+        public void MinColumnsTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Min(new { q.DoubleTest, q.FloatTest }));
+            Assert.AreEqual("SELECT MIN(`DoubleTest` + `FloatTest`) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Max test.
+        /// </summary>
+        [TestMethod]
+        public void MaxTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Max(q.DoubleTest));
+            Assert.AreEqual("SELECT MAX(`DoubleTest`) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Max columns test.
+        /// </summary>
+        [TestMethod]
+        public void MaxColumnsTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Max(new { q.DoubleTest, q.FloatTest }));
+            Assert.AreEqual("SELECT MAX(`DoubleTest` + `FloatTest`) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Average test.
+        /// </summary>
+        [TestMethod]
+        public void AverageTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Avg(q.DoubleTest));
+            Assert.AreEqual("SELECT AVG(`DoubleTest`) FROM TestClass", arg.ToString());
+        }
+
+        /// <summary>
+        /// Average columns test.
+        /// </summary>
+        [TestMethod]
+        public void AverageColumnsTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Avg(new { q.DoubleTest, q.FloatTest }));
+            Assert.AreEqual("SELECT AVG(`DoubleTest` + `FloatTest`) FROM TestClass", arg.ToString());
+        }       
     }
 }

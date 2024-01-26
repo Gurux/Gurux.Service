@@ -337,14 +337,14 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DoubleColumnDefinition"/>
+        /// <inheritdoc/>
         override public string DoubleColumnDefinition
         {
             get
             {
                 return "DOUBLE";
             }
-        }
+        }      
 
         /// <inheritdoc />
         override public string DesimalColumnDefinition

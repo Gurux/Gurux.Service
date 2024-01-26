@@ -139,7 +139,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.TableQuotation"/>
+        /// <inheritdoc/>
         public override char TableQuotation
         {
             get
@@ -149,7 +149,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.SelectUsingAs"/>
+        /// <inheritdoc/>
         public override bool SelectUsingAs
         {
             get
@@ -158,7 +158,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        ///<inheritdoc cref="GXDBSettings.UpperCase"/>
+        /// <inheritdoc/>
         public override bool UpperCase
         {
             get
@@ -167,7 +167,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.LimitType"/>
+        /// <inheritdoc/>
         internal override LimitType LimitType
         {
             get
@@ -176,7 +176,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        ///<inheritdoc cref="GXDBSettings.UseQuotationWhereColumns"/>
+        /// <inheritdoc/>
         ///<remarks>
         ///Oracle needs separator to where column names.
         ///</remarks>
@@ -393,7 +393,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DoubleColumnDefinition"/>
+        /// <inheritdoc/>
         override public string DoubleColumnDefinition
         {
             get
@@ -402,7 +402,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DesimalColumnDefinition"/>
+        /// <inheritdoc/>
         override public string DesimalColumnDefinition
         {
             get
@@ -411,7 +411,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ByteArrayColumnDefinition"/>
+        /// <inheritdoc/>
         override public string ByteArrayColumnDefinition
         {
             get
@@ -420,7 +420,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ObjectColumnDefinition"/>
+        /// <inheritdoc/>
         override public string ObjectColumnDefinition
         {
             get
@@ -445,7 +445,7 @@ namespace Gurux.Service.Orm.Settings
             return name.ToUpper();
         }
 
-        /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
+        /// <inheritdoc/>
         public override string ConvertToString(object value, bool where)
         {
             if (value is DateTime)
@@ -491,7 +491,7 @@ namespace Gurux.Service.Orm.Settings
             return name.ToUpper();
         }
 
-        /// <inheritdoc cref="GXDBSettings.CreateAutoIncrement"/>
+        /// <inheritdoc/>
         public override string[] CreateAutoIncrement(string tableName, string columnName)
         {
             //IDENTITY don't work with multiple insert at the same query.
@@ -510,13 +510,13 @@ namespace Gurux.Service.Orm.Settings
             };
         }
 
-        /// <inheritdoc cref="GXDBSettings.OnUpdate"/>
+        /// <inheritdoc/>
         public override string OnUpdate(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyUpdate updateType)
         {
             return null;
         }
 
-        /// <inheritdoc cref="GXDBSettings.DropAutoIncrement"/>
+        /// <inheritdoc/>
         public override string[] DropAutoIncrement(string tableName, string columnName)
         {
             //IDENTITY don't work with multiple insert at the same query.

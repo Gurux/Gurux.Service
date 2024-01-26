@@ -426,15 +426,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                 }
-            }
-
-            if ((value & (int)Attributes.Filter) != 0)
-            {
-                if (s.FilterValue == null && s.DefaultValue != null)
-                {
-                    s.FilterValue = s.DefaultValue;
-                }
-            }
+            }            
             s.Attributes = (Attributes)value;
         }
 

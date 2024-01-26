@@ -225,7 +225,7 @@ namespace Gurux.Service.Orm
             bool found = false;
             foreach (var it in GXSqlBuilder.GetProperties(type))
             {
-                if (((PropertyInfo)it.Value.Target).Name == path[index])
+                if (string.Compare(((PropertyInfo)it.Value.Target).Name, path[index], true) == 0)
                 {
                     if (path.Count != 1 + index)
                     {
@@ -260,7 +260,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentException(nameof(name));
             }
             List<string> path = new List<string>(name.Split('.'));
-            Find(typeof(T), path, 0);            
+            Find(typeof(T), path, 0);
         }
     }
 }

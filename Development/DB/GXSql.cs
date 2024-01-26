@@ -102,7 +102,7 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Get maximum value from selected objects.
+        /// Get average value from selected objects.
         /// </summary>
         /// <param name="expression"></param>
         /// <returns></returns>

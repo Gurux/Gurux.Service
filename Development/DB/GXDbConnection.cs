@@ -48,6 +48,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using System.Threading;
 using Gurux.Common.Db;
+using System.Data.SqlClient;
 
 namespace Gurux.Service.Orm
 {
@@ -485,6 +486,7 @@ namespace Gurux.Service.Orm
             }
             return list.ToArray();
         }
+
         /// <summary>
         /// Create new table.
         /// </summary>
@@ -640,8 +642,7 @@ namespace Gurux.Service.Orm
                     {
                         if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type)
                         {
-                            if (it.Value.Relation.RelationType == RelationType.OneToOne ||
-                                it.Value.Relation.RelationType == RelationType.OneToMany ||
+                            if (it.Value.Relation.RelationType == RelationType.OneToMany ||
                                 it.Value.Relation.RelationType == RelationType.ManyToMany)
                             {
                                 continue;
@@ -657,7 +658,16 @@ namespace Gurux.Service.Orm
                             Builder.Settings.DataQuotaReplacement,
                             Builder.Settings.ColumnQuotation));
                         sb.Append(" ");
-                        sb.Append(GetDataBaseType(it.Value.Type, it.Value.Target));
+                        if (it.Value.Relation != null &&
+                            it.Value.Relation.RelationType == RelationType.OneToOne)
+                        {
+                            //If 1:1 ralation
+                            sb.Append(GetDataBaseType(it.Value.Relation.ForeignId.Type, it.Value.Relation));
+                        }
+                        else
+                        {
+                            sb.Append(GetDataBaseType(it.Value.Type, it.Value.Target));
+                        }
                         sb.Append(" ");
                         //If nullable.
                         if ((it.Value.Attributes & (Attributes.AllowNull)) != 0)
@@ -1800,7 +1810,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
@@ -1848,7 +1858,6 @@ namespace Gurux.Service.Orm
             }
             return list.ToArray();
         }
-
 
         private bool IsAutoIncrement(string tableName, string columnName, IDbConnection connection)
         {
@@ -2126,6 +2135,11 @@ namespace Gurux.Service.Orm
             return type;
         }
 
+
+        /// <summary>
+        /// Returns table names in the current database.
+        /// </summary>
+        /// <returns>Database table names.</returns>
         public string[] GetTables()
         {
             string query;
@@ -2147,7 +2161,7 @@ namespace Gurux.Service.Orm
                     case DatabaseType.SqLite:
                         query = "SELECT NAME FROM sqlite_master WHERE type='table'";
                         break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (connection as System.Data.OleDb.OleDbConnection != null)
@@ -2242,7 +2256,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (connection as System.Data.OleDb.OleDbConnection != null)
@@ -2307,7 +2321,8 @@ namespace Gurux.Service.Orm
             }
             else if (!Builder.DbTypeMap.ContainsKey(type))
             {
-                if (typeof(IEnumerable).IsAssignableFrom(type))
+                if (typeof(IEnumerable).IsAssignableFrom(type) ||
+                    type.IsClass)
                 {
                     type = GXInternal.GetPropertyType(type);
                     foreach (var i in type.GetInterfaces())
@@ -2331,6 +2346,10 @@ namespace Gurux.Service.Orm
             return Builder.DbTypeMap[type];
         }
 
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="arg">Delete arguments.</param>
         public async Task DeleteAsync(GXDeleteArgs arg)
         {
             await DeleteAsync(arg, CancellationToken.None);
@@ -3079,7 +3098,7 @@ namespace Gurux.Service.Orm
             //Read column headers.
             if (columns != null)
             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
                 if (connection is OdbcConnection)
                 {
                     using (IDbCommand com = ((OdbcConnection)connection).CreateCommand())
@@ -3438,7 +3457,8 @@ namespace Gurux.Service.Orm
             IDbConnection connection,
             IDbTransaction? transaction,
             GXSelectArgs arg,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int timeout = 0)
         {
             if (arg == null)
             {
@@ -3460,7 +3480,8 @@ namespace Gurux.Service.Orm
             List<T> value;
             try
             {
-                value = (List<T>)SelectInternal2<T>(connection, transaction, arg, cancellationToken);
+                value = (List<T>)SelectInternal2<T>(connection, transaction,
+                    arg, cancellationToken, timeout);
             }
             finally
             {
@@ -3482,7 +3503,11 @@ namespace Gurux.Service.Orm
             return await SelectAsync<T>(transaction, arg, CancellationToken.None);
         }
 
-        public async Task<List<T>> SelectAsync<T>(IDbTransaction transaction, GXSelectArgs arg, CancellationToken cancellationToken)
+        public async Task<List<T>> SelectAsync<T>(
+            IDbTransaction transaction,
+            GXSelectArgs arg,
+            CancellationToken cancellationToken,
+            int timeout = 0)
         {
             bool useTransaction = transaction != null;
             IDbConnection connection;
@@ -3498,7 +3523,11 @@ namespace Gurux.Service.Orm
             {
                 try
                 {
-                    return SelectInternal<T>(connection, transaction, arg, cancellationToken);
+                    return SelectInternal<T>(connection,
+                        transaction,
+                        arg,
+                        cancellationToken,
+                        timeout);
                 }
                 finally
                 {
@@ -3543,7 +3572,8 @@ namespace Gurux.Service.Orm
             IDbConnection connection,
             IDbTransaction? transaction,
             GXSelectArgs arg,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int timeout = 0)
         {
             DateTime now = DateTime.Now;
 
@@ -3642,7 +3672,7 @@ namespace Gurux.Service.Orm
             //Read column headers.
             if (columns != null)
             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
                 if (connection is OdbcConnection)
                 {
                     using (IDbCommand com = ((OdbcConnection)connection).CreateCommand())
@@ -3689,6 +3719,10 @@ namespace Gurux.Service.Orm
             }
             using (IDbCommand com = connection.CreateCommand())
             {
+                if (timeout > 0)
+                {
+                    com.CommandTimeout = timeout;
+                }
                 com.Transaction = transaction;
                 com.CommandType = CommandType.Text;
                 com.CommandText = query;
@@ -3970,12 +4004,15 @@ namespace Gurux.Service.Orm
                 {
                     throw;
                 }
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0
-                catch (SqlException ex)
-#else
                 catch (Exception ex)
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0
                 {
+                    if (ex.InnerException is Win32Exception e)
+                    {
+                        if (e.NativeErrorCode == 0x102)
+                        {
+                            throw new TimeoutException();
+                        }
+                    }
                     throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
                 }
             }
@@ -4147,14 +4184,19 @@ namespace Gurux.Service.Orm
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Database object.</returns>
-        public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg, CancellationToken cancellationToken)
+        public async Task<T> SingleOrDefaultAsync<T>(
+            GXSelectArgs arg,
+            CancellationToken cancellationToken,
+            int timeout = 0)
         {
-            return await SingleOrDefaultAsync<T>(null, arg, CancellationToken.None);
+            return await SingleOrDefaultAsync<T>(null,
+                arg, cancellationToken, timeout);
         }
 
         /// <summary>
         /// Select object by ID and create empty object if it's not found from the database.
         /// </summary>
+        /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
         public async Task<T> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
@@ -4165,13 +4207,21 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select object by ID and create empty object if it's not found from the database.
         /// </summary>
+        /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Database object.</returns>
-        public async Task<T> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg, CancellationToken cancellationToken)
+        public async Task<T> SingleOrDefaultAsync<T>(
+            IDbTransaction transaction,
+            GXSelectArgs arg,
+            CancellationToken cancellationToken,
+            int timeout = 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            List<T> list = await SelectAsync<T>(transaction, arg, cancellationToken);
+            List<T> list = await SelectAsync<T>(transaction,
+                arg,
+                cancellationToken,
+                timeout);
             cancellationToken.ThrowIfCancellationRequested();
             if (list.Count == 0)
             {
@@ -4448,9 +4498,9 @@ namespace Gurux.Service.Orm
             }
         }
 
-        private Task UpdateOrInsertAsync(IDbConnection connection, 
-            IDbTransaction transaction, 
-            List<KeyValuePair<Type, GXUpdateItem>> list, 
+        private Task UpdateOrInsertAsync(IDbConnection connection,
+            IDbTransaction transaction,
+            List<KeyValuePair<Type, GXUpdateItem>> list,
             bool insert)
         {
             return Task.Run(() => UpdateOrInsert(connection, transaction, list, insert));
@@ -4461,9 +4511,9 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="list">List of tables to update.</param>
         /// <param name="insert">Insert or update.</param>
-        private Task UpdateOrInsert(IDbConnection connection, 
-            IDbTransaction transaction, 
-            List<KeyValuePair<Type, GXUpdateItem>> list, 
+        private Task UpdateOrInsert(IDbConnection connection,
+            IDbTransaction transaction,
+            List<KeyValuePair<Type, GXUpdateItem>> list,
             bool insert)
         {
             if (list.Count == 0)

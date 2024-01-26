@@ -1429,6 +1429,62 @@ namespace Gurux.Service.Orm
                     return new string[] { "((" + tmp + " IS NULL OR " + tmp + " = ''))" };
                 }
             }
+            if (m.Method.Name == "Sum")
+            {
+                var args = GetMembers(settings, m.Arguments[0], settings.ColumnQuotation, where, ref post);
+                StringBuilder sb = new StringBuilder();
+                sb.Append("SUM(");
+                foreach (var it in args)
+                {
+                    sb.Append(it);
+                    sb.Append(" + ");
+                }
+                sb.Length -= 3;
+                sb.Append(")");
+                return new string[] { sb.ToString() };
+            }
+            if (m.Method.Name == "Max")
+            {
+                var args = GetMembers(settings, m.Arguments[0], settings.ColumnQuotation, where, ref post);
+                StringBuilder sb = new StringBuilder();
+                sb.Append("MAX(");
+                foreach (var it in args)
+                {
+                    sb.Append(it);
+                    sb.Append(" + ");
+                }
+                sb.Length -= 3;
+                sb.Append(")");
+                return new string[] { sb.ToString() };
+            }
+            if (m.Method.Name == "Min")
+            {
+                var args = GetMembers(settings, m.Arguments[0], settings.ColumnQuotation, where, ref post);
+                StringBuilder sb = new StringBuilder();
+                sb.Append("MIN(");
+                foreach (var it in args)
+                {
+                    sb.Append(it);
+                    sb.Append(" + ");
+                }
+                sb.Length -= 3;
+                sb.Append(")");
+                return new string[] { sb.ToString() };
+            }
+            if (m.Method.Name == "Avg")
+            {
+                var args = GetMembers(settings, m.Arguments[0], settings.ColumnQuotation, where, ref post);
+                StringBuilder sb = new StringBuilder();
+                sb.Append("AVG(");
+                foreach (var it in args)
+                {
+                    sb.Append(it);
+                    sb.Append(" + ");
+                }
+                sb.Length -= 3;
+                sb.Append(")");
+                return new string[] { sb.ToString() };
+            }
             object value22 = Expression.Lambda(m).Compile().DynamicInvoke();
             return new string[] { settings.ConvertToString(value22, where) };
         }
@@ -2073,7 +2129,7 @@ namespace Gurux.Service.Orm
                 return new string[] { ce.Value.ToString() };
             }
             if (expression is ParameterExpression pe)
-            {                
+            {
                 return new string[] { AddQuotes(pe.Name, settings.DataQuotaReplacement, quoteSeparator) };
             }
             throw new ArgumentException("Invalid expression");

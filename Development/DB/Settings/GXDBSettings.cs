@@ -33,7 +33,6 @@
 using System;
 using System.Globalization;
 using System.ComponentModel;
-using System.Data.Common;
 using Gurux.Common.Db;
 
 namespace Gurux.Service.Orm.Settings
@@ -43,10 +42,15 @@ namespace Gurux.Service.Orm.Settings
     /// </summary>
     public abstract class GXDBSettings
     {
-        public GXDBSettings(DatabaseType type)
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        /// <param name="type">Database type.</param>
+        protected GXDBSettings(DatabaseType type)
         {
             Type = type;
         }
+
         /// <summary>
         /// Database type.
         /// </summary>
@@ -508,6 +512,6 @@ namespace Gurux.Service.Orm.Settings
         public virtual string[] DropAutoIncrement(string tableName, string columnName)
         {
             return null;
-        }
-    };
+        }     
+    }
 }

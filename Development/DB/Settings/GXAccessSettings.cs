@@ -129,7 +129,7 @@ namespace Gurux.Service.Orm.Settings
             return null;
         }
 
-        /// <inheritdoc cref="GXDBSettings.TableQuotation"/>
+        /// <inheritdoc />
         public override char TableQuotation
         {
             get
@@ -147,7 +147,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.LimitType"/>
+        /// <inheritdoc />
         internal override LimitType LimitType
         {
             get
@@ -156,7 +156,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.SelectUsingAs"/>
+        /// <inheritdoc />
         public override bool SelectUsingAs
         {
             get
@@ -363,7 +363,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DoubleColumnDefinition"/>
+        /// <inheritdoc />
         override public string DoubleColumnDefinition
         {
             get
@@ -372,7 +372,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DesimalColumnDefinition"/>
+        /// <inheritdoc />
         override public string DesimalColumnDefinition
         {
             get
@@ -381,7 +381,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ByteArrayColumnDefinition"/>
+        /// <inheritdoc />
         override public string ByteArrayColumnDefinition
         {
             get
@@ -390,7 +390,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ObjectColumnDefinition"/>
+        /// <inheritdoc />
         override public string ObjectColumnDefinition
         {
             get
@@ -399,7 +399,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
+        /// <inheritdoc />
         public override string ConvertToString(object value, bool where)
         {
             if (value is DateTime)

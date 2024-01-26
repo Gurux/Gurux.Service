@@ -39,7 +39,7 @@ namespace Gurux.Service.Orm.Settings
     /// <summary>
     /// MySQL database settings.
     /// </summary>
-    class GXMySqlSettings : GXDBSettings
+    internal class GXMySqlSettings : GXDBSettings
     {
         /// <summary>
         /// Constructor.
@@ -335,7 +335,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DoubleColumnDefinition"/>
+        /// <inheritdoc/>
         override public string DoubleColumnDefinition
         {
             get
@@ -344,7 +344,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.DesimalColumnDefinition"/>
+        /// <inheritdoc/>
         override public string DesimalColumnDefinition
         {
             get
@@ -353,7 +353,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ByteArrayColumnDefinition"/>
+        /// <inheritdoc/>
         override public string ByteArrayColumnDefinition
         {
             get
@@ -363,7 +363,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ObjectColumnDefinition"/>
+        /// <inheritdoc/>
         override public string ObjectColumnDefinition
         {
             get
@@ -372,7 +372,7 @@ namespace Gurux.Service.Orm.Settings
             }
         }
 
-        /// <inheritdoc cref="GXDBSettings.ConvertToString"/>
+        /// <inheritdoc/>
         public override string ConvertToString(object value, bool where)
         {
             //MYSQL doesn't support time zone so all values are saving using current time zone.
