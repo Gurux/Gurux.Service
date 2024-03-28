@@ -108,6 +108,11 @@ namespace Gurux.Service.Orm
             return ToString(true);
         }
 
+        /// <summary>
+        /// Update argument as SQL string.
+        /// </summary>
+        /// <param name="addExecutionTime">Is execution time included to the string.</param>
+        /// <returns></returns>
         public string ToString(bool addExecutionTime)
         {
             if (Parent.Updated)
@@ -221,8 +226,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Exclude columns from the update.
         /// </summary>
-        /// <param name="value">Updated value.</param>
-        /// <returns>Created update attribute.</returns>
+        /// <param name="columns">Excluded columns.</param>
         public void Exclude<T>(Expression<Func<T, object>> columns)
         {
             Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));

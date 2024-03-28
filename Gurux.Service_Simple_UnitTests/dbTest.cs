@@ -422,7 +422,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void WhereDateTimeTest()
         {
-            string format = "yyyy-MM-dd HH:mm:ss:fff";
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Time);
             arg.Where.And<TestClass>(q => q.Time > DateTime.MinValue && q.Time < DateTime.MaxValue);
             Assert.AreEqual("SELECT `Time` FROM TestClass WHERE (TestClass.`Time` > '" + DateTime.MinValue.ToString(format) + "') AND (TestClass.`Time` < '" + DateTime.MaxValue.ToString(format) + "')", arg.ToString());
@@ -853,7 +853,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void SqlOrder3Test()
         {
-            string value = "Id";
+            string value = "ID";
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Id);
             arg.OrderBy.Add<TestClass>(value);
             Assert.AreEqual("SELECT `ID` FROM TestClass ORDER BY TestClass.`ID`", arg.ToString());
@@ -973,7 +973,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void UpdateTest()
         {
-            string format = "yyyy-MM-dd HH:mm:ss:fff";
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00.000", format, CultureInfo.CurrentCulture);
             TestClass t = new TestClass();
             t.Id = 2;
@@ -988,13 +988,13 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void UpdateTest2()
         {
-            string format = "yyyy-MM-dd HH:mm:ss:fff";
-            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00.000", format, CultureInfo.CurrentCulture);
+            DateTime dt = new DateTime(2014, 1, 2);
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             GuidTestClass t = new GuidTestClass();
             t.Id = Guid.NewGuid();
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t, u => u.Time);
-            Assert.AreEqual("UPDATE GuidTestClass SET `Time` = '2014-01-02 00.00.00.000' WHERE `Id` = '" + t.Id.ToString() + "'", args.ToString());
+            Assert.AreEqual("UPDATE GuidTestClass SET `Time` = '" + dt.ToString(format) + "' WHERE `Id` = '" + t.Id.ToString() + "'", args.ToString());
         }
 
         /// <summary>
@@ -1003,8 +1003,8 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void UpdateWhereTest()
         {
-            string format = "yyyy-MM-dd HH:mm:ss:fff";
-            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00.000", format, CultureInfo.CurrentCulture);
+            DateTime dt = new DateTime(2014, 1, 2);
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             TestClass t = new TestClass();
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
@@ -1286,7 +1286,7 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void ExcludeUpdateTest()
         {
-            string format = "yyyy-MM-dd HH:mm:ss:fff";
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00.000", format, CultureInfo.CurrentCulture);
             TestClass t = new TestClass();
             t.Id = 2;
@@ -1302,13 +1302,31 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void ExcludeUpdateTest2()
         {
-            string format = "yyyy-MM-dd HH:mm:ss:fff";
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00.000", format, CultureInfo.CurrentCulture);
             TestClass t = new TestClass();
             t.Id = 2;
             t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
             GXUpdateArgs args = GXUpdateArgs.Update(t);
             args.Exclude<TestClass>(x => new { x.Text, x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
+        }
+
+        /// <summary>
+        /// Exclude update test.
+        /// </summary>
+        [TestMethod]
+        public void ExcludeUpdateTest3()
+        {
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
+            DateTime dt = DateTime.ParseExact("2014-01-02 00:00:00.000", format, CultureInfo.CurrentCulture);
+            TestClass t = new TestClass();
+            t.Id = 2;
+            t.Text = t.Text2 = "Gurux";
+            t.Time = DateTime.SpecifyKind(new DateTime(2014, 1, 2), DateTimeKind.Utc);
+            GXUpdateArgs args = GXUpdateArgs.Update(t, x => new { x.Id, x.Guid, x.Time });
+            args.Exclude<TestClass>(x => new { x.Text2, x.Text3, x.Text4, x.BooleanTest, x.IntTest, x.DoubleTest, x.FloatTest, x.Span, x.Object, x.Status });
+            args.Exclude<TestClass>(x => x.Text);
             Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE `ID` = 2", args.ToString());
         }
 
@@ -1383,12 +1401,14 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void FilterByDateTime()
         {
+            string format = "yyyy-MM-dd HH:mm:ss.fff";
             TestClass filter = new TestClass();
             filter.Status = State.OK;
             filter.Time = new DateTime(2020, 4, 1);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.FilterBy(filter);
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` >= '2020-04-01 00.00.00.000'", arg.ToString());
+            DateTime dt = new DateTime(2020, 04, 01);
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` >= '" + dt.ToString(format) + "'", arg.ToString());
         }
 
         /// <summary>
@@ -1431,7 +1451,7 @@ namespace Gurux.Service_Test
         public void EmptyDateTimeTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Time.Equals(null) || q.Time.Equals(DateTime.MinValue));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Time` IS NULL) OR (TestClass.`Time`='0001-01-01 00.00.00.000')", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Time` IS NULL) OR (TestClass.`Time`='0001-01-01 00:00:00.000')", arg.ToString());
         }
 
         /// <summary>
@@ -1456,7 +1476,7 @@ namespace Gurux.Service_Test
             List<DateTime> list = new List<DateTime>();
             list.Add(DateTime.MinValue);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => list.Contains(q.Time));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IN ('1.1.0001 0.00.00')", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Time` IN ('" + DateTime.MinValue + "')", arg.ToString());
         }
 
         /// <summary>
@@ -1854,6 +1874,6 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Avg(new { q.DoubleTest, q.FloatTest }));
             Assert.AreEqual("SELECT AVG(`DoubleTest` + `FloatTest`) FROM TestClass", arg.ToString());
-        }       
+        }
     }
 }

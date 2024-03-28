@@ -940,7 +940,13 @@ namespace Gurux.Service.Orm
                             if (e.Key == type)
                             {
                                 string post = null;
-                                removed = GetMembers(null, e.Value, '\0', false, ref post);
+                                List<string> list = new List<string>();
+                                if (removed != null)
+                                {
+                                    list.AddRange(removed);
+                                }
+                                list.AddRange(GetMembers(null, e.Value, '\0', false, ref post));
+                                removed = list.ToArray();
                             }
                         }
                     }
