@@ -27,8 +27,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Gurux.Common" Version="8.4.2302.901" />
-    <PackageReference Include="System.Data.Odbc" Version="8.0.0" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+    <PackageReference Include="System.Data.Odbc" Version="9.0.1" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">

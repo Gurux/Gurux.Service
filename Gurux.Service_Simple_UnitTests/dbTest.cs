@@ -1875,5 +1875,15 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Avg(new { q.DoubleTest, q.FloatTest }));
             Assert.AreEqual("SELECT AVG(`DoubleTest` + `FloatTest`) FROM TestClass", arg.ToString());
         }
+
+        /// <summary>
+        /// Bitwice test.
+        /// </summary>
+        [TestMethod]
+        public void BitwiseTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(s => s.Id, w => (w.IntTest & 1) != 0);
+            Assert.AreEqual("SELECT `ID` FROM TestClass WHERE (TestClass.`IntTest` & 1) <> 0", arg.ToString());
+        }
     }
 }

@@ -2006,7 +2006,7 @@ namespace Gurux.Service.Orm
                         op = " + ";
                         break;
                     case ExpressionType.And:
-                        op = " AND ";
+                        op = " & ";
                         break;
                     case ExpressionType.AndAlso:
                         list.Add("(" + GetMembers(settings, newExpression.Left, quoteSeparator, where, ref post)[0] + " AND " +
