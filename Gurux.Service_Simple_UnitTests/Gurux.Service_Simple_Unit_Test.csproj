@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Development\Gurux.Service.csproj" />
-    <ProjectReference Include="..\Gurux.Service.Common\Gurux.Service.Common.csproj" />
   </ItemGroup>
 
 </Project>
