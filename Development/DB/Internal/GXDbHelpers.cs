@@ -36,15 +36,15 @@ using System.Linq;
 using System.Text;
 using Gurux.Service.Orm.Settings;
 using System.Linq.Expressions;
-using Gurux.Common;
 using Gurux.Common.Internal;
 using System.Runtime.Serialization;
 using System.Reflection;
 using System.Collections;
 using System.Globalization;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Enums;
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Internal
 {
     static class GXDbHelpers
     {
@@ -135,13 +135,13 @@ namespace Gurux.Service.Orm
                 {
                     return tablePrefix + type.Name;
                 }
-                return GXDbHelpers.AddQuotes(tablePrefix + type.Name, null, tableQuotation);
+                return AddQuotes(tablePrefix + type.Name, null, tableQuotation);
             }
             if (!addQuotation)
             {
                 return tablePrefix + attr[0].Name;
             }
-            return GXDbHelpers.AddQuotes(tablePrefix + attr[0].Name, null, tableQuotation);
+            return AddQuotes(tablePrefix + attr[0].Name, null, tableQuotation);
         }
 
         /// <summary>
@@ -176,7 +176,7 @@ namespace Gurux.Service.Orm
             {
                 str = GetQuetedValue(((Type)value).FullName);
             }
-            else if (value is float || value is double || value is System.Decimal)
+            else if (value is float || value is double || value is decimal)
             {
                 str = settings.ConvertToString(value, where);
             }
@@ -210,7 +210,7 @@ namespace Gurux.Service.Orm
             }
             else if (value is byte[])
             {
-                str = GetQuetedValue(GXCommon.ToHex(value as byte[], false));
+                str = GetQuetedValue(Convert.ToHexString(value as byte[]));
             }
             else if (value is DateTime)
             {
@@ -253,10 +253,10 @@ namespace Gurux.Service.Orm
                     str = settings.ConvertToString(dt, where);
                 }
             }
-            else if (value is System.Collections.IEnumerable)//If collection
+            else if (value is IEnumerable)//If collection
             {
                 StringBuilder sb = new StringBuilder();
-                foreach (object it in (System.Collections.IEnumerable)value)
+                foreach (object it in (IEnumerable)value)
                 {
                     sb.Append(ConvertToString(it, settings, where, true));
                     sb.Append(';');
@@ -279,9 +279,9 @@ namespace Gurux.Service.Orm
             DataMemberAttribute[] attr = (DataMemberAttribute[])info.GetCustomAttributes(typeof(DataMemberAttribute), true);
             if (attr.Length == 0 || attr[0].Name == null)
             {
-                return GXDbHelpers.AddQuotes(info.Name, null, quoteSeparator);
+                return AddQuotes(info.Name, null, quoteSeparator);
             }
-            return GXDbHelpers.AddQuotes(attr[0].Name, null, quoteSeparator);
+            return AddQuotes(attr[0].Name, null, quoteSeparator);
         }
 
         /// <summary>
@@ -289,7 +289,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="queries"></param>
         internal static void GetQueries(
-            bool insert,
+            object caller,
             GXDBSettings settings,
             List<KeyValuePair<object, LambdaExpression>> values,
             List<KeyValuePair<Type, LambdaExpression>> excluded,
@@ -297,27 +297,29 @@ namespace Gurux.Service.Orm
             GXWhereCollection where,
             List<object> insertedObjects)
         {
+            GXUpdateArgs upd = caller as GXUpdateArgs;
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
             List<object> handledObjects = new List<object>();
             foreach (KeyValuePair<object, LambdaExpression> it in values)
             {
-                GetValues(settings, it.Key, null, it.Value, list, excluded, insert, false,
+                GetValues(settings, it.Key, null, it.Value, list, excluded, upd == null, false,
                     settings.ColumnQuotation, false, where, handledObjects, insertedObjects);
             }
             foreach (KeyValuePair<Type, GXUpdateItem> table in list)
             {
-                if (insert)
+                if (upd != null)
                 {
-                    GetInsertQuery(table, settings, queries);
+                    GetUpdateQuery(upd, table, settings, queries);
                 }
                 else
                 {
-                    GetUpdateQuery(table, settings, queries);
+                    GetInsertQuery(table, settings, queries);
                 }
             }
         }
 
         internal static void GetUpdateQuery(
+            GXUpdateArgs args,
             KeyValuePair<Type, GXUpdateItem> table,
             GXDBSettings settings,
             List<string> queries)
@@ -325,17 +327,22 @@ namespace Gurux.Service.Orm
             if (!table.Value.Inserted)
             {
                 StringBuilder sb = new StringBuilder();
-                int index = 0;
+                int index = 0, colIndex = 0;
                 object value;
                 sb.Length = 0;
-                string tableName = GXDbHelpers.GetTableName(table.Key, true, settings);
+                string tableName = GetTableName(table.Key, true, settings);
                 bool first;
                 foreach (var col in table.Value.Rows)
                 {
+                    ++index;
+                    if (args.Count != 0 && index == args.Count)
+                    {
+                        break;
+                    }
                     sb.Append("UPDATE ");
                     sb.Append(tableName);
                     sb.Append(" SET ");
-                    index = 0;
+                    colIndex = 0;
                     first = true;
                     foreach (var it in col)
                     {
@@ -347,7 +354,7 @@ namespace Gurux.Service.Orm
                         {
                             sb.Append(", ");
                         }
-                        sb.Append(GXDbHelpers.AddQuotes(table.Value.Columns[index],
+                        sb.Append(GXDbHelpers.AddQuotes(table.Value.Columns[colIndex],
                             null,
                             settings.ColumnQuotation));
                         sb.Append(" = ");
@@ -382,8 +389,8 @@ namespace Gurux.Service.Orm
                         {
                             value = it;
                         }
-                        sb.Append(GXDbHelpers.ConvertToString(value, settings, false, true));
-                        ++index;
+                        sb.Append(ConvertToString(value, settings, false, true));
+                        ++colIndex;
                     }
                     if (table.Value.Where.Count != 0)
                     {
@@ -424,7 +431,7 @@ namespace Gurux.Service.Orm
             StringBuilder sb,
             bool select)
         {
-            string tableName = GXDbHelpers.GetTableName(table.Key, true, settings);
+            string tableName = GetTableName(table.Key, true, settings);
             GetInsert(settings, first, sb);
             sb.Append(tableName);
             sb.Append(" (");
@@ -466,7 +473,7 @@ namespace Gurux.Service.Orm
                 }
                 else if (o1.GetType().IsValueType)
                 {
-                    ret = (o1 as System.ValueType).Equals(Convert.ChangeType(ZeroValue, o1.GetType()));
+                    ret = (o1 as ValueType).Equals(Convert.ChangeType(ZeroValue, o1.GetType()));
                 }
                 else if (o1.GetType() == typeof(string))
                 {
@@ -610,7 +617,7 @@ namespace Gurux.Service.Orm
                     {
                         value = it;
                     }
-                    sb.Append(GXDbHelpers.ConvertToString(value, settings, false, true));
+                    sb.Append(ConvertToString(value, settings, false, true));
                 }
                 if (!select)
                 {
@@ -712,6 +719,17 @@ namespace Gurux.Service.Orm
                     {
                         foreach (object v in (IEnumerable)value)
                         {
+                            if (v is GXTableBase b)
+                            {
+                                if (insert)
+                                {
+                                    b.BeforeAdd();
+                                }
+                                else
+                                {
+                                    b.BeforeUpdate();
+                                }
+                            }
                             GetValues(settings, v, parent, columns, itemsList, excluded, insert, false,
                                 columnQuotation, updating, where, handledObjects, insertedObjects);
                         }
@@ -727,7 +745,7 @@ namespace Gurux.Service.Orm
                         if (value is GXSelectArgs sel)
                         {
                             //Auto increment keys are added to excluded list.
-                            PropertyInfo pi = (si.Target as PropertyInfo);
+                            PropertyInfo pi = si.Target as PropertyInfo;
                             string name;
                             DataMemberAttribute[] attr = (DataMemberAttribute[])pi.GetCustomAttributes(typeof(DataMemberAttribute), true);
                             if (attr.Length == 0 || attr[0].Name == null)
@@ -744,7 +762,7 @@ namespace Gurux.Service.Orm
                         else
                         {
                             //If ID is zero do not update item if it's auto increment value.
-                            if ((si.Attributes & (Attributes.Id)) != 0)
+                            if ((si.Attributes & Attributes.Id) != 0)
                             {
                                 tmp = si.Get(value);
                                 //If Id is not autoincrement.
@@ -857,7 +875,7 @@ namespace Gurux.Service.Orm
                 {
                     string post = null;
                     List<string> colums = new List<string>();
-                    colums.AddRange(GXDbHelpers.GetMembers(null, columns.Body, '\0', false, ref post));
+                    colums.AddRange(GetMembers(null, columns.Body, '\0', false, ref post));
                     foreach (string item in colums)
                     {
                         KeyValuePair<string, GXSerializedItem> it = new KeyValuePair<string, GXSerializedItem>(item, properties[item]);
@@ -924,7 +942,7 @@ namespace Gurux.Service.Orm
                                 {
                                     if (!properties.ContainsKey(r))
                                     {
-                                        Expression<Func<object, object>> expression = (_ => r);
+                                        Expression<Func<object, object>> expression = _ => r;
                                         s.Columns.Excluded.Add(new KeyValuePair<Type, LambdaExpression>(c.Key, expression));
                                     }
                                 }
@@ -1004,7 +1022,6 @@ namespace Gurux.Service.Orm
                         GetColumn(settings, value, itemsList, excluded, insert, mapTable, columnQuotation, updating, where, type, u, update, it);
                     }
                 }
-                //Remove excluded columns.
                 if (excluded != null)
                 {
                     foreach (KeyValuePair<Type, LambdaExpression> it in excluded)
@@ -1152,7 +1169,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                     //Relations are not inserted. They are expected to be in DB already.
-                    else if (it.Value.Relation.RelationType != RelationType.Relation)
+                    else if (target != null && it.Value.Relation.RelationType != RelationType.Relation)
                     {
                         GetValues(settings, target, value, null, itemsList,
                             excluded, insert, mapTable, columnQuotation, updating, where, null, null);
@@ -1246,7 +1263,7 @@ namespace Gurux.Service.Orm
                 if (m.Method.Name == "Exists")
                 {
                     string tmp;
-                    if (m.Arguments.Count == 3)
+                    if (m.Arguments.Count == 3 || m.Arguments.Count == 4)
                     {
                         if (unaryExpression != null && unaryExpression.NodeType == ExpressionType.Not)
                         {
@@ -1256,9 +1273,17 @@ namespace Gurux.Service.Orm
                         {
                             tmp = "(EXISTS (";
                         }
-                        tmp += GetMembers(settings, m.Arguments[2], quoteSeparator, where, false, ref post, false)[0] + " AND " +
-                                  GetMembers(settings, m.Arguments[1], quoteSeparator, where, false, ref post, false)[0] + " = " +
-                                  GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post, false)[0] + "))";
+                        string query = GetMembers(settings, m.Arguments[2], quoteSeparator, where, false, ref post, false)[0];
+                        if (query.IndexOf("WHERE") == -1)
+                        {
+                            tmp += query + " WHERE ";
+                        }
+                        else
+                        {
+                            tmp += query + " AND ";
+                        }
+                        tmp += GetMembers(settings, m.Arguments[1], quoteSeparator, where, false, ref post, false)[0] + " = ";
+                        tmp += GetMembers(settings, m.Arguments[0], quoteSeparator, where, false, ref post, false)[0] + "))";
                         return new string[] { tmp };
                     }
                     if (m.Arguments.Count == 1)
@@ -1320,7 +1345,7 @@ namespace Gurux.Service.Orm
                             GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
                 }
             }
-            if (m.Method.DeclaringType == typeof(System.Linq.Enumerable) && m.Method.Name == "Contains")
+            if (m.Method.DeclaringType == typeof(Enumerable) && m.Method.Name == "Contains")
             {
                 StringBuilder sb = new StringBuilder();
                 sb.Append("(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where, ref post)[0]);
@@ -1357,7 +1382,17 @@ namespace Gurux.Service.Orm
                 }
                 foreach (string it in GetMembers(settings, m.Object, quoteSeparator, where, ref post))
                 {
-                    sb.Append(it);
+                    int pos = it.IndexOf("IN(");
+                    if (pos != -1)
+                    {
+                        //If IN is collection of IUnique objects.
+                        string str = it.Substring(3 + pos);
+                        sb.Append(str.Substring(0, str.Length - 2));
+                    }
+                    else
+                    {
+                        sb.Append(it);
+                    }
                     sb.Append(", ");
                 }
                 sb.Length -= 2;
@@ -1383,13 +1418,6 @@ namespace Gurux.Service.Orm
             {
                 if (m.Method.DeclaringType == typeof(string))
                 {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                    if (settings.Type == DatabaseType.Access)
-                    {
-                        return new string[] {"(" + GetMembers(settings, m.Object, quoteSeparator, where, ref post)[0] + " LIKE('" +
-                                GetMembers(settings, m.Arguments[0], '\0', where, true, ref post, false)[0] + "'))"};
-                    }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                     string tmp = GetMembers(settings, m.Arguments[0], '\0', where, true, ref post, false)[0];
                     if (tmp == null)
                     {
@@ -1531,7 +1559,8 @@ namespace Gurux.Service.Orm
             if (expression is LambdaExpression)
             {
                 LambdaExpression lambdaEx = expression as LambdaExpression;
-                return GetMembers(settings, lambdaEx.Body, quoteSeparator, where, ref post);
+                return GetMembers(settings, lambdaEx.Body, quoteSeparator,
+                    where, getValue, ref post, isParameter);
             }
 
             if (expression is MemberExpression)
@@ -1558,12 +1587,12 @@ namespace Gurux.Service.Orm
                     //In where get table type and column name.
                     if (where && memberExpression.Member.DeclaringType.IsClass)
                     {
-                        if (GXDbHelpers.IsAliasName(memberExpression.Expression.Type))
+                        if (IsAliasName(memberExpression.Expression.Type))
                         {
-                            return new string[] { GXDbHelpers.OriginalTableName(memberExpression.Expression.Type) +
-                            "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };
+                            return new string[] { OriginalTableName(memberExpression.Expression.Type) +
+                                "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };
                         }
-                        return new string[] { GXDbHelpers.GetTableName(memberExpression.Expression.Type, true, settings) +
+                        return new string[] { GetTableName(memberExpression.Expression.Type, true, settings) +
                             "." + GetColumnName(memberExpression.Member, settings.ColumnQuotation) };
                     }
                     else
@@ -1632,12 +1661,12 @@ namespace Gurux.Service.Orm
                         //In where get table type and column name.
                         if (where && p.DeclaringType.IsClass)
                         {
-                            if (GXDbHelpers.IsAliasName(p.DeclaringType))
+                            if (IsAliasName(p.DeclaringType))
                             {
-                                return new string[] { GXDbHelpers.OriginalTableName(p.DeclaringType) +
+                                return new string[] { OriginalTableName(p.DeclaringType) +
                             "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
                             }
-                            return new string[] { GXDbHelpers.GetTableName(p.DeclaringType, true, settings) +
+                            return new string[] { GetTableName(p.DeclaringType, true, settings) +
                             "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
                         }
                         return new string[] { GetColumnName(value as PropertyInfo, quoteSeparator) };
@@ -1655,12 +1684,12 @@ namespace Gurux.Service.Orm
                             //In where get table type and column name.
                             if (where && p.DeclaringType.IsClass)
                             {
-                                if (GXDbHelpers.IsAliasName(p.DeclaringType))
+                                if (IsAliasName(p.DeclaringType))
                                 {
-                                    return new string[] { GXDbHelpers.OriginalTableName(p.DeclaringType) +
+                                    return new string[] { OriginalTableName(p.DeclaringType) +
                             "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
                                 }
-                                return new string[] { GXDbHelpers.GetTableName(p.DeclaringType, true, settings) +
+                                return new string[] { GetTableName(p.DeclaringType, true, settings) +
                             "." + GetColumnName(value as PropertyInfo, settings.ColumnQuotation) };
                             }
                             return new string[] { GetColumnName(value as PropertyInfo, quoteSeparator) };
@@ -1689,7 +1718,7 @@ namespace Gurux.Service.Orm
                         //If this is a basic type list. example int[].
                         if (properties.Count == 0)
                         {
-                            foreach (object it in (target as IEnumerable))
+                            foreach (object it in target as IEnumerable)
                             {
                                 if (first)
                                 {
@@ -1907,7 +1936,7 @@ namespace Gurux.Service.Orm
                         {
                             if (settings.UseQuotationWhereColumns)
                             {
-                                sb.Append(GXDbHelpers.AddQuotes(it.Key,
+                                sb.Append(AddQuotes(it.Key,
                                     null,
                                     settings.ColumnQuotation));
                             }
@@ -1961,9 +1990,11 @@ namespace Gurux.Service.Orm
                 MethodCallExpression m = unaryExpression.Operand as MethodCallExpression;
                 if (m != null)
                 {
-                    return HandleMethod(settings, unaryExpression, m, quoteSeparator, where, getValue, ref post);
+                    return HandleMethod(settings, unaryExpression, m, quoteSeparator,
+                        where, getValue, ref post);
                 }
-                return GetMembers(settings, unaryExpression.Operand, quoteSeparator, where, getValue, ref post, true);
+                return GetMembers(settings, unaryExpression.Operand, quoteSeparator,
+                    where, getValue, ref post, true);
             }
 
             if (expression is NewExpression)
@@ -2089,7 +2120,7 @@ namespace Gurux.Service.Orm
                     tmp = GetMembers(settings, newExpression.Right, quoteSeparator, where, true, ref post, isClass2)[0];
                 }
                 //Where string is empty is not working with oracle DB. We must use where string is null expression.
-                if (where && (tmp == null || ((settings.Type == DatabaseType.Oracle) && tmp == "''")))
+                if (where && (tmp == null || settings.Type == DatabaseType.Oracle && tmp == "''"))
                 {
                     tmp = null;
                     if (expression.NodeType == ExpressionType.NotEqual)
@@ -2126,7 +2157,7 @@ namespace Gurux.Service.Orm
                 }
                 if (ce.Value is bool)
                 {
-                    return new string[] { ((bool)ce.Value) ? "1" : "0" };
+                    return new string[] { (bool)ce.Value ? "1" : "0" };
                 }
                 if (ce.Value is Enum e)
                 {

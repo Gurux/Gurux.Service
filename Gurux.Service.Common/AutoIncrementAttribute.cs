@@ -31,41 +31,15 @@
 //---------------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Is table column marked as auto increment to the DB.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class AutoIncrementAttribute : Attribute
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
 
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
-        {
-            Parent = parent;
-        }
-
-        /// <summary>
-        /// Add map.
-        /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
-        {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
-        }
     }
 }

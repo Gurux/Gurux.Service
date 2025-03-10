@@ -30,42 +30,28 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common.Enums
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Foreign key delete actions.
+    /// </summary>
+    public enum ForeignKeyDelete
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
-
         /// <summary>
-        /// Constructor.
+        /// Foreign key delete action is not used. This is a default.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
-        {
-            Parent = parent;
-        }
-
+        None,
         /// <summary>
-        /// Add map.
+        /// Items are removed from child table when parent item is removed.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
-        {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
-        }
+        Cascade,
+        /// <summary>
+        /// If parent item is try to remove and there are items on the child table deletion is rejected.
+        /// </summary>
+        Empty,
+        /// <summary>
+        /// Deletion is restrict.
+        /// </summary>
+        Restrict
     }
 }

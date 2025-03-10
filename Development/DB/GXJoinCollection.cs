@@ -30,6 +30,7 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;

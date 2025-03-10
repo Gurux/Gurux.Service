@@ -30,42 +30,53 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Service.Orm.Common.Enums;
 using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Filter attribute can be used to filter columns.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
+    public class FilterAttribute : Attribute
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
+        /// <summary>
+        /// Filter type.
+        /// </summary>
+        public FilterType FilterType
+        {
+            get;
+            set;
+        }
+
+        /// <summary>
+        /// Default value when filter is ignored.
+        /// </summary>
+        public object DefaultValue
+        {
+            get;
+            set;
+        }
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
+        /// <param name="filterType">Filter type.</param>
+        public FilterAttribute(FilterType filterType)
         {
-            Parent = parent;
+            FilterType = filterType;
         }
 
         /// <summary>
-        /// Add map.
+        /// Constructor.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
+        /// <param name="filterType">Filter type.</param>
+        /// <param name="defaultValue">Default value.</param>
+        public FilterAttribute(FilterType filterType, object defaultValue)
         {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
+            FilterType = filterType;
+            DefaultValue = defaultValue;
         }
     }
 }

@@ -36,6 +36,8 @@ using System.Linq.Expressions;
 using System.Text;
 using Gurux.Service.Orm.Settings;
 using System.Reflection;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Enums;
 
 namespace Gurux.Service.Orm
 {
@@ -178,7 +180,7 @@ namespace Gurux.Service.Orm
                     sb.Append(GXDbHelpers.AddQuotes(it.Column,
                         null,
                         parent.Settings.ColumnQuotation));
-                }              
+                }
             }
         }
 

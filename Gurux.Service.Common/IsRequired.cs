@@ -30,28 +30,39 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm
+using System;
+
+namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Join types.
+    /// IsRequired attribute can be used tell is null value allowed for the database column.
     /// </summary>
-    enum JoinType
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class IsRequiredAttribute : Attribute
     {
         /// <summary>
-        /// Left join.
+        /// Is value required.
         /// </summary>
-        Left,
+        public bool IsRequired
+        {
+            get;
+            set;
+        }
+
         /// <summary>
-        /// Inner join.
+        /// Constructor.
         /// </summary>
-        Inner,        
+        public IsRequiredAttribute()
+        {
+            IsRequired = true;
+        }
         /// <summary>
-        /// Right join.
+        /// Constructor.
         /// </summary>
-        Right,
-        /// <summary>
-        /// Full join.
-        /// </summary>
-        Full
+        /// <param name="required">Is null value allowed.</param>
+        public IsRequiredAttribute(bool required)
+        {
+            IsRequired = required;
+        }
     }
 }

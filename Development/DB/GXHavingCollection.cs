@@ -34,6 +34,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text;
+using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Settings;
 
 namespace Gurux.Service.Orm

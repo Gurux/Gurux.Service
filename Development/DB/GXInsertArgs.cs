@@ -37,7 +37,8 @@ using Gurux.Common.Internal;
 using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Internal;
 
 namespace Gurux.Service.Orm
 {
@@ -95,7 +96,7 @@ namespace Gurux.Service.Orm
 
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<object> insertedObjects = new List<object>();
-        
+
         /// <summary>
         /// Generated insert SQL string.
         /// </summary>
@@ -140,12 +141,14 @@ namespace Gurux.Service.Orm
             return ToString(true);
         }
 
+        /// <inheritdoc/>
+        /// <param name="addExecutionTime"> is execution time added to string.</param>
         public string ToString(bool addExecutionTime)
         {
             if (Parent.Updated)
             {
                 List<string> queries = new List<string>();
-                GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries, null, insertedObjects);
+                GXDbHelpers.GetQueries(null, Parent.Settings, Values, Excluded, queries, null, insertedObjects);
                 sql = string.Join(" ", queries.ToArray());
             }
             return sql;

@@ -37,7 +37,8 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Collections;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common;
 
 namespace Gurux.Common.Internal
 {
@@ -446,7 +447,7 @@ namespace Gurux.Common.Internal
                             }
                             value = items;
                         }
-#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NET5_0 && !NET6_0 && !NET8_0
+#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NET5_0 && !NET6_0 && !NET8_0  && !NET9_0
                         else if (pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(System.Data.Linq.EntitySet<>))
                         {
                             Type listT = typeof(System.Data.Linq.EntitySet<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
@@ -616,9 +617,9 @@ namespace Gurux.Common.Internal
             {
                 if (value is string)
                 {
-                    return GXCommon.HexToBytes((string)value);
+                    return Convert.FromHexString((string)value);
                 }
-                return GXCommon.HexToBytes(ASCIIEncoding.ASCII.GetString((byte[])value));
+                return Convert.FromHexString(ASCIIEncoding.ASCII.GetString((byte[])value));
             }
             //Date times are saved in UTC format.
             if (type == typeof(DateTime))

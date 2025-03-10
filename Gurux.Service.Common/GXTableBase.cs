@@ -30,42 +30,41 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common
 {
-    public class GXMapCollection
+    /// <summary>
+    /// This class is used add external functionality to the table object.
+    /// </summary>
+    public abstract class GXTableBase
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
+        /// <summary>
+        /// This method is called before Item is added to database.
+        /// </summary>
+        public virtual void BeforeAdd() { }
 
         /// <summary>
-        /// Constructor.
+        /// This method is called after Item is added to database.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
-        {
-            Parent = parent;
-        }
+        public virtual void AfterAdd() { }
 
         /// <summary>
-        /// Add map.
+        /// This method is called before Item is updated to database.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
-        {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
-        }
+        public virtual void BeforeUpdate() { }
+
+        /// <summary>
+        /// This method is called after Item is updated to database.
+        /// </summary>
+        public virtual void AfterUpdate() { }
+
+        /// <summary>
+        /// This method is called before Item is removed from database.
+        /// </summary>
+        public virtual void BeforeRemove() { }
+
+        /// <summary>
+        /// This method is called after Item is removed from database.
+        /// </summary>
+        public virtual void AfterRemove() { }
     }
 }

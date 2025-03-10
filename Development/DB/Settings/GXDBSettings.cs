@@ -33,7 +33,8 @@
 using System;
 using System.Globalization;
 using System.ComponentModel;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Common.Enums;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -48,6 +49,8 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="type">Database type.</param>
         protected GXDBSettings(DatabaseType type)
         {
+            //Update type so SQL queries are shown for correct database.
+            GXDbConnection.DefaultDatabaseType = type;
             Type = type;
         }
 
@@ -512,6 +515,6 @@ namespace Gurux.Service.Orm.Settings
         public virtual string[] DropAutoIncrement(string tableName, string columnName)
         {
             return null;
-        }     
+        }
     }
 }

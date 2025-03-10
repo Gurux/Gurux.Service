@@ -39,9 +39,10 @@ using Gurux.Service.Orm.Settings;
 using Gurux.Common.Internal;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
-using Gurux.Common;
-using System.Diagnostics.CodeAnalysis;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Common.Enums;
 
 namespace Gurux.Service.Orm
 {
@@ -133,11 +134,6 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     settings = new GXSqLiteSettings();
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                case DatabaseType.Access:
-                    settings = new GXAccessSettings();
-                    break;
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 case DatabaseType.Oracle:
                     settings = new GXOracleSqlSettings();
                     break;
@@ -426,7 +422,7 @@ namespace Gurux.Service.Orm
                         }
                     }
                 }
-            }            
+            }
             s.Attributes = (Attributes)value;
         }
 
@@ -450,7 +446,7 @@ namespace Gurux.Service.Orm
             }
             foreach (var it in GetProperties(type))
             {
-                if ((it.Value.Attributes & Common.Internal.Attributes.Id) != 0)
+                if ((it.Value.Attributes & Attributes.Id) != 0)
                 {
                     return it.Value;
                 }

@@ -39,7 +39,8 @@ using Gurux.Service.Orm.Settings;
 using System.Collections;
 using Gurux.Common.Internal;
 using System.Diagnostics;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Common;
 
 namespace Gurux.Service.Orm
 {
@@ -81,18 +82,20 @@ namespace Gurux.Service.Orm
             if (Parent.Updated || Updated)
             {
                 StringBuilder sb = new StringBuilder();
-                sb.Append("DELETE FROM ");
+                sb.Append("DELETE");
+                if (Count != 0)
+                {
+                    sb.Append(" TOP (");
+                    sb.Append(Count);
+                    sb.Append(")");
+                }
+                sb.Append(" FROM ");
                 sb.Append(GXDbHelpers.GetTableName(Table, true, Parent.Settings.TableQuotation, Parent.Settings.TablePrefix));
                 string str = Where.ToString();
                 if (!string.IsNullOrEmpty(str))
                 {
                     sb.Append(" ");
                     sb.Append(str);
-                }
-                if (Count != 0)
-                {
-                    sb.Append("LIMIT ");
-                    sb.Append(Count);
                 }
                 Updated = false;
                 return sb.ToString();
@@ -268,7 +271,7 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// How many items are deleted.
+        /// The maximum number of items that can be deleted.
         /// </summary>
         /// <remarks>
         /// If value is zero there are no limitations.

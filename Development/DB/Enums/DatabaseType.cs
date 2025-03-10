@@ -31,8 +31,11 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Enums
 {
+    /// <summary>
+    /// Available database types.
+    /// </summary>
     public enum DatabaseType
     {
         /// <summary>
@@ -50,12 +53,6 @@ namespace Gurux.Service.Orm
         /// http://www.sqlite.org
         /// </remarks>
         SqLite,
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-        /// <summary>
-        /// Target database is MS Access.
-        /// </summary>        
-        Access,
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
         /// <summary>
         /// Target database is Oracle.
         /// </summary>        

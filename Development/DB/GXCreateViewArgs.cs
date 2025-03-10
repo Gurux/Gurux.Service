@@ -36,6 +36,7 @@ using System.Text;
 using Gurux.Service.Orm.Settings;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Gurux.Service.Orm.Internal;
 namespace Gurux.Service.Orm
 {
     /// <summary>

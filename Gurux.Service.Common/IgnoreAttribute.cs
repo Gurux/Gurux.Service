@@ -28,44 +28,43 @@
 //
 // This code is licensed under the GNU General Public License v2. 
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
-//---------------------------------------------------------------------------
+//--------------------------------------------------------------------------
 
+using Gurux.Service.Orm.Common.Enums;
 using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Properties with this IgnoreAttribute are ignored when building sql sentences 
+    /// and they are not saved to DB or JSON data.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
+    public class IgnoreAttribute : Attribute
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
+        /// <summary>
+        /// Ignore types.
+        /// </summary>
+        public IgnoreType IgnoreType
+        {
+            get;
+            private set;
+        }
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
+        public IgnoreAttribute()
         {
-            Parent = parent;
+            IgnoreType = IgnoreType.All;
         }
 
         /// <summary>
-        /// Add map.
+        /// Constructor.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
+        public IgnoreAttribute(IgnoreType ignore)
         {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
+            IgnoreType = ignore;
         }
     }
 }

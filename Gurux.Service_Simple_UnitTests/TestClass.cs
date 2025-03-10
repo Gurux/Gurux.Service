@@ -32,10 +32,10 @@
 
 using System.Runtime.Serialization;
 using System.ComponentModel;
-using Gurux.Common;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Gurux.Common.Db;
 using System.ComponentModel.DataAnnotations;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Common.Enums;
 
 namespace Gurux.Service_Test
 {
@@ -496,7 +496,7 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [DataMember(), Gurux.Common.Db.Ignore]
+        [DataMember(), Gurux.Service.Orm.Common.Ignore]
         public TestItem[] Items
         {
             get;
@@ -766,6 +766,60 @@ namespace Gurux.Service_Test
 
         [DataMember, ForeignKey(typeof(Parent), OnDelete = ForeignKeyDelete.Cascade)]
         public int ParentId
+        {
+            get;
+            set;
+        }
+
+        [DataMember]
+        public string Name
+        {
+            get;
+            set;
+        }
+    }
+
+    [DataContract]
+    class Parent2 : IUnique<int>
+    {
+        [AutoIncrement]
+        [DataMember]
+        public int Id
+        {
+            get;
+            set;
+        }
+        [DataMember(Name = "ParentName")]
+        public string Name
+        {
+            get;
+            set;
+        }
+
+        [DataMember]
+        [ForeignKey]
+        public Child2[] Childrens
+        {
+            get;
+            set;
+        }
+    }
+
+
+    [DataContract]
+    class Child2 : IUnique<long>
+    {
+        [DataMember]
+        [AutoIncrement]
+        public long Id
+        {
+            get;
+            set;
+        }
+
+        [DataMember, ForeignKey(typeof(Parent2),
+            OnDelete = ForeignKeyDelete.Cascade)]
+        public Parent2 Parent
         {
             get;
             set;

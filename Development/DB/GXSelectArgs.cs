@@ -38,8 +38,9 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Gurux.Common.Internal;
-using Gurux.Common;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Common;
 
 namespace Gurux.Service.Orm
 {

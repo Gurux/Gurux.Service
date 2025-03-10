@@ -28,44 +28,33 @@
 //
 // This code is licensed under the GNU General Public License v2. 
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
-//---------------------------------------------------------------------------
+//--------------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common.Enums
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Ignore type enumeration.
+    /// </summary>
+    [Flags]
+    public enum IgnoreType : int
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
-
         /// <summary>
-        /// Constructor.
+        /// Nothing is ingoner.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
-        {
-            Parent = parent;
-        }
-
+        None = 0,
         /// <summary>
-        /// Add map.
+        /// DB is ignored.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
-        {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
-        }
+        Db = 1,
+        /// <summary>
+        /// JSON formatter is ignored.
+        /// </summary>
+        Json = 2,
+        /// <summary>
+        /// This is ignored always.
+        /// </summary>
+        All = -1
     }
 }

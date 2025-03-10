@@ -36,7 +36,8 @@ using Gurux.Service.Orm.Settings;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Collections;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Common;
 
 namespace Gurux.Service.Orm
 {
@@ -121,11 +122,11 @@ namespace Gurux.Service.Orm
                 if (Where.List.Count == 0)
                 {
                     //Get inserted items.
-                    GXDbHelpers.GetQueries(true, Parent.Settings, Values, Excluded, queries, Where, null);
+                    GXDbHelpers.GetQueries(null, Parent.Settings, Values, Excluded, queries, Where, null);
                 }
 
                 //Get updated items.
-                GXDbHelpers.GetQueries(false, Parent.Settings, Values, Excluded, queries, Where, null);
+                GXDbHelpers.GetQueries(this, Parent.Settings, Values, Excluded, queries, Where, null);
                 sql = string.Join(" ", queries.ToArray());
             }
             return sql;
@@ -231,6 +232,24 @@ namespace Gurux.Service.Orm
         {
             Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));
             Parent.Updated = true;
+        }
+
+        /// <summary>
+        /// The maximum number of items that can be updated.
+        /// </summary>
+        /// <remarks>
+        /// If value is zero there are no limitations.
+        /// </remarks>
+        public UInt32 Count
+        {
+            get
+            {
+                return Parent.Count;
+            }
+            set
+            {
+                Parent.Count = value;
+            }
         }
     }
 }

@@ -31,41 +31,39 @@
 //---------------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
 
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Relation attribute.
+    /// </summary>
+    /// <remarks>
+    /// Relation attribute is used to show relations between tables.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Property)]
+    public class RelationAttribute : Attribute
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
+        public Type Target
+        {
+            get;
+            set;
+        }
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
+        public RelationAttribute()
         {
-            Parent = parent;
+
         }
 
         /// <summary>
-        /// Add map.
+        /// Constructor.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
+        /// <param name="type">Relation target</param>
+        public RelationAttribute(Type target)
         {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
+            Target = target;
         }
     }
 }

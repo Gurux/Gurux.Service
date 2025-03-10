@@ -34,8 +34,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
 using System.Runtime.Serialization;
 using System.Globalization;
-using Gurux.Common.Db;
-using System.Collections.Generic;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Enums;
 
 namespace Gurux.Service_Test
 {
@@ -360,6 +360,39 @@ namespace Gurux.Service_Test
             GXDeleteArgs del = GXDeleteArgs.Delete<TestClass>(a => GXSql.Exists(sel));
             Assert.AreEqual("DELETE FROM TestClass WHERE EXISTS (SELECT 1 FROM TestClass WHERE TestClass.`Text` = 'Gurux')", del.ToString());
         }
+
+        /// <summary>
+        /// Delete using list.
+        /// </summary>
+        [TestMethod]
+        public void DeleteByListTest()
+        {
+            Parent2 p = new Parent2()
+            {
+                Id = 1,
+            };
+            p.Childrens = new[] {
+                    new Child2()
+            {
+                Id = 2,
+                Parent = p,
+            },
+            new Child2()
+            {
+                Id = 3,
+                Parent = p,
+            },
+            new Child2()
+            {
+                Id = 4,
+                Parent = p,
+            }};
+            List<Parent2> list = new List<Parent2>();
+            list.Add(p);
+            GXDeleteArgs del = GXDeleteArgs.Delete<Child2>(w => list.Contains(w.Parent));
+            Assert.AreEqual("DELETE FROM Child2 WHERE Child2.`Parent` IN (1)", del.ToString());
+        }
+
         /// <summary>
         /// Select two columns test.
         /// </summary>
@@ -1085,6 +1118,18 @@ namespace Gurux.Service_Test
         /// Select Guid where ID in array.
         /// </summary>
         [TestMethod]
+        public void SqlIn3Test()
+        {
+            GXSelectArgs sub = GXSelectArgs.Select<Country>(x => x.Id, w => w.Name == "Finland");
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Company>();
+            arg.Where.And<Company>(q => GXSql.In(q.Country, sub));
+            Assert.AreEqual("SELECT `Id`, `Name`, `CountryID` FROM Company WHERE Company.`CountryID` IN (SELECT `ID` FROM Country WHERE Country.`CountryName` = 'Finland')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
         public void SqlNotIn2Test()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
@@ -1093,16 +1138,16 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
-        /// Select Guid where ID is in the array.
+        /// Select all countries where company exists. 
         /// </summary>
         [TestMethod]
         public void ExistsTest()
         {
-            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id);
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => GXSql.One);
             arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
             GXSelectArgs arg = GXSelectArgs.SelectAll<Country>();
-            arg.Where.And<Country>(q => GXSql.Exists<Company, Country>(a => a.Country, b => b.Id, arg2));
-            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE EXISTS (SELECT `Id` FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Country.`ID` = Company.`CountryID`)";
+            arg.Where.And<Country>(q => GXSql.Exists<Country, Company>(b => b.Id, a => a.Country, arg2));
+            string expected = "SELECT `ID`, `CountryName` FROM Country WHERE EXISTS (SELECT 1 FROM Company WHERE UPPER(Company.`Name`) LIKE('GURUX') AND Company.`CountryID` = Country.`ID`)";
             string actual = arg.ToString();
             Assert.AreEqual(expected, actual);
         }

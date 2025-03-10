@@ -137,7 +137,10 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Is value exists in the table.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="TSourceTable">Source table</typeparam>
+        /// <typeparam name="TDestinationTable">Destination table</typeparam>
+        /// <param name="sourceColumn">Source column.</param>
+        /// <param name="destinationColumn">Destination column.</param>
         /// <param name="expression">Value to search.</param>
         /// <returns>True, if value exists.</returns>
         public static bool Exists<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> sourceColumn,

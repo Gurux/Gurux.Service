@@ -36,8 +36,8 @@ using System.Linq.Expressions;
 using System.Text;
 using Gurux.Service.Orm.Settings;
 using System.Reflection;
-using System.Xml.Linq;
-using Gurux.Common.Db;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Enums;
 
 namespace Gurux.Service.Orm
 {

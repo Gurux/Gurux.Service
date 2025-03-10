@@ -47,8 +47,10 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using System.Threading;
-using Gurux.Common.Db;
-using System.Data.SqlClient;
+using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Internal;
 
 namespace Gurux.Service.Orm
 {
@@ -330,39 +332,6 @@ namespace Gurux.Service.Orm
             {
                 type = DatabaseType.Oracle;
             }
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-            else if (name == "OdbcConnection")
-            {
-                name = tp.GetProperty("DataSource").GetValue(connections[0], null).ToString();
-                if (name == "ACCESS")
-                {
-                    type = DatabaseType.Access;
-                }
-                else
-                {
-                    if (connections[0].ServerVersion.Contains("Oracle"))
-                    {
-                        type = DatabaseType.Oracle;
-                    }
-                    else
-                    {
-                        throw new ArgumentOutOfRangeException("Unknown connection.");
-                    }
-                }
-            }
-            else if (name == "OleDbConnection")
-            {
-                name = tp.GetProperty("DataSource").GetValue(connections[0], null).ToString();
-                if (string.Compare(Path.GetExtension(name), ".mdb", true) == 0)
-                {
-                    type = DatabaseType.Access;
-                }
-                else
-                {
-                    throw new ArgumentOutOfRangeException("Unknown connection.");
-                }
-            }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
             else
             {
                 throw new ArgumentOutOfRangeException("Unknown connection.");
@@ -513,6 +482,22 @@ namespace Gurux.Service.Orm
             if (!tables.ContainsKey(type))
             {
                 tables.Add(type, null);
+            }
+            if (relations && !overwrite)
+            {
+                //Existing tables are not created.
+                List<Type> removed = new List<Type>();
+                foreach (var it in tables)
+                {
+                    if (TableExist(it.Key))
+                    {
+                        removed.Add(it.Key);
+                    }
+                }
+                foreach (var it in removed)
+                {
+                    tables.Remove(it);
+                }
             }
             IDbConnection connection;
             bool tranactionOnProgress = transaction != null;
@@ -976,11 +961,7 @@ namespace Gurux.Service.Orm
                                 Builder.Settings.ColumnQuotation));
                             sb.Append(" ");
                             if (!((it.Value.Attributes & (Attributes.AutoIncrement)) != 0 &&
-                                (
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                                Builder.Settings.Type == DatabaseType.Access ||
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
-                                Builder.Settings.Type == DatabaseType.SqLite)))
+                                (Builder.Settings.Type == DatabaseType.SqLite)))
                             {
                                 try
                                 {
@@ -1054,7 +1035,7 @@ namespace Gurux.Service.Orm
                             if ((it.Value.Attributes & (Attributes.AutoIncrement | Attributes.PrimaryKey)) != 0)
                             {
 #if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                                if (Builder.Settings.Type == DatabaseType.Access || Builder.Settings.Type == DatabaseType.Oracle)
+                                if (Builder.Settings.Type == DatabaseType.Oracle)
                                 {
                                     if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                                     {
@@ -1343,25 +1324,48 @@ namespace Gurux.Service.Orm
                     }
                 }
             }
-            IndexCollectionAttribute coll = GXInternal.GetAttribute<IndexCollectionAttribute>(type);
-            if (coll != null)
+            if (Builder.Settings.Type != DatabaseType.Oracle)
             {
-                bool first = true;
-                sb.Length = 0;
-                sb.Append("CREATE ");
-                if (coll.Unique)
+                IndexCollectionAttribute coll = GXInternal.GetAttribute<IndexCollectionAttribute>(type);
+                if (coll != null)
                 {
-                    sb.Append("UNIQUE ");
-                }
-                if (coll.Clustered && Builder.Settings.Type == DatabaseType.MSSQL)
-                {
-                    //Create clustered index for MSSQL.
-                    sb.Append("CLUSTERED ");
-                }
-                sb.Append("INDEX ");
-                name = coll.Name;
-                if (string.IsNullOrEmpty(name))
-                {
+                    bool first = true;
+                    sb.Length = 0;
+                    sb.Append("CREATE ");
+                    if (coll.Unique)
+                    {
+                        sb.Append("UNIQUE ");
+                    }
+                    if (coll.Clustered &&
+                        (Builder.Settings.Type == DatabaseType.MSSQL))
+                    {
+                        //Create clustered index for MSSQL or MySQL.
+                        sb.Append("CLUSTERED ");
+                    }
+                    sb.Append("INDEX ");
+                    name = coll.Name;
+                    if (string.IsNullOrEmpty(name))
+                    {
+                        foreach (string it2 in coll.Columns)
+                        {
+                            if (first)
+                            {
+                                first = false;
+                            }
+                            else
+                            {
+                                name += "_";
+                            }
+                            name += it2;
+                        }
+                    }
+                    sb.Append(GXDbHelpers.AddQuotes(name,
+                        Builder.Settings.DataQuotaReplacement,
+                        Builder.Settings.ColumnQuotation));
+                    sb.Append(" ON ");
+                    sb.Append(Builder.GetTableName(type, true));
+                    sb.Append(" (");
+                    first = true;
                     foreach (string it2 in coll.Columns)
                     {
                         if (first)
@@ -1370,53 +1374,34 @@ namespace Gurux.Service.Orm
                         }
                         else
                         {
-                            name += "_";
+                            sb.Append(", ");
                         }
-                        name += it2;
-                    }
-                }
-                sb.Append(GXDbHelpers.AddQuotes(name,
-                    Builder.Settings.DataQuotaReplacement,
-                    Builder.Settings.ColumnQuotation));
-                sb.Append(" ON ");
-                sb.Append(Builder.GetTableName(type, true));
-                sb.Append(" (");
-                first = true;
-                foreach (string it2 in coll.Columns)
-                {
-                    if (first)
-                    {
-                        first = false;
-                    }
-                    else
-                    {
-                        sb.Append(", ");
-                    }
-                    name = null;
-                    //Find correct name.
-                    foreach (var it3 in list)
-                    {
-                        if (((PropertyInfo)it3.Value.Target).Name == it2)
+                        name = null;
+                        //Find correct name.
+                        foreach (var it3 in list)
                         {
-                            if (Builder.Settings.UpperCase)
+                            if (((PropertyInfo)it3.Value.Target).Name == it2)
                             {
-                                name = it3.Key.ToUpper();
+                                if (Builder.Settings.UpperCase)
+                                {
+                                    name = it3.Key.ToUpper();
+                                }
+                                else
+                                {
+                                    name = it3.Key;
+                                }
+                                sb.Append(name);
+                                break;
                             }
-                            else
-                            {
-                                name = it3.Key;
-                            }
-                            sb.Append(name);
-                            break;
+                        }
+                        if (name == null)
+                        {
+                            throw new Exception("Unknown index name: " + it2);
                         }
                     }
-                    if (name == null)
-                    {
-                        throw new Exception("Unknown index name: " + it2);
-                    }
+                    sb.Append(")");
+                    tableItem.Queries.Add(sb.ToString());
                 }
-                sb.Append(")");
-                tableItem.Queries.Add(sb.ToString());
             }
         }
 
@@ -1762,10 +1747,6 @@ namespace Gurux.Service.Orm
                     return ExecuteScalarInternal(connection, transaction, "SELECT @@IDENTITY" + name, valueType);
                 case DatabaseType.SqLite:
                     return ExecuteScalarInternal(connection, transaction, "SELECT last_insert_rowid()" + name, valueType);
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                case DatabaseType.Access:
-                    return ExecuteScalarInternal(connection, transaction, "SELECT @@IDENTITY" + name, valueType);
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                 default:
                     throw new ArgumentOutOfRangeException("GetLastInsertId failed. Unknown database connection.");
             }
@@ -1810,7 +1791,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
@@ -2161,7 +2142,7 @@ namespace Gurux.Service.Orm
                     case DatabaseType.SqLite:
                         query = "SELECT NAME FROM sqlite_master WHERE type='table'";
                         break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (connection as System.Data.OleDb.OleDbConnection != null)
@@ -2256,7 +2237,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (connection as System.Data.OleDb.OleDbConnection != null)
@@ -3098,7 +3079,7 @@ namespace Gurux.Service.Orm
             //Read column headers.
             if (columns != null)
             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
                 if (connection is OdbcConnection)
                 {
                     using (IDbCommand com = ((OdbcConnection)connection).CreateCommand())
@@ -3287,14 +3268,6 @@ namespace Gurux.Service.Orm
                                         }
                                         if (value != null)
                                         {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                                            //Access minimum date time is 98, 11, 26.
-                                            if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
-                                                ((DateTime)value).Date <= new DateTime(100, 1, 1))
-                                            {
-                                                value = DateTime.MinValue;
-                                            }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                             if (col.Setter.Set != null)
                                             {
                                                 col.Setter.Set(item, value);
@@ -3672,7 +3645,7 @@ namespace Gurux.Service.Orm
             //Read column headers.
             if (columns != null)
             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
                 if (connection is OdbcConnection)
                 {
                     using (IDbCommand com = ((OdbcConnection)connection).CreateCommand())
@@ -3920,14 +3893,6 @@ namespace Gurux.Service.Orm
                                         }
                                         if (value != null)
                                         {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1
-                                            //Access minimum date time is 98, 11, 26.
-                                            if (this.Builder.Settings.Type == DatabaseType.Access && value is DateTime &&
-                                                ((DateTime)value).Date <= new DateTime(100, 1, 1))
-                                            {
-                                                value = DateTime.MinValue;
-                                            }
-#endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
                                             if (col.Setter.Set != null)
                                             {
                                                 col.Setter.Set(item, value);
@@ -4013,7 +3978,7 @@ namespace Gurux.Service.Orm
                             throw new TimeoutException();
                         }
                     }
-                    throw new Exception(ex.Message + "\r\n" + com.CommandText, ex);
+                    throw new Exception("SQL query failed." + Environment.NewLine + ex.Message + Environment.NewLine + com.CommandText, ex);
                 }
             }
             //Update relation data.
@@ -4270,7 +4235,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                UpdateOrInsert(connection, transaction, list, true);
+                UpdateOrInsert(connection, transaction, null, list);
             }
             finally
             {
@@ -4341,7 +4306,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                await UpdateOrInsert(connection, transaction, list, true);
+                await UpdateOrInsert(connection, transaction, null, list);
             }
             finally
             {
@@ -4396,7 +4361,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                UpdateOrInsert(connection, transaction, list, true);
+                UpdateOrInsert(connection, transaction, null, list);
                 list.Clear();
                 //Get updated values.
                 foreach (var it in arg.Values)
@@ -4404,7 +4369,7 @@ namespace Gurux.Service.Orm
                     GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded,
                         false, false, Builder.Settings.ColumnQuotation, true, arg.Where, handledObjects, null);
                 }
-                UpdateOrInsert(connection, transaction, list, false);
+                UpdateOrInsert(connection, transaction, arg, list);
             }
             finally
             {
@@ -4479,7 +4444,7 @@ namespace Gurux.Service.Orm
             }
             try
             {
-                await UpdateOrInsert(connection, transaction, list, true);
+                await UpdateOrInsert(connection, transaction, null, list);
                 list.Clear();
                 //Get updated values.
                 foreach (var it in arg.Values)
@@ -4487,7 +4452,7 @@ namespace Gurux.Service.Orm
                     GXDbHelpers.GetValues(arg.Settings, it.Key, null, it.Value, list, arg.Excluded,
                         false, false, Builder.Settings.ColumnQuotation, true, arg.Where, handledObjects, null);
                 }
-                await UpdateOrInsertAsync(connection, transaction, list, false);
+                await UpdateOrInsertAsync(connection, transaction, arg, list);
             }
             finally
             {
@@ -4500,21 +4465,22 @@ namespace Gurux.Service.Orm
 
         private Task UpdateOrInsertAsync(IDbConnection connection,
             IDbTransaction transaction,
-            List<KeyValuePair<Type, GXUpdateItem>> list,
-            bool insert)
+            object caller,
+            List<KeyValuePair<Type, GXUpdateItem>> list)
         {
-            return Task.Run(() => UpdateOrInsert(connection, transaction, list, insert));
+            return Task.Run(() => UpdateOrInsert(connection, transaction, caller, list));
         }
 
         /// <summary>
         /// Update or insert new value to the DB.
         /// </summary>
+        /// <param name="connection">Database connection.</param>
+        /// <param name="caller">Insert or update.</param>
         /// <param name="list">List of tables to update.</param>
-        /// <param name="insert">Insert or update.</param>
         private Task UpdateOrInsert(IDbConnection connection,
             IDbTransaction transaction,
-            List<KeyValuePair<Type, GXUpdateItem>> list,
-            bool insert)
+            object caller,
+            List<KeyValuePair<Type, GXUpdateItem>> list)
         {
             if (list.Count == 0)
             {
@@ -4527,6 +4493,7 @@ namespace Gurux.Service.Orm
             Type type;
             bool transactionUninitialized = transaction == null;
             List<string> queries = new List<string>();
+            bool update = caller is GXUpdateArgs;
             try
             {
                 if (AutoTransaction && transactionUninitialized)
@@ -4536,14 +4503,14 @@ namespace Gurux.Service.Orm
                 foreach (var q in list)
                 {
                     queries.Clear();
-                    if (insert)
+                    if (update)
                     {
-                        total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
-                        q.Value.Inserted = true;
+                        GXDbHelpers.GetUpdateQuery((GXUpdateArgs)caller, q, Builder.Settings, queries);
                     }
                     else
                     {
-                        GXDbHelpers.GetUpdateQuery(q, Builder.Settings, queries);
+                        total += GXDbHelpers.GetInsertQuery(q, Builder.Settings, queries);
+                        q.Value.Inserted = true;
                     }
                     type = q.Key;
                     pos = -1;
@@ -4605,7 +4572,7 @@ namespace Gurux.Service.Orm
                     /////////////////////////////////////////////////////////////////////////////////////////////////
                     //Update ID's after transaction is made and all the rows are updated.
                     //Update auto increment value if it's used.
-                    if (insert && total == 0 && si != null && pos != -1)
+                    if (!update && total == 0 && si != null && pos != -1)
                     {
                         foreach (string query in queries)
                         {

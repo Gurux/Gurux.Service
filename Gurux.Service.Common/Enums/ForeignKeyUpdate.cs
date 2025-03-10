@@ -30,42 +30,32 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-
-namespace Gurux.Service.Orm
+namespace Gurux.Service.Orm.Common.Enums
 {
-    public class GXMapCollection
+    /// <summary>
+    /// Foreign key update actions.
+    /// </summary>
+    public enum ForeignKeyUpdate
     {
-        internal List<BinaryExpression> List = new List<BinaryExpression>();
-        GXSettingsArgs Parent;
-
         /// <summary>
-        /// Constructor.
+        /// Foreign key update action is not used. This is a default.
         /// </summary>
-        internal GXMapCollection(GXSettingsArgs parent)
-        {
-            Parent = parent;
-        }
-
+        None,
         /// <summary>
-        /// Add map.
+        /// Cross-table updates are allowed.
         /// </summary>
-        public void AddMap<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> destinationColumn,
-            Expression<Func<TDestinationTable, object>> sourceColumn)
-        {
-            if (destinationColumn == null)
-            {
-                throw new ArgumentNullException("destinationColumn");
-            }
-            if (sourceColumn == null)
-            {
-                throw new ArgumentNullException("sourceColumn");
-            }
-            Parent.Updated = true;
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
-        }
+        Cascade,
+        /// <summary>
+        /// Rejects updates to the rows in the child table when the rows in the parent table are updated.
+        /// </summary>
+        Reject,
+        /// <summary>
+        /// Updates are not allowed.
+        /// </summary>
+        Restrict,
+        /// <summary>
+        /// Resets the values in the rows in the child table to NULL.
+        /// </summary>
+        Null
     }
 }
