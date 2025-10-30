@@ -1,367 +1,419 @@
-See An [Gurux](http://www.gurux.org/ "Gurux") for an overview.
+# Gurux ORM
 
+See [Gurux](http://www.gurux.org/ "Gurux") for an overview.  
 Join the Gurux Community or follow [@Gurux](http://twitter.com/guruxorg "@Gurux") for project updates.
 
-Open Source Object Relational Mapping (ORM) component for c#, is a part of  Gurux Device Framework. 
-For more info check out [Gurux](http://www.gurux.org/ "Gurux").
+**Gurux ORM** is an open-source **Object Relational Mapping (ORM)** component for **C#**, and part of the **Gurux Device Framework**.  
+Its purpose is to provide a **fast and simple-to-use** ORM layer for serializing database data into C# objects — while supporting multiple database engines.
 
-Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.
-Big problem with different databases is that all databases are little bit different and you can't use same SQL sentences to all databases.
-Using Gurux ORM component you can serialize your data to different databases. You can use Gurux ORM to create or drop all your tables.
+---
 
-Best part is that in debug mode you can see generated SQL sentence if you move your mouse over argument.
+## ✨ Features
 
-![alt tag](debug.png)
+- Unified ORM interface for multiple databases  
+- Automatic table creation and relation handling  
+- Debug-mode SQL visualization (hover over arguments)  
+- Lambda expression-based query support  
+- Built-in attributes for database mapping  
+- Supports complex relations: `1:1`, `1:N`, and `N:N`
 
-You can use [Lambda Expressions](http://msdn.microsoft.com/en-us/library/bb397687.aspx Lambda Expressions) with Gurux ORM to tell what kind of queries you want to do.
+---
 
-We have added some test cases where you can get idea how to use Lambda expressions. You will find test cases from Gurux.Service_Simple_UnitTests directory.
+## 🗃️ Supported Databases
 
-At the moment we are supporting following databases:
+- [MySQL](http://www.mysql.com/)
+- [MariaDB](http://www.mariadb.com/)
+- [Microsoft SQL Server](http://www.microsoft.com/)
+- [Oracle](http://www.oracle.com/)
+- [SQLite](http://www.sqlite.com/)
 
-* [MySql](http://www.MySql.com/ "MySql")
-* [Maria BD](http://www.mariadb.com/ "Maria BD")
-* [Microsoft SQL Server](http://www.microsoft.com/ "Microsoft SQL Server")
-* [Oracle](http://www.oracle.com/ "Oracle")
-* [SQLite](http://www.sqlite.com/ "SQLite")
+---
 
-General information
-=========================== 
+## ⚙️ Key Attributes
 
-* DataMember attribute will tell is field saved to the database.
-* AutoIncrement attribute will tell if field value is automatically increased on add. Value is updated automatically to the class value on insert.
-* ForeignKey attribute tells is foreign key used.
-* Relation attribute tells that there is a relation to the other table.
-* Enum values are saved as integer value as default. If you want to save enum value as string set Builder.Settings.UseEnumStringValue to true.
-* If you want to use Unix date time set Builder.Settings.UseEpochTimeFormat to true.
-* Alias Attribute tells name that is used to the table with SQL queries. It works like AS in SQL.
+| Attribute | Description |
+|------------|-------------|
+| `DataMember` | Marks a field as stored in the database. |
+| `AutoIncrement` | Automatically increases on insert; updated back to object. |
+| `ForeignKey` | Defines foreign key relations. |
+| `Relation` | Declares table-to-table relationships. |
+| `Alias` | Specifies custom SQL alias for a field or table. |
+| `UseEnumStringValue` | Save enums as strings (default: integer). |
+| `UseEpochTimeFormat` | Store dates as Unix timestamps. |
+| `StringLength(int max)` | Validates and limits string length in the DB schema. |
+| `IsRequired` | Field must have a value (NOT NULL). |
 
-Relations between tables.
-=========================== 
+---
 
+## 🔗 Relations
 
-Gurux ORM supports following relations between tables:
+Gurux ORM supports:
 
-* 1:1
-* 1:N
-* N:N
+- **1:1** — One-to-One  
+- **1:N** — One-to-Many  
+- **N:N** — Many-to-Many
 
-Creating C# objects
-=========================== 
+---
 
-First you should create C# objects that hold the data that you want to save to the database. There is only one limitation at the moment.
-All objects must derive from IUnique. This means that they must have unique ID. Reason for this is that we want to identify every object and it's
-very slow find objects example by name. It's much faster to use ID. 
-You can use DataContract and DataMember attributes to tell what data you want to save to the database.
-Relations between objects are told using ForeignKey attribute.
+## 🏗️ Defining C# Classes
 
-Creating 1:1 object
-=========================== 
+All ORM classes must implement `IUnique<T>`, ensuring a unique ID for each object.  
+This makes lookups faster and relations easier to manage.
 
-In this example we have two objects. Company and Country. Each company can be only in one country. So relation is 1:1.
+---
+
+## Models
+
+### Country ↔ Company (1:N)
+
+`GXCountry` maintains a list of its companies and cascades deletes.
+
+```csharp
+[DataContract]
+class GXCountry : IUnique<int>
+{
+    [DataMember(Name = "ID"), AutoIncrement]
+    public int Id { get; set; }
+
+    [DataMember(Name = "CountryName"), IsRequired, StringLength(100)]
+    public string Name { get; set; }
+
+    [DataMember]
+    [ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
+    public List<GXCompany> Companies { get; set; }
+}
+
+[DataContract]
+class GXCompany : IUnique<long>
+{
+    [AutoIncrement, DataMember]
+    public long Id { get; set; }
+
+    [DataMember, IsRequired, StringLength(150)]
+    public string Name { get; set; }
+
+    // Navigation to Country; FK column is auto-managed (e.g., CountryID)
+    [DataMember(Name = "CountryID"), ForeignKey]
+    public GXCountry Country { get; set; }
+}
+```
+
+**Usage Example:**
+
+```csharp
+GXCountry finland = new GXCountry { Name = "Finland" };
+GXCompany gurux = new GXCompany { Name = "Gurux Ltd", Country = finland };
+GXCompany sample = new GXCompany { Name = "Sample Co", Country = finland };
+finland.Companies = new List<GXCompany> { gurux, sample };
+
+// Create Country and all related tables in one go (including Company)
+Connection.CreateTable<GXCountry>(true, false);
+
+Connection.Insert(GXInsertArgs.Insert(finland));
+```
+
+---
+
+### Company ↔ Users (1:N)
+
+`GXUser` holds a direct reference to `GXCompany` (no `CompanyId`).
 
 ```csharp
 [DataContract]
 class GXCompany : IUnique<long>
 {
-    [AutoIncrement]
-    [DataMember]
-    public long Id
-    {
-        get;
-        set;
-    }
-    [DataMember]
-    public string Name
-    {
-       get;
-       set;
-    }
-    
-    [DataMember(Name = "CountryID")]
-    [ForeignKey]
-    public GXCountry Country
-    {
-        get;
-        set;
-    }
+    [AutoIncrement, DataMember]
+    public long Id { get; set; }
 
-[DataContract]
-class GXCountry : IUnique<int>
-{
-    [DataMember(Name="ID")]
-    [AutoIncrement]
-    public int Id
-    {
-        get;
-        set;
-    }
-    [DataMember(Name = "CountryName")]
-    public string Name
-    {
-        get;
-        set;
-    }	
+    [DataMember, IsRequired, StringLength(150)]
+    public string Name { get; set; }
+
+    [DataMember, ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
+    public GXUser[] Users { get; set; }
 }
-```
-
-Creating 1:N object
-=========================== 
-
-In this example we have two objects. Parent and Child. Each parent can have multiple children. So relation is 1:N.
-
-```csharp
-[DataContract]
-class GXParent : IUnique<int>
-{
-    [AutoIncrement]
-    [DataMember]
-    public int Id
-    {
-        get;
-        set;
-    }
-    [DataMember(Name= "ParentName")]
-    public string Name
-    {
-        get;
-        set;
-    }
-
-    [DataMember]
-    [ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
-    public GXChild[] Children
-    {
-        get;
-        set;
-    }
-}
-
-[DataContract]
-class GXChild : IUnique<long>
-{
-    [DataMember]
-    [AutoIncrement]
-    public long Id
-    {
-        get;
-        set;
-    }
-
-    [DataMember, ForeignKey(typeof(GXParent), OnDelete=ForeignKeyDelete.Cascade)]
-    public int ParentId
-    {
-        get;
-        set;
-    }
-
-    [DataMember]
-    public string Name
-    {
-        get;
-        set;
-    }
-}
-```
-Because we want to that child knows it's parent only by ID we must told parent's type in ForeignKey parameter.
-We also told in foreign key parameter that all children are removed if parent is removed.
-
-
-Creating N:N object
-=========================== 
-
-In this example we have two objects. User and user group. Each user can belong to several user groups. So relation is N:N.
-
-```csharp
 
 [DataContract]
 class GXUser : IUnique<int>
 {
-    [AutoIncrement]
-    [DataMember]
-    public int Id
-    {
-        get;
-        set;
-    }
-    [DataMember]
-    public string Name
-    {
-        get;
-        set;
-    }        
-    [DataMember]
-    [ForeignKey(typeof(GXUserGroup), typeof(GXUserToUserGroup))]
-    public GXUserGroup2[] Groups
-    {
-        get;
-        set;
-    }
+    [AutoIncrement, DataMember]
+    public int Id { get; set; }
+
+    [DataMember, IsRequired, StringLength(120)]
+    public string Name { get; set; }
+
+    [DataMember, ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
+    public GXCompany Company { get; set; }
 }
+```
 
+**Usage Example:**
+
+```csharp
+GXCompany company = new GXCompany { Name = "Gurux Ltd" };
+GXUser u1 = new GXUser { Name = "Alice", Company = company };
+GXUser u2 = new GXUser { Name = "Bob", Company = company };
+company.Users = new[] { u1, u2 };
+
+// Create Company and all related tables (Users) in one go
+Connection.CreateTable<GXCompany>(true, false);
+
+Connection.Insert(GXInsertArgs.Insert(company));
+```
+
+---
+
+### Users ↔ UserGroups (N:N)
+
+```csharp
 [DataContract]
-class GXUserToUserGroup
+class GXUser : IUnique<int>
 {
-    [DataMember]
-    [ForeignKey(typeof(GXUser), OnDelete = ForeignKeyDelete.Cascade)]
-    public int UserId
-    {
-        get;
-        set;
-    }
+    [AutoIncrement, DataMember]
+    public int Id { get; set; }
 
-    [DataMember]
-    [ForeignKey(typeof(GXUserGroup), OnDelete = ForeignKeyDelete.Cascade)]
-    public int GroupId
-    {
-        get;
-        set;
-    }
+    [DataMember, IsRequired, StringLength(120)]
+    public string Name { get; set; }
+
+    [DataMember, ForeignKey(typeof(GXUserGroup), typeof(GXUserToUserGroup))]
+    public GXUserGroup[] Groups { get; set; }
+
+    [DataMember, ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
+    public GXCompany Company { get; set; }
 }
 
 [DataContract]
 class GXUserGroup : IUnique<int>
 {
-    [DataMember]
-    [AutoIncrement]
-    public int Id
-    {
-        get;
-        set;
-    }
+    [AutoIncrement, DataMember]
+    public int Id { get; set; }
 
-    [DataMember]        
-    public string Name
-    {
-        get;
-        set;
-    }
+    [DataMember, IsRequired, StringLength(120)]
+    public string Name { get; set; }
 
-    [DataMember]
-    [ForeignKey(typeof(GXUser), typeof(GXUserToUserGroup))]
-    public GXUser[] Users
+    [DataMember, ForeignKey(typeof(GXUser), typeof(GXUserToUserGroup))]
+    public GXUser[] Users { get; set; }
+}
+
+[DataContract]
+class GXUserToUserGroup
+{
+    [DataMember, ForeignKey(typeof(GXUser), OnDelete = ForeignKeyDelete.Cascade)]
+    public int UserId { get; set; }
+
+    [DataMember, ForeignKey(typeof(GXUserGroup), OnDelete = ForeignKeyDelete.Cascade)]
+    public int GroupId { get; set; }
+}
+```
+
+**Usage Example:**
+
+```csharp
+GXUserGroup adminGroup = new GXUserGroup { Name = "Admin" };
+GXUserGroup devGroup = new GXUserGroup { Name = "Developers" };
+
+GXCompany gurux = new GXCompany { Name = "Gurux Ltd" };
+GXUser user = new GXUser
+{
+    Name = "Charlie",
+    Company = gurux,
+    Groups = new[] { adminGroup, devGroup }
+};
+
+// Create UserGroup and all related tables (bridge + users + company) in one go
+Connection.CreateTable<GXUserGroup>(true, false);
+
+Connection.Insert(GXInsertArgs.Insert(user));
+```
+
+---
+
+## ⚡ Quick Start
+
+A full example using `CreateTable<T>(true, false)` to generate **all related tables** with a single call,  
+and using `GXDeleteArgs.Delete(obj)` when you have the instance (preferred over `DeleteById`).
+
+```csharp
+using Gurux.ORM;
+using System.Collections.Generic;
+using System.Data.SQLite;
+
+class Program
+{
+    static void Main()
     {
-        get;
-        set;
+        // 1. Connect to SQLite (you can also use MySQL, SQL Server, etc.)
+        var sqlite = new SQLiteConnection("Data Source=:memory:");
+        var Connection = new GXDbConnection(sqlite, null);
+
+        // 2. Create all related tables starting from GXCountry
+        Connection.CreateTable<GXCountry>(true, false);
+
+        // 3. Insert data
+        GXCountry finland = new GXCountry { Name = "Finland" };
+        GXCompany gurux = new GXCompany { Name = "Gurux Ltd", Country = finland };
+        GXCompany sample = new GXCompany { Name = "Sample Co", Country = finland };
+        finland.Companies = new List<GXCompany> { gurux, sample };
+        Connection.Insert(GXInsertArgs.Insert(finland));
+
+        GXUser john = new GXUser { Name = "John", Company = gurux };
+        GXUser jane = new GXUser { Name = "Jane", Company = gurux };
+        Connection.Insert(GXInsertArgs.Insert(john));
+        Connection.Insert(GXInsertArgs.Insert(jane));
+
+        GXUserGroup devs = new GXUserGroup { Name = "Developers" };
+        john.Groups = new[] { devs };
+        Connection.Insert(GXInsertArgs.Insert(john));
+
+        // 4. Query data
+        GXSelectArgs selectUsers = GXSelectArgs.SelectAll<GXUser>();
+        List<GXUser> users = Connection.Select<GXUser>(selectUsers);
+
+        // 5. Update data
+        john.Name = "John Updated";
+        Connection.Update(GXUpdateArgs.Update(john, q => q.Name));
+
+        // 6. Delete data (preferred when you have the instance)
+        Connection.Delete(GXDeleteArgs.Delete(john));
     }
 }
 ```
 
-With N:N relations we need extra table (GXUserToUserGroup) where we are saving relation information.
-We told this to User and user group table in second parameter of ForeignKey attribute.
+---
 
-Making connection to the DB
-=========================== 
-First you should initialize connection to the DB. Like below:
+## 🔍 Query Examples
 
-```csharp
-MySqlConnection c = new MySqlConnection("Server=localhost;Database=test;UID=root;Password=");
-SqlConnection connection = new SqlConnection("DataBase=test;Server=localhost;Integrated Security=True;");
-OracleConnection connection = new OracleConnection("User Id=system;Password=");
-SQLiteConnection c = new SQLiteConnection("Data Source=:memory:");
-```
+### Join query for N:N (Users ↔ Groups)
 
-After that you create Gurux DB connection component.
+Fetch users together with their groups using explicit joins over the bridge table:
 
 ```csharp
-Connection = new GXDbConnection(c, null);
+GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
+arg.Columns.Add<GXUserGroup>();
+arg.Joins.AddInnerJoin<GXUser, GXUserToUserGroup>(j => j.Id, j => j.UserId);
+arg.Joins.AddInnerJoin<GXUserToUserGroup, GXUserGroup>(j => j.GroupId, j => j.Id);
+
+var list = Connection.Select<GXUser>(arg);
 ```
 
-Connection is now ready and you can create your tables to the database. Gurux ORM can walk through relations and create all tables that are connected to others.
+#### Filtering & sorting for N:N
+
+**Only users in the "Developers" group, ordered by user name:**
 
 ```csharp
-Connection.CreateTable<GXUser>();
-Connection.CreateTable<GXParent>();
-Connection.CreateTable<GXCompany>();
+GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
+arg.Columns.Add<GXUserGroup>();
+arg.Joins.AddInnerJoin<GXUser, GXUserToUserGroup>(j => j.Id, j => j.UserId);
+arg.Joins.AddInnerJoin<GXUserToUserGroup, GXUserGroup>(j => j.GroupId, j => j.Id);
+
+// Filter: group name equals "Developers"
+arg.Where.And<GXUserGroup>(g => g.Name == "Developers");
+
+// Sort: users by Name (ascending)
+arg.OrderBy.Add<GXUser>(u => u.Name, true);
+
+var developers = Connection.Select<GXUser>(arg);
 ```
 
-Insert data
-=========================== 
-
-Data is inserted by GXInsertArgs.
+**Alternative (portable) approach using a subquery:**
 
 ```csharp
-GXUser user = new GXUser();
-//Fill you class data.
+// Subquery: find group IDs with name 'Developers'
+var groupsSub = GXSelectArgs.Select<GXUserGroup>(g => g.Id, g => g.Name == "Developers");
 
-//This generates SQL sentence.
-GXInsertArgs arg = GXInsertArgs.Insert(user);
-//Insert data to the DB.
-Connection.Insert(arg);
+// Users whose Groups contain one of the subquery results
+var usersInDevs = GXSelectArgs.Select<GXUser>(
+    s => "*",
+    u => GXSql.In(u => u.Groups, groupsSub)
+);
+
+// Optional sort
+usersInDevs.OrderBy.Add<GXUser>(u => u.Name, true);
+
+var developers2 = Connection.Select<GXUser>(usersInDevs);
 ```
 
-Select data
-=========================== 
-Data is selected by GXSelectArgs. 
+---
+
+### Separate blocks for filtering and sorting
+
+#### Filtering only
 
 ```csharp
-//Generate SQL sentence where data is search by ID from the DB.
-GXSelectArgs arg = GXSelectArgs.SelectById<GXUser>(10);
-//Generate SQL sentence where data is search by name like "Gurux.
-GXSelectArgs arg = GXSelectArgs.Select<GXUser>(q => q.Name, q => q.Name.Equals("Gurux"));
+GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
+arg.Where.And<GXUser>(c => c.Name.StartsWith("Cha"));
 
-//Find data from the DB.
-List<GXUser> users = Connection.Select<GXUser>(arg);
+var filtered = Connection.Select<GXUser>(arg);
 ```
 
-In default ALL relation data is searched from the DB. If you do not want to get relation data you can set Relations to false 
-or tell what relation data you do not want to get.
+#### Sorting only
 
 ```csharp
-//Do not get relation data from other tables.
-arg.Relations = false;
-//Do not retrieve user group information at all.
-arg.Excluded.Add<GXUserGroup>();
+GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
+arg.OrderBy.Add<GXUser>(c => c.Name);
 
-//Do not retrieve user group information in User table. 
-//If there are other tables where is relation to the user group field they are retrieved.
-arg.Excluded.Add<GXUser>(q => q.Groups);
-
-arg.
-//Find data from the DB.
-List<GXUser> users = Connection.Select<GXUser>(arg);
+var sorted = Connection.Select<GXUser>(arg);
 ```
 
-Sub queries
-=========================== 
+> You can also combine:
+> 
+> ```csharp
+> GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
+> arg.Where.And<GXUser>(c => c.Name.StartsWith("Cha"));
+> arg.OrderBy.Add<GXUser>(c => c.Name);
+> var result = Connection.Select<GXUser>(arg);
+> ```
 
-It's faster to get all data with one query than execute several queries. You can make sub queries like this:
-```csharp
-//Generate SQL sentence where select User IDs.
-GXSelectArgs subQuery = GXSelectArgs.Select<GXUser>(q => q.Id, q => q.Id > 100);
-//Select all columns from user group where User Group ID in sub query.
-GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => q.Id > GXSql.In(q => q.Users, subQuery));
-```
+---
 
-Update data
-=========================== 
-
-Data is updated by GXUpdateArgs.
+### Selecting Related Data (1:N Join Example)
 
 ```csharp
-//Update all data to the DB.
-GXUpdateArgs arg = GXUpdateArgs.Update(user);
-//Udate only name to the DB.
-GXUpdateArgs arg = GXUpdateArgs.Update(user, q => q.Name);
-//Update data to the DB.
-Connection.Update(arg);
+GXSelectArgs arg = GXSelectArgs.SelectAll<GXCountry>();
+arg.Columns.Add<GXCompany>();
+arg.Joins.AddInnerJoin<GXCountry, GXCompany>(c => c.Id, c => c.Country);
+List<GXCountry> countries = Connection.Select<GXCountry>(arg);
 ```
 
-Delete data
-=========================== 
+---
 
-Data is Deleted by GXDeleteArgs.
+## 🔁 Updating Data
 
 ```csharp
-//Generate SQL sentence where all data is deleted from the table.
-GXDeleteArgs arg = GXDeleteArgs.DeleteAll();
-//Generate SQL sentence where user is deleted from the DB.
-GXDeleteArgs arg = GXDeleteArgs.Delete(user);
-//Generate SQL sentence where user is deleted by id.
-GXDeleteArgs arg = GXDeleteArgs.DeleteById(10);
-//Delete data from the DB.
-Connection.Delete(arg);
+user.Name = "UpdatedName";
+Connection.Update(GXUpdateArgs.Update(user, q => q.Name));
 ```
 
-We are updating documentation on Gurux web page. 
-If you have problems you can ask your questions in Gurux [Forum](http://www.gurux.org/forum).
+---
+
+## ❌ Deleting Data
+
+```csharp
+// Preferred when you have the instance:
+Connection.Delete(GXDeleteArgs.Delete(user));
+
+// If only ID is known:
+Connection.Delete(GXDeleteArgs.DeleteById<GXUser>(5));
+```
+
+---
+
+## 🧠 Subqueries
+
+```csharp
+GXSelectArgs sub = GXSelectArgs.Select<GXUser>(q => q.Id, q => q.Id > 100);
+GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => q.Id > GXSql.In(q => q.Users, sub));
+```
+
+---
+
+## 📚 Further Resources
+
+For examples and tests, check:  
+`Gurux.Service_Simple_UnitTests` directory
+
+Need help?  
+Ask your questions on the [Gurux Forum](https://gurux.fi/forum/103).
+
+---
+
+![Debug SQL Example](debug.png)
