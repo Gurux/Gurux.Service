@@ -1742,7 +1742,7 @@ namespace Gurux.Service.Orm.Internal
                                 }
                                 else
                                 {
-                                    sb.Append(it);
+                                    sb.Append(Convert.ToString(it, CultureInfo.InvariantCulture));
                                 }
                             }
                             return new string[] { sb.ToString() };

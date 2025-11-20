@@ -43,6 +43,9 @@ namespace Gurux.Service.Orm.Common
     [AttributeUsage(AttributeTargets.Property)]
     public class RelationAttribute : Attribute
     {
+        /// <summary>
+        /// Target type.
+        /// </summary>
         public Type Target
         {
             get;
@@ -60,7 +63,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Constructor.
         /// </summary>
-        /// <param name="type">Relation target</param>
+        /// <param name="target">Relation target type.</param>
         public RelationAttribute(Type target)
         {
             Target = target;
