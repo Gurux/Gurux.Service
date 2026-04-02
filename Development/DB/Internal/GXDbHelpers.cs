@@ -1217,6 +1217,11 @@ namespace Gurux.Service.Orm.Internal
 
         internal static string[] HandleMethod(GXDBSettings settings, UnaryExpression unaryExpression, MethodCallExpression m, char quoteSeparator, bool where, bool getValue, ref string post)
         {
+            if (m.Method.DeclaringType.IsGenericType &&
+                m.Method.DeclaringType.GetGenericTypeDefinition() == typeof(ReadOnlySpan<>))
+            {
+                return GetMembers(settings, m.Arguments[0], quoteSeparator, where, true, ref post, false);
+            }
             if (m.Method.DeclaringType == typeof(GXSql))
             {
                 if (m.Method.Name == "Count")
@@ -1345,7 +1350,9 @@ namespace Gurux.Service.Orm.Internal
                             GetMembers(settings, m.Arguments[1], '\0', where, ref post)[0] + ")"};
                 }
             }
-            if (m.Method.DeclaringType == typeof(Enumerable) && m.Method.Name == "Contains")
+            if (m.Method.Name == "Contains" &&
+                (m.Method.DeclaringType == typeof(Enumerable) ||
+                m.Method.DeclaringType == typeof(System.MemoryExtensions)))
             {
                 StringBuilder sb = new StringBuilder();
                 sb.Append("(" + GetMembers(settings, m.Arguments[1], quoteSeparator, where, ref post)[0]);

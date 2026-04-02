@@ -30,12 +30,14 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Gurux.Service.Orm;
-using System.Runtime.Serialization;
-using System.Globalization;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Enums;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System.Globalization;
+using System.Linq.Expressions;
+using System.Reflection.Metadata.Ecma335;
+using System.Runtime.Serialization;
 
 namespace Gurux.Service_Test
 {
@@ -665,6 +667,23 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select Guid where list contains -1.
+        /// </summary>
+        [TestMethod]
+        public void WhereContains5Test()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            List<int> list = new List<int>();
+            list.Add(1);
+            list.Add(-1);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => list.Contains(q.Id));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, -1)", arg.ToString());
+        }
+
+
+        /// <summary>
         /// Select Guid where Text equals with Gurux.
         /// </summary>
         [TestMethod]
@@ -829,6 +848,18 @@ namespace Gurux.Service_Test
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
         }
 
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlInTest3()
+        {
+            List<Guid> list = new List<Guid>();
+            list.Add(Guid.Empty);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => list.Contains(q.Guid));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000-0000-0000-0000-000000000000')", arg.ToString());
+        }
 
         /// <summary>
         /// Select Guid where ID not in array.
@@ -855,6 +886,19 @@ namespace Gurux.Service_Test
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => !list.Contains(q.Id));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` NOT IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlNotInTest3()
+        {
+            List<Guid> list = new List<Guid>();
+            list.Add(Guid.Empty);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => !list.Contains(q.Guid));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` NOT IN ('00000000-0000-0000-0000-000000000000')", arg.ToString());
         }
 
         /// <summary>
@@ -944,6 +988,17 @@ namespace Gurux.Service_Test
             Assert.AreEqual("INSERT INTO Parameter2 (`Name`, `Value`, `DeviceID`) VALUES('Name1', 'Value1', 0), ('Name2', 'Value2', 0), ('Name3', 'Value3', 0)", args.ToString());
             args = GXInsertArgs.InsertRange(list, c => new { c.Name, c.Value });
             Assert.AreEqual("INSERT INTO Parameter2 (`Name`, `Value`) VALUES('Name1', 'Value1'), ('Name2', 'Value2'), ('Name3', 'Value3')", args.ToString());
+        }
+
+        /// <summary>
+        /// Insert emptyrange test.
+        /// </summary>
+        [TestMethod]
+        public void InsertEmptyRangeTest()
+        {
+            List<Parameter2> list = new List<Parameter2>();
+            GXInsertArgs args = GXInsertArgs.InsertRange(list);
+            Assert.AreEqual("", args.ToString());
         }
 
 
@@ -1467,6 +1522,7 @@ namespace Gurux.Service_Test
             arg = GXSelectArgs.Select<TestClass>(q => q.Guid, x => x.Guid.Equals(null));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IS NULL", arg.ToString());
         }
+
         /// <summary>
         /// Find Empty date time values.
         /// </summary>
@@ -1496,7 +1552,7 @@ namespace Gurux.Service_Test
         public void EmptyDateTimeTest()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Guid, q => q.Time.Equals(null) || q.Time.Equals(DateTime.MinValue));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Time` IS NULL) OR (TestClass.`Time`='0001-01-01 00:00:00.000')", arg.ToString());
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE (TestClass.`Time` IS NULL) OR (TestClass.`Time`='0001-01-01 00.00.00.000')", arg.ToString());
         }
 
         /// <summary>
@@ -1929,6 +1985,19 @@ namespace Gurux.Service_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(s => s.Id, w => (w.IntTest & 1) != 0);
             Assert.AreEqual("SELECT `ID` FROM TestClass WHERE (TestClass.`IntTest` & 1) <> 0", arg.ToString());
+        }
+
+        /// <summary>
+        /// Verify that a query using LEFT JOIN combined with a WHERE Company.Id IS NULL filter 
+        /// returns only the rows from the left table that have no matching row in the joined (right) table.
+        /// </summary>
+        [TestMethod]
+        public void NotExistOnJoinTableTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Country>(q => q.Name);
+            arg.Joins.AddInnerJoin<Country, Company>(y => y.Id, x => x.Country);
+            arg.Where.And<Company>(w => w.Id == null);
+            Assert.AreEqual("SELECT Country.`CountryName` FROM Country INNER JOIN Company ON Country.`ID`=Company.`CountryID` WHERE Company.`Id` IS NULL", arg.ToString());
         }
     }
 }

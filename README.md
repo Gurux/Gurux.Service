@@ -3,19 +3,19 @@
 See [Gurux](http://www.gurux.org/ "Gurux") for an overview.  
 Join the Gurux Community or follow [@Gurux](http://twitter.com/guruxorg "@Gurux") for project updates.
 
-**Gurux ORM** is an open-source **Object Relational Mapping (ORM)** component for **C#**, and part of the **Gurux Device Framework**.  
-Its purpose is to provide a **fast and simple-to-use** ORM layer for serializing database data into C# objects — while supporting multiple database engines.
+**Gurux ORM** is an open-source **Object Relational Mapping (ORM)** component for **C#**, part of the **Gurux Device Framework**.  
+Its goal is to provide a **fast** and **easy-to-use** ORM that works across multiple database engines.
 
 ---
 
 ## ✨ Features
 
 - Unified ORM interface for multiple databases  
-- Automatic table creation and relation handling  
-- Debug-mode SQL visualization (hover over arguments)  
-- Lambda expression-based query support  
-- Built-in attributes for database mapping  
-- Supports complex relations: `1:1`, `1:N`, and `N:N`
+- Automatic table creation and relation traversal  
+- See generated SQL in debug mode (hover on the argument)  
+- Lambda-expression query support  
+- Attribute-driven schema mapping  
+- Supports `1:1`, `1:N`, and `N:N` relationships
 
 ---
 
@@ -32,15 +32,15 @@ Its purpose is to provide a **fast and simple-to-use** ORM layer for serializing
 ## ⚙️ Key Attributes
 
 | Attribute | Description |
-|------------|-------------|
-| `DataMember` | Marks a field as stored in the database. |
-| `AutoIncrement` | Automatically increases on insert; updated back to object. |
-| `ForeignKey` | Defines foreign key relations. |
-| `Relation` | Declares table-to-table relationships. |
-| `Alias` | Specifies custom SQL alias for a field or table. |
-| `UseEnumStringValue` | Save enums as strings (default: integer). |
-| `UseEpochTimeFormat` | Store dates as Unix timestamps. |
-| `StringLength(int max)` | Validates and limits string length in the DB schema. |
+| --- | --- |
+| `DataMember` | Marks a field to be stored in the database. |
+| `AutoIncrement` | Increases on insert; value is written back to the object. |
+| `ForeignKey` | Defines a foreign key relation. |
+| `Relation` | Declares a relation between tables. |
+| `Alias` | SQL alias for fields/tables. |
+| `UseEnumStringValue` | Save enums as strings (default is integer). |
+| `UseEpochTimeFormat` | Store dates as UNIX epoch. |
+| `StringLength(int max)` | Validates and limits string length in the schema. |
 | `IsRequired` | Field must have a value (NOT NULL). |
 
 ---
@@ -229,8 +229,7 @@ Connection.Insert(GXInsertArgs.Insert(user));
 
 ## ⚡ Quick Start
 
-A full example using `CreateTable<T>(true, false)` to generate **all related tables** with a single call,  
-and using `GXDeleteArgs.Delete(obj)` when you have the instance (preferred over `DeleteById`).
+Create all related tables with a single call, do CRUD, and prefer `GXDeleteArgs.Delete(obj)` when you have the instance.
 
 ```csharp
 using Gurux.ORM;
@@ -282,9 +281,7 @@ class Program
 
 ## 🔍 Query Examples
 
-### Join query for N:N (Users ↔ Groups)
-
-Fetch users together with their groups using explicit joins over the bridge table:
+### N:N Join (Users ↔ Groups)
 
 ```csharp
 GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
@@ -297,7 +294,7 @@ var list = Connection.Select<GXUser>(arg);
 
 #### Filtering & sorting for N:N
 
-**Only users in the "Developers" group, ordered by user name:**
+Only users in the "Developers" group, ascending by user name:
 
 ```csharp
 GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => "*");
@@ -376,7 +373,55 @@ List<GXCountry> countries = Connection.Select<GXCountry>(arg);
 
 ---
 
-## 🔁 Updating Data
+## 🚫 `Exclude<T>()` (Select & Update)
+
+Use `Exclude<T>()` to omit specific fields from **queries** and **updates**. Great for skipping heavy columns on read and avoiding server-managed columns on update.
+
+**Exclude in Select**
+
+```csharp
+// Select all fields for GXUser, but exclude heavy/sensitive ones
+GXSelectArgs args = GXSelectArgs.SelectAll<GXUser>(it);
+args.Exclude<GXUser>(q => new
+{
+    // Fields to exclude from the query result:
+    // e.g., q.PasswordHash, q.ProfileImageBlob, q.InternalNote
+});
+
+var users = Connection.Select<GXUser>(args);
+```
+
+**Exclude in Update**
+
+```csharp
+// Update from an instance 'it' while skipping server-managed or immutable fields
+GXUpdateArgs args = GXUpdateArgs.Update(it);
+args.Exclude<GXUser>(q => new
+{
+    // Fields to exclude from updates:
+    // e.g., q.Id, q.CreatedAt, q.Company, q.PasswordHash
+});
+
+Connection.Update(args);
+```
+
+**Practical example**
+
+```csharp
+// READ: don't fetch large binary data or secrets
+GXSelectArgs s = GXSelectArgs.SelectAll<GXUser>(it);
+s.Exclude<GXUser>(q => new { q.PasswordHash, q.AvatarBlob });
+var list = Connection.Select<GXUser>(s);
+
+// UPDATE: avoid changing keys or audit fields
+GXUpdateArgs u = GXUpdateArgs.Update(it);
+u.Exclude<GXUser>(q => new { q.Id, q.Company, q.CreatedAt, q.UpdatedAt });
+Connection.Update(u);
+```
+
+---
+
+## 🔁 Update
 
 ```csharp
 user.Name = "UpdatedName";
@@ -385,13 +430,13 @@ Connection.Update(GXUpdateArgs.Update(user, q => q.Name));
 
 ---
 
-## ❌ Deleting Data
+## ❌ Delete
 
 ```csharp
 // Preferred when you have the instance:
 Connection.Delete(GXDeleteArgs.Delete(user));
 
-// If only ID is known:
+// If only the ID is known:
 Connection.Delete(GXDeleteArgs.DeleteById<GXUser>(5));
 ```
 

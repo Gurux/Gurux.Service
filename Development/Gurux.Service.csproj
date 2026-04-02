@@ -4,13 +4,13 @@
     <AssemblyName>Gurux.Service</AssemblyName>
     <Company>Gurux Ltd</Company>
     <Authors>Gurux Ltd</Authors>
-    <Copyright>Copyright (c) 1998-2025 Gurux Ltd. All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 1998-2026 Gurux Ltd. All rights reserved.</Copyright>
     <PackageProjectUrl>www.gurux.fi/index.php?q=Gurux.Service</PackageProjectUrl>
     <Description>Gurux.Service class implements Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.</Description>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <TargetFrameworks>net90;net80;net60</TargetFrameworks>
+    <TargetFrameworks>net10.0;net90;net80;net60</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
     <PackageTags>Gurux Service framework.</PackageTags>
@@ -26,9 +26,9 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Service.Common" Version="3.0.2503.1002" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.0" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.9.0" />
+    <PackageReference Include="Gurux.Service.Common" Version="3.0.2511.2001" />
+    <PackageReference Include="System.Data.Odbc" Version="10.0.5" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
  </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">

@@ -1791,7 +1791,7 @@ namespace Gurux.Service.Orm
             string query;
             int index = 0;
             List<string> list;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0 && !NET10_0
             if (type == DatabaseType.Access)
             {
                 DataTable dt;
@@ -2142,7 +2142,7 @@ namespace Gurux.Service.Orm
                     case DatabaseType.SqLite:
                         query = "SELECT NAME FROM sqlite_master WHERE type='table'";
                         break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0 && !NET10_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (connection as System.Data.OleDb.OleDbConnection != null)
@@ -2237,7 +2237,7 @@ namespace Gurux.Service.Orm
                 case DatabaseType.SqLite:
                     query = string.Format("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = '{0}'", tableName);
                     break;
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0 && !NET10_0
                 case DatabaseType.Access:
                     DataTable dt;
                     if (connection as System.Data.OleDb.OleDbConnection != null)
@@ -3079,7 +3079,7 @@ namespace Gurux.Service.Orm
             //Read column headers.
             if (columns != null)
             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0 && !NET10_0
                 if (connection is OdbcConnection)
                 {
                     using (IDbCommand com = ((OdbcConnection)connection).CreateCommand())
@@ -3645,7 +3645,7 @@ namespace Gurux.Service.Orm
             //Read column headers.
             if (columns != null)
             {
-#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0
+#if !NETCOREAPP2_0 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NETCOREAPP5_0 && !NET5_0 && !NET6_0 && !NET8_0 && !NET9_0 && !NET10_0
                 if (connection is OdbcConnection)
                 {
                     using (IDbCommand com = ((OdbcConnection)connection).CreateCommand())
@@ -4214,7 +4214,12 @@ namespace Gurux.Service.Orm
         {
             if (arg == null)
             {
-                throw new ArgumentException("Insert failed. There is nothing to insert.");
+                throw new ArgumentException("Insert arguments cannot be null.");
+            }
+            if (arg.ToString() == "")
+            {
+                //Nothing to insert.
+                return;
             }
             arg.Settings = Builder.Settings;
             List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
