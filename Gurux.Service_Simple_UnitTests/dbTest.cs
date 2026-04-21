@@ -1620,8 +1620,18 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void IsEmptyTest()
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.IsEmpty(q), a => a.Id == 1);
-            Assert.AreEqual("SELECT COUNT(1) WHERE NOT EXISTS (SELECT 1 FROM TestClass WHERE TestClass.`ID` = 1)", arg.ToString());
+            GXSelectArgs arg = GXSelectArgs.IsEmpty<TestClass>();
+            Assert.AreEqual("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM TestClass) THEN 1 ELSE 0 END AS IsEmpty", arg.ToString());
+        }
+
+        /// <summary>
+        /// Is result empty.
+        /// </summary>
+        [TestMethod]
+        public void IsEmpty1Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.IsEmpty<TestClass>(a => a.Id == 1);
+            Assert.AreEqual("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM TestClass WHERE TestClass.`ID` = 1) THEN 1 ELSE 0 END AS IsEmpty", arg.ToString());
         }
 
         /// <summary>
@@ -1629,6 +1639,16 @@ namespace Gurux.Service_Test
         /// </summary>
         [TestMethod]
         public void IsEmpty2Test()
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.IsEmpty(q), a => a.Id == 1);
+            Assert.AreEqual("SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM TestClass WHERE TestClass.`ID` = 1) THEN 1 ELSE 0 END AS IsEmpty", arg.ToString());
+        }
+
+        /// <summary>
+        /// Is result empty.
+        /// </summary>
+        [TestMethod]
+        public void IsEmpty3Test()
         {
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Count(q), a => a.Id == 1);
             Assert.AreEqual("SELECT COUNT(1) FROM TestClass WHERE TestClass.`ID` = 1", arg.ToString());

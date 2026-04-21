@@ -253,14 +253,20 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        /// <summary>
+        /// Check if the table is empty.
+        /// </summary>
+        public static GXSelectArgs IsEmpty<T>()
+        {
+            return IsEmpty<T>(null);
+        }
+
+        /// <summary>
+        /// Check if there are no items that match the where clause.
+        /// </summary>
         public static GXSelectArgs IsEmpty<T>(Expression<Func<T, object>> where)
         {
-            GXSelectArgs arg = Select<T>(null);
-            if (where != null)
-            {
-                arg.Where.Or<T>(where);
-            }
-            return arg;
+            return Select(q => GXSql.IsEmpty(q), where);
         }
 
         /// <summary>

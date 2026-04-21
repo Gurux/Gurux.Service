@@ -1316,8 +1316,12 @@ namespace Gurux.Service.Orm.Internal
                 }
                 if (m.Method.Name == "IsEmpty")
                 {
-                    post = ")";
-                    return new string[] { "COUNT(1) WHERE NOT EXISTS (SELECT 1" };
+                    post = ") THEN 1 ELSE 0 END AS IsEmpty";
+                    if (settings.Type == DatabaseType.Oracle)
+                    {
+                        post += " FROM dual";
+                    }
+                    return new string[] { "CASE WHEN NOT EXISTS (SELECT 1" };
                 }
                 if (m.Method.Name == "Greater")
                 {

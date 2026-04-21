@@ -456,15 +456,14 @@ GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => q.Id > GXSql.In(q
 ## Check is table empty.
 
 ```csharp
-GXSelectArgs arg = GXSelectArgs.Select<GXUser>(s => GXSql.One)
-arg.Count = 1;
-if (Connection.Select<GXUser>(arg).Any())
+GXSelectArgs arg = GXSelectArgs.IsEmpty<GXUser>()
+if (Connection.SingleOrDefault<bool>(arg))
 {
-    // Table has at least 1 record
+    // Table is empty
 }
 else
 {
-    // Table is empty
+    // Table has at least 1 record
 }
 ```
 
