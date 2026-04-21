@@ -77,6 +77,11 @@ namespace Gurux.Service.Orm
             return ToString(true);
         }
 
+        /// <summary>
+        /// Generates a SQL DELETE statement based on the current object's state.
+        /// </summary>
+        /// <param name="addExecutionTime">Unused parameter that indicates whether to include execution time in the output.</param>
+        /// <returns>The constructed SQL DELETE statement as a string, or an empty string if no updates are necessary.</returns>
         public string ToString(bool addExecutionTime)
         {
             if (Parent.Updated || Updated)
