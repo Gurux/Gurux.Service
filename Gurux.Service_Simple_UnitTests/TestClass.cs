@@ -1139,7 +1139,8 @@ namespace Gurux.Service_Test
             set;
         }
 
-        [Required]
+        [IsRequired]
+        [DefaultValue(true)]
         public bool? Active
         {
             get;

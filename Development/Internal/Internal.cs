@@ -34,6 +34,7 @@ using System;
 using System.Reflection.Emit;
 using System.Reflection;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Collections;
@@ -402,6 +403,20 @@ namespace Gurux.Common.Internal
             return atts[0];
         }
 
+#if !NETSTANDARD2_0 && !NETSTANDARD2_1
+        /// <summary>
+        /// Cache of compiled IL get-delegates keyed by MemberInfo to avoid repeated reflection.
+        /// </summary>
+        private static readonly ConcurrentDictionary<MemberInfo, GetHandler> _getHandlerCache =
+            new ConcurrentDictionary<MemberInfo, GetHandler>();
+
+        /// <summary>
+        /// Cache of compiled IL set-delegates keyed by MemberInfo to avoid repeated reflection.
+        /// </summary>
+        private static readonly ConcurrentDictionary<MemberInfo, SetHandler> _setHandlerCache =
+            new ConcurrentDictionary<MemberInfo, SetHandler>();
+#endif
+
         /// <summary>
         /// Get property value.
         /// </summary>
@@ -412,13 +427,22 @@ namespace Gurux.Common.Internal
             PropertyInfo pi = target as PropertyInfo;
             if (pi != null)
             {
+#if !NETSTANDARD2_0 && !NETSTANDARD2_1
+                GetHandler handler = _getHandlerCache.GetOrAdd(pi, p =>
+                    CreateGetHandler(((PropertyInfo)p).DeclaringType, (PropertyInfo)p));
+                return handler(instance);
+#else
                 return pi.GetValue(instance, null);
+#endif
             }
-            else
-            {
-                FieldInfo fi = target as FieldInfo;
-                return fi.GetValue(instance);
-            }
+            FieldInfo fi = target as FieldInfo;
+#if !NETSTANDARD2_0 && !NETSTANDARD2_1
+            GetHandler fieldHandler = _getHandlerCache.GetOrAdd(fi, f =>
+                CreateGetHandler(((FieldInfo)f).DeclaringType, (FieldInfo)f));
+            return fieldHandler(instance);
+#else
+            return fi.GetValue(instance);
+#endif
         }
 
         /// <summary>
@@ -471,13 +495,23 @@ namespace Gurux.Common.Internal
                         }
                     }
                 }
+#if !NETSTANDARD2_0 && !NETSTANDARD2_1
+                SetHandler handler = _setHandlerCache.GetOrAdd(pi, p =>
+                    CreateSetHandler(((PropertyInfo)p).DeclaringType, (PropertyInfo)p));
+                handler(instance, value);
+#else
                 pi.SetValue(instance, value, null);
+#endif
+                return;
             }
-            else
-            {
-                FieldInfo fi = target as FieldInfo;
-                fi.SetValue(instance, value);
-            }
+            FieldInfo fi = target as FieldInfo;
+#if !NETSTANDARD2_0 && !NETSTANDARD2_1
+            SetHandler fieldHandler = _setHandlerCache.GetOrAdd(fi, f =>
+                CreateSetHandler(((FieldInfo)f).DeclaringType, (FieldInfo)f));
+            fieldHandler(instance, value);
+#else
+            fi.SetValue(instance, value);
+#endif
         }
 
         internal delegate void UpdateAttributes(Type type, object[] attributes, GXSerializedItem s);
@@ -646,6 +680,10 @@ namespace Gurux.Common.Internal
             }
             if (value.GetType() == type)
             {
+                if (type == typeof(string) && value is string s)
+                {
+                    return s.Replace(@"\\", @"\");
+                }
                 return value;
             }
             if (type == typeof(Guid))
@@ -710,6 +748,14 @@ namespace Gurux.Common.Internal
                 else
                 {
                     dt = DateTime.SpecifyKind(dt, DateTimeKind.Local);
+                }
+                if (dt == DateTime.MinValue)
+                {
+                    return DateTimeOffset.MinValue;
+                }
+                if (dt == DateTime.MaxValue)
+                {
+                    return DateTimeOffset.MaxValue;
                 }
                 return new DateTimeOffset(dt.ToLocalTime());
             }

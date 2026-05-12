@@ -38,6 +38,7 @@ using System.Diagnostics;
 using System.Collections;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Common;
+using Gurux.Service.DB;
 
 namespace Gurux.Service.Orm
 {
@@ -116,6 +117,19 @@ namespace Gurux.Service.Orm
         /// <returns></returns>
         public string ToString(bool addExecutionTime)
         {
+            string cacheKey = Parent.QueryCache.BuildKey(
+                "UpdateArgs",
+                Parent.QueryCache.GetSettingsHash(Settings),
+                Values,
+                Excluded,
+                Where != null ? Where.GetItemHash() : 0,
+                Joins != null ? Joins.GetItemHash() : 0,
+                Count);
+            if (Parent.QueryCache.TryGet(cacheKey, out string cachedSql))
+            {
+                sql = cachedSql;
+                return sql;
+            }
             if (Parent.Updated)
             {
                 List<string> queries = new List<string>();
@@ -128,8 +142,15 @@ namespace Gurux.Service.Orm
                 //Get updated items.
                 GXDbHelpers.GetQueries(this, Parent.Settings, Values, Excluded, queries, Where, null);
                 sql = string.Join(" ", queries.ToArray());
+                Parent.QueryCache.Set(cacheKey, sql);
             }
             return sql;
+        }
+
+        public GXUpdateArgs UseQueryCache(GXQueryCache queryCache)
+        {
+            Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            return this;
         }
 
         /// <summary>
@@ -139,7 +160,12 @@ namespace Gurux.Service.Orm
         /// <returns>Created update attribute.</returns>
         public static GXUpdateArgs Update<T>(T value)
         {
-            return Update<T>(value, null);
+            return Update<T>(value, (Expression<Func<T, object>>)null);
+        }
+
+        public static GXUpdateArgs Update<T>(T value, GXQueryCache queryCache)
+        {
+            return Update<T>(value, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
         }
 
         /// <summary>
@@ -169,9 +195,19 @@ namespace Gurux.Service.Orm
             return args;
         }
 
+        public static GXUpdateArgs Update<T>(T value, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return Update<T>(value, columns).UseQueryCache(queryCache);
+        }
+
         public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection)
         {
-            return UpdateRange(collection, null);
+            return UpdateRange(collection, (Expression<Func<T, object>>)null);
+        }
+
+        public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection, GXQueryCache queryCache)
+        {
+            return UpdateRange(collection, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
         }
 
         public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection, Expression<Func<T, object>> columns)
@@ -187,6 +223,11 @@ namespace Gurux.Service.Orm
                 args.Values.Add(new KeyValuePair<object, LambdaExpression>(it, columns));
             }
             return args;
+        }
+
+        public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return UpdateRange(collection, columns).UseQueryCache(queryCache);
         }
 
         /// <summary>

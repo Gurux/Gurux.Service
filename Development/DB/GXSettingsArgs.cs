@@ -33,6 +33,7 @@
 using Gurux.Service.Orm.Settings;
 using System;
 using System.Diagnostics;
+using Gurux.Service.DB;
 
 namespace Gurux.Service.Orm
 {
@@ -54,10 +55,18 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Constructor.
         /// </summary>
-        public GXSettingsArgs()
+        /// <param name="queryCache">Query cache instance.</param>
+        public GXSettingsArgs(GXQueryCache queryCache = null)
         {
             settings = GXSqlBuilder.CreateSettings(GXDbConnection.DefaultDatabaseType);
+            QueryCache = queryCache ?? new GXQueryCache();
             Updated = true;
+        }
+
+        internal GXQueryCache QueryCache
+        {
+            get;
+            set;
         }
 
         internal GXDBSettings Settings

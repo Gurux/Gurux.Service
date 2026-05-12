@@ -31,22 +31,28 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
 
 namespace Gurux.Service.Orm
 {
+    /// <summary>
+    /// Collection of JOIN expressions for a SQL query.
+    /// </summary>
     public class GXJoinCollection
     {
         internal List<KeyValuePair<JoinType, BinaryExpression>> List = new List<KeyValuePair<JoinType, BinaryExpression>>();
         internal bool Updated;
+        readonly GXSettingsArgs Parent;
 
         /// <summary>
         /// Constructor.
         /// </summary>
         internal GXJoinCollection(GXSettingsArgs parent)
         {
+            Parent = parent;
         }
 
         /// <summary>
@@ -127,6 +133,11 @@ namespace Gurux.Service.Orm
         public void Append(GXJoinCollection joins)
         {
             List.AddRange(joins.List);
+        }
+
+        internal int GetItemHash()
+        {
+            return Parent.QueryCache.GetHash(List);
         }
     }
 }

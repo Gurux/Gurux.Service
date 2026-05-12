@@ -41,6 +41,7 @@ using Gurux.Common.Internal;
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Common;
+using Gurux.Service.DB;
 
 namespace Gurux.Service.Orm
 {
@@ -72,7 +73,7 @@ namespace Gurux.Service.Orm
         /// <inheritdoc />
         public override string ToString()
         {
-            return ToString(true);
+            return ToString(false);
         }
 
         /// <summary>
@@ -82,20 +83,24 @@ namespace Gurux.Service.Orm
         /// <returns>Selection clause as a string.</returns>
         public string ToString(bool addExecutionTime)
         {
+            var sw = Stopwatch.StartNew();
             StringBuilder sb = new StringBuilder();
             string post = null;
             sb.Append(Columns.ToString(ref post));
+
             string str, where = Where.ToString();
             if (!string.IsNullOrEmpty(where))
             {
                 sb.Append(" ");
                 sb.Append(where);
             }
+
             str = OrderBy.ToString();
             if (!string.IsNullOrEmpty(str))
             {
                 sb.Append(str);
             }
+
             str = GroupBy.ToString();
             if (!string.IsNullOrEmpty(str))
             {
@@ -111,6 +116,7 @@ namespace Gurux.Service.Orm
                 sb.Append(Count);
                 sb.Append(" ROWS ONLY");
             }
+
             str = Having.ToString();
             if (!string.IsNullOrEmpty(str))
             {
@@ -142,6 +148,9 @@ namespace Gurux.Service.Orm
                 sb.Append(post);
             }
             query = sb.ToString();
+            Parent.Updated = false;
+            sw.Stop();
+            ExecutionTime = (int)sw.ElapsedMilliseconds;
             if (addExecutionTime && ExecutionTime != 0)
             {
                 sb.Clear();
@@ -150,6 +159,7 @@ namespace Gurux.Service.Orm
                 sb.Append(" ms. ");
                 sb.Append(Environment.NewLine);
                 sb.Append(query);
+                query = sb.ToString();
             }
             return query;
         }
@@ -219,16 +229,62 @@ namespace Gurux.Service.Orm
             ExecutionTime = 0;
         }
 
+        /// <summary>
+        /// Sets the query cache to use for this select operation.
+        /// </summary>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        /// <returns>This <see cref="GXSelectArgs"/> instance.</returns>
+        public GXSelectArgs UseQueryCache(GXQueryCache queryCache)
+        {
+            Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            return this;
+        }
+
+        /// <summary>
+        /// Select all columns from the table.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
         public static GXSelectArgs SelectAll<T>()
         {
-            return Select<T>(null, null);
+            return Select<T>((Expression<Func<T, object>>)null, (Expression<Func<T, object>>)null);
         }
 
+        /// <summary>
+        /// Select all columns from the table and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectAll<T>(GXQueryCache queryCache)
+        {
+            return Select<T>((Expression<Func<T, object>>)null, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Select all columns from rows matching the where expression.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="where">Filter expression.</param>
         public static GXSelectArgs SelectAll<T>(Expression<Func<T, object>> where)
         {
-            return Select<T>(null, where);
+            return Select<T>((Expression<Func<T, object>>)null, where);
         }
 
+        /// <summary>
+        /// Select all columns from rows matching the where expression and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="where">Filter expression.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectAll<T>(Expression<Func<T, object>> where, GXQueryCache queryCache)
+        {
+            return Select<T>((Expression<Func<T, object>>)null, where).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Select specific columns from the table.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="columns">Columns to select.</param>
         public static GXSelectArgs Select<T>(Expression<Func<T, object>> columns)
         {
             GXSelectArgs arg = new GXSelectArgs();
@@ -243,14 +299,88 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        /// <summary>
+        /// Select specific columns from the table and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="columns">Columns to select.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs Select<T>(Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return Select<T>(columns).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Select specific columns from rows matching the where expression.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="columns">Columns to select.</param>
+        /// <param name="where">Filter expression.</param>
         public static GXSelectArgs Select<T>(Expression<Func<T, object>> columns, Expression<Func<T, object>> where)
         {
             GXSelectArgs arg = Select<T>(columns);
-            if (where != null)
+            if (!IsNullOrEmptyWhereExpression(where))
             {
                 arg.Where.Or<T>(where);
             }
             return arg;
+        }
+
+        /// <summary>
+        /// Determines whether the specified expression is null or represents an empty value.
+        /// </summary>
+        /// <typeparam name="T">The type of the parameter used in the expression.</typeparam>
+        /// <param name="where">The expression to evaluate for null or empty value.</param>
+        /// <returns>true if the expression is null or empty; otherwise, false.</returns>
+        private static bool IsNullOrEmptyWhereExpression<T>(Expression<Func<T, object>> where)
+        {
+            if (where == null)
+            {
+                return true;
+            }
+
+            Expression body = where.Body;
+            while (body is UnaryExpression unaryExpression &&
+                (body.NodeType == ExpressionType.Convert || body.NodeType == ExpressionType.ConvertChecked))
+            {
+                body = unaryExpression.Operand;
+            }
+
+            if (body is ConstantExpression constantExpression)
+            {
+                if (constantExpression.Value == null)
+                {
+                    return true;
+                }
+                if (constantExpression.Value is string value && string.IsNullOrWhiteSpace(value))
+                {
+                    return true;
+                }
+            }
+
+            if (body is NewExpression newExpression && newExpression.Arguments.Count == 0)
+            {
+                return true;
+            }
+
+            if (body is NewArrayExpression newArrayExpression && newArrayExpression.Expressions.Count == 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Select specific columns from rows matching the where expression and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="columns">Columns to select.</param>
+        /// <param name="where">Filter expression.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs Select<T>(Expression<Func<T, object>> columns, Expression<Func<T, object>> where, GXQueryCache queryCache)
+        {
+            return Select<T>(columns, where).UseQueryCache(queryCache);
         }
 
         /// <summary>
@@ -280,6 +410,17 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Select item by string ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(string id, GXQueryCache queryCache)
+        {
+            return SelectById<T, string>(id, q => "*", queryCache);
+        }
+
+        /// <summary>
         /// Select item by Id.
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -287,6 +428,17 @@ namespace Gurux.Service.Orm
         public static GXSelectArgs SelectById<T>(Guid id)
         {
             return SelectById<T, Guid>(id, q => "*");
+        }
+
+        /// <summary>
+        /// Select item by GUID ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(Guid id, GXQueryCache queryCache)
+        {
+            return SelectById<T, Guid>(id, q => "*", queryCache);
         }
 
         /// <summary>
@@ -300,13 +452,35 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Select item by unsigned 64-bit integer ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(UInt64 id, GXQueryCache queryCache)
+        {
+            return SelectById<T, ulong>(id, q => "*", queryCache);
+        }
+
+        /// <summary>
         /// Select item by Id.
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <param name="id">Item's ID.</param>
         public static GXSelectArgs SelectById<T>(long id)
         {
-            return SelectById<T, long>(id, null);
+            return SelectById<T, long>(id, (Expression<Func<T, object>>)null);
+        }
+
+        /// <summary>
+        /// Select item by 64-bit integer ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(long id, GXQueryCache queryCache)
+        {
+            return SelectById<T, long>(id, (Expression<Func<T, object>>)null, queryCache);
         }
 
         /// <summary>
@@ -321,6 +495,18 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Select item's columns by GUID ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(Guid id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return SelectById<T, Guid>(id, columns, queryCache);
+        }
+
+        /// <summary>
         /// Select item's columns by ID.
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -329,6 +515,18 @@ namespace Gurux.Service.Orm
         public static GXSelectArgs SelectById<T>(string id, Expression<Func<T, object>> columns)
         {
             return SelectById<T, string>(id, columns);
+        }
+
+        /// <summary>
+        /// Select item's columns by string ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(string id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return SelectById<T, string>(id, columns, queryCache);
         }
 
         /// <summary>
@@ -343,6 +541,18 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Select item's columns by 64-bit integer ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(long id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return SelectById<T, long>(id, columns, queryCache);
+        }
+
+        /// <summary>
         /// Select item's columns by ID.
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -353,6 +563,25 @@ namespace Gurux.Service.Orm
             return SelectById<T, UInt64>(id, columns);
         }
 
+        /// <summary>
+        /// Select item's columns by unsigned 64-bit integer ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return SelectById<T, UInt64>(id, columns, queryCache);
+        }
+
+        /// <summary>
+        /// Select item's columns by ID using a generic ID type.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <typeparam name="IDTYPE">Type of the ID.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
         public static GXSelectArgs SelectById<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns)
         {
             GXSelectArgs arg = GXSelectArgs.Select<T>(columns);
@@ -364,6 +593,19 @@ namespace Gurux.Service.Orm
             string name = GXDbHelpers.GetColumnName(si.Target as PropertyInfo, '\0');
             arg.Where.Or<IUnique<T>>(q => name.Equals((IDTYPE)id));
             return arg;
+        }
+
+        /// <summary>
+        /// Select item's columns by ID using a generic ID type and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Table type to select from.</typeparam>
+        /// <typeparam name="IDTYPE">Type of the ID.</typeparam>
+        /// <param name="id">Item's ID.</param>
+        /// <param name="columns">Selected columns.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs SelectById<T, IDTYPE>(IDTYPE id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return SelectById<T, IDTYPE>(id, columns).UseQueryCache(queryCache);
         }
 
         /// <summary>

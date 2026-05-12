@@ -283,6 +283,10 @@ namespace Gurux.Service.Orm
             Dictionary<Type, List<string>> columns,
             Dictionary<Type, GXSerializedItem> tables)
         {
+            if (type == null)
+            {
+                throw new AccessViolationException("Type can't be null.");
+            }
             if (tables.ContainsKey(type))
             {
                 bool exists = columns.ContainsKey(type);
@@ -346,6 +350,28 @@ namespace Gurux.Service.Orm
         {
             if (Parent.Updated || Updated)
             {
+                string cacheKey = Parent.QueryCache.BuildKey(
+                    "Columns",
+                    this,
+                    Parent.QueryCache.GetSettingsHash(Parent.Settings),
+                    List,
+                    Excluded,
+                    Joins != null ? Joins.GetItemHash() : 0,
+                    Parent.Distinct,
+                    Parent.Index,
+                    Parent.Count,
+                    Insert);
+                string postCacheKey = cacheKey + "|post";
+                if (Parent.QueryCache.TryGet(cacheKey, out string cachedSql))
+                {
+                    sql = cachedSql;
+                    if (!Parent.QueryCache.TryGet(postCacheKey, out post))
+                    {
+                        post = null;
+                    }
+                    Updated = false;
+                    return sql;
+                }
                 ColumnList.Clear();
                 List<GXJoin> joinList = new List<GXJoin>();
                 GXOrderByCollection.UpdateJoins(Parent.Settings, Joins, joinList);
@@ -453,9 +479,26 @@ namespace Gurux.Service.Orm
                 }
                 SelectToString(Parent.Settings, sb, Parent.Distinct, ColumnList, joinList, Parent.Index, Parent.Count, post);
                 sql = sb.ToString();
+                Parent.QueryCache.Set(cacheKey, sql);
+                Parent.QueryCache.Set(postCacheKey, post);
                 Updated = false;
             }
             return sql;
+        }
+
+        internal int GetItemHash()
+        {
+            int hash = Parent.QueryCache.GetHash(List);
+            unchecked
+            {
+                hash = hash * 31 + Parent.QueryCache.GetHash(Excluded);
+                hash = hash * 31 + (Joins != null ? Joins.GetItemHash() : 0);
+                hash = hash * 31 + Parent.Distinct.GetHashCode();
+                hash = hash * 31 + Parent.Index.GetHashCode();
+                hash = hash * 31 + Parent.Count.GetHashCode();
+                hash = hash * 31 + Insert.GetHashCode();
+            }
+            return hash;
         }
 
         public void Add<T>()

@@ -47,6 +47,9 @@ namespace Gurux.Service.Orm
         Or
     }
 
+    /// <summary>
+    /// Collection of WHERE conditions for a SQL query.
+    /// </summary>
     public class GXWhereCollection
     {
         internal List<KeyValuePair<WhereType, LambdaExpression>> List = new List<KeyValuePair<WhereType, LambdaExpression>>();
@@ -67,6 +70,17 @@ namespace Gurux.Service.Orm
         {
             if (Parent.Updated || Updated)
             {
+                string cacheKey = Parent.QueryCache.BuildKey(
+                    "Where",
+                    this,
+                    Parent.QueryCache.GetSettingsHash(Parent.Settings),
+                    List);
+                if (Parent.QueryCache.TryGet(cacheKey, out string cached))
+                {
+                    sql = cached;
+                    Updated = false;
+                    return sql;
+                }
                 StringBuilder sb = new StringBuilder();
                 string str = WhereToString(Parent.Settings, List);
                 if (!string.IsNullOrEmpty(str))
@@ -75,9 +89,15 @@ namespace Gurux.Service.Orm
                     sb.Append(str);
                 }
                 sql = sb.ToString();
+                Parent.QueryCache.Set(cacheKey, sql);
                 Updated = false;
             }
             return sql;
+        }
+
+        internal int GetItemHash()
+        {
+            return Parent.QueryCache.GetHash(List);
         }
 
         internal string LimitToString()
@@ -224,6 +244,10 @@ namespace Gurux.Service.Orm
             return null;
         }
 
+        /// <summary>
+        /// Append all conditions from another <see cref="GXWhereCollection"/> to this collection.
+        /// </summary>
+        /// <param name="where">The collection whose conditions are appended.</param>
         public void Append(GXWhereCollection where)
         {
             List.AddRange(where.List);
@@ -271,7 +295,7 @@ namespace Gurux.Service.Orm
                             {
                                 if (typeof(System.Collections.IEnumerable).IsAssignableFrom(actual.GetType()))
                                 {
-                                    foreach(var e1 in (System.Collections.IEnumerable) actual)
+                                    foreach (var e1 in (System.Collections.IEnumerable)actual)
                                     {
                                         FilterBy(e1);
                                     }

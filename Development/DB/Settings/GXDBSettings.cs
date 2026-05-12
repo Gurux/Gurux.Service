@@ -364,10 +364,7 @@ namespace Gurux.Service.Orm.Settings
             get;
         }
 
-        abstract public string DateTimeColumnDefinition
-        {
-            get;
-        }
+        abstract public string DateTimeColumnDefinition(TimeStorageUnit unit = TimeStorageUnit.Seconds);
 
         /// <summary>
         /// Time span is saved in seconds because some DBs can save max few days.
@@ -377,11 +374,7 @@ namespace Gurux.Service.Orm.Settings
             get;
         }
 
-        abstract public string DateTimeOffsetColumnDefinition
-        {
-            get;
-        }
-
+        abstract public string DateTimeOffsetColumnDefinition(TimeStorageUnit unit = TimeStorageUnit.Seconds);
 
         abstract public string ByteColumnDefinition
         {

@@ -59,6 +59,17 @@ namespace Gurux.Service.Orm
         {
             if (Parent.Updated || Updated)
             {
+                string cacheKey = Parent.QueryCache.BuildKey(
+                    "Having",
+                    this,
+                    Parent.QueryCache.GetSettingsHash(Parent.Settings),
+                    List);
+                if (Parent.QueryCache.TryGet(cacheKey, out string cached))
+                {
+                    sql = cached;
+                    Updated = false;
+                    return sql;
+                }
                 StringBuilder sb = new StringBuilder();
                 string str = HavingToString(Parent.Settings, List);
                 if (!string.IsNullOrEmpty(str))
@@ -67,9 +78,15 @@ namespace Gurux.Service.Orm
                     sb.Append(str);
                 }
                 sql = sb.ToString();
+                Parent.QueryCache.Set(cacheKey, sql);
                 Updated = false;
             }
             return sql;
+        }
+
+        internal int GetItemHash()
+        {
+            return Parent.QueryCache.GetHash(List);
         }
 
         /// <summary>

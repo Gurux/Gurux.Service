@@ -148,8 +148,9 @@ namespace Gurux.Service.Orm.Internal
         /// Convert value to string that can be add to DB.
         /// </summary>
         /// <param name="value">Converter value.</param>
-        /// <param name="useEpochTimeFormat">Is epoch time format used.</param>
-        /// <param name="useEnumStringValue">Is Enum value saved by name or by integer value.</param>
+        /// <param name="settings">Database settings.</param>
+        /// <param name="where">Is where calling this method.</param>
+        /// <param name="addQueted">is string queted.</param>
         /// <returns>Converted value.</returns>
         static internal string ConvertToString(object value, GXDBSettings settings,
             bool where, bool addQueted = true)
@@ -159,10 +160,12 @@ namespace Gurux.Service.Orm.Internal
             {
                 str = "NULL";
             }
-            else if (value is string)
+            else if (value is string tmp)
             {
-                str = value as string;
-                str = str.Replace("\\", "\\\\");
+                //Escape ' and \ characters.
+                str = tmp.Replace(@"\", @"\\");
+                //Handle \\
+                str = str.Replace(@"\\\\", @"\\");
                 if (!string.IsNullOrEmpty(settings.DataQuotaReplacement))
                 {
                     str = str.Replace("'", settings.DataQuotaReplacement);
@@ -229,10 +232,9 @@ namespace Gurux.Service.Orm.Internal
                     str = settings.ConvertToString(tm, where);
                 }
             }
-            else if (value is DateTimeOffset)
+            else if (value is DateTimeOffset dt)
             {
-                DateTimeOffset dt = (DateTimeOffset)value;
-                if (settings.UniversalTime && dt != DateTime.MinValue && dt != DateTime.MaxValue)
+                if (settings.UniversalTime && dt != DateTimeOffset.MinValue && dt != DateTimeOffset.MaxValue)
                 {
                     str = settings.ConvertToString(dt.ToUniversalTime(), where);
                 }
@@ -243,14 +245,15 @@ namespace Gurux.Service.Orm.Internal
             }
             else if (value is DateTimeOffset?)
             {
-                DateTimeOffset? dt = (DateTimeOffset?)value;
-                if (settings.UniversalTime && dt != DateTime.MinValue && dt != DateTime.MaxValue)
+                DateTimeOffset? dt2 = (DateTimeOffset?)value;
+                if (settings.UniversalTime && dt2 != DateTimeOffset.MinValue &&
+                    dt2 != DateTimeOffset.MaxValue)
                 {
-                    str = settings.ConvertToString(dt.Value.ToUniversalTime(), where);
+                    str = settings.ConvertToString(dt2.Value.ToUniversalTime(), where);
                 }
                 else
                 {
-                    str = settings.ConvertToString(dt, where);
+                    str = settings.ConvertToString(dt2, where);
                 }
             }
             else if (value is IEnumerable)//If collection
@@ -388,6 +391,11 @@ namespace Gurux.Service.Orm.Internal
                         else
                         {
                             value = it;
+                        }
+                        if (value == null && (row.Attributes & Attributes.AllowNull) == 0)
+                        {
+                            //Get the default value if nullable value is null and it's not allowed.
+                            value = row.DefaultValue;
                         }
                         sb.Append(ConvertToString(value, settings, false, true));
                         ++colIndex;
@@ -1972,6 +1980,7 @@ namespace Gurux.Service.Orm.Internal
                 if (methodCallExpression.Arguments.Count != 0 &&
                     (methodCallExpression.Arguments[0].NodeType == ExpressionType.MemberAccess ||
                     methodCallExpression.Arguments[0].NodeType == ExpressionType.Constant ||
+                    methodCallExpression.Arguments[0].NodeType == ExpressionType.NewArrayInit ||
                     methodCallExpression.Arguments[0].NodeType == ExpressionType.Convert))
                 {
                     return HandleMethod(settings, null, methodCallExpression, quoteSeparator, where, getValue, ref post);
@@ -1991,7 +2000,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     return new string[] { settings.ConvertToString(value, where) };
                 }
-                return new string[] { ConvertToString(value, settings, where) };
+                return new string[] { ConvertToString(value, settings, where, quoteSeparator != '\0') };
             }
 
             if (expression is UnaryExpression)
@@ -2182,5 +2191,51 @@ namespace Gurux.Service.Orm.Internal
             }
             throw new ArgumentException("Invalid expression");
         }
+
+        /// <summary>
+        /// Determines whether the specified expression is null or represents an empty value.
+        /// </summary>
+        /// <typeparam name="T">The type of the parameter used in the expression.</typeparam>
+        /// <param name="where">The expression to evaluate for null or empty value.</param>
+        /// <returns>true if the expression is null or empty; otherwise, false.</returns>
+        public static bool IsNullOrEmptyWhereExpression<T>(Expression<Func<T, object>> where)
+        {
+            if (where == null)
+            {
+                return true;
+            }
+
+            Expression body = where.Body;
+            while (body is UnaryExpression unaryExpression &&
+                (body.NodeType == ExpressionType.Convert || body.NodeType == ExpressionType.ConvertChecked))
+            {
+                body = unaryExpression.Operand;
+            }
+
+            if (body is ConstantExpression constantExpression)
+            {
+                if (constantExpression.Value == null)
+                {
+                    return true;
+                }
+                if (constantExpression.Value is string value && string.IsNullOrWhiteSpace(value))
+                {
+                    return true;
+                }
+            }
+
+            if (body is NewExpression newExpression && newExpression.Arguments.Count == 0)
+            {
+                return true;
+            }
+
+            if (body is NewArrayExpression newArrayExpression && newArrayExpression.Expressions.Count == 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
     }
 }

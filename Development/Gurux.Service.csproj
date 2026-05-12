@@ -10,7 +10,7 @@
     <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
     <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <TargetFrameworks>net10.0;net90;net80;net60</TargetFrameworks>
+    <TargetFrameworks>net10.0;net90;</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
     <PackageTags>Gurux Service framework.</PackageTags>
@@ -26,8 +26,8 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Service.Common" Version="3.0.2604.201" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.6" />
+    <PackageReference Include="Gurux.Service.Common" Version="3.0.2605.602" />
+    <PackageReference Include="System.Data.Odbc" Version="10.0.7" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
  </ItemGroup>
 

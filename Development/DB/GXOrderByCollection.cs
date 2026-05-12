@@ -41,6 +41,9 @@ using Gurux.Service.Orm.Enums;
 
 namespace Gurux.Service.Orm
 {
+    /// <summary>
+    /// Collection of ORDER BY expressions for a SQL query.
+    /// </summary>
     public class GXOrderByCollection
     {
         internal List<LambdaExpression> List = new List<LambdaExpression>();
@@ -61,6 +64,20 @@ namespace Gurux.Service.Orm
         {
             if (Updated || Parent.Parent.Updated)
             {
+                string cacheKey = Parent.Parent.QueryCache.BuildKey(
+                    "OrderBy",
+                    this,
+                    Parent.Parent.QueryCache.GetSettingsHash(Parent.Settings),
+                    List,
+                    Parent.Joins != null ? Parent.Joins.GetItemHash() : 0,
+                    Parent.Count,
+                    Parent.Descending);
+                if (Parent.Parent.QueryCache.TryGet(cacheKey, out string cached))
+                {
+                    sql = cached;
+                    Updated = false;
+                    return sql;
+                }
                 List<GXJoin> joinList = new List<GXJoin>();
                 List<GXOrder> orderList = new List<GXOrder>();
                 UpdateJoins(Parent.Settings, Parent.Joins, joinList);
@@ -71,9 +88,15 @@ namespace Gurux.Service.Orm
                 StringBuilder sb = new StringBuilder();
                 OrderByToString(Parent, sb, orderList, joinList);
                 sql = sb.ToString();
+                Parent.Parent.QueryCache.Set(cacheKey, sql);
                 Updated = false;
             }
             return sql;
+        }
+
+        internal int GetItemHash()
+        {
+            return Parent.Parent.QueryCache.GetHash(List);
         }
 
         /// <summary>

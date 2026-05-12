@@ -265,12 +265,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        override public string DateTimeColumnDefinition
+        override public string DateTimeColumnDefinition(TimeStorageUnit unit)
         {
-            get
+            if (unit == TimeStorageUnit.Milliseconds)
             {
-                return "DATETIME2";
+                return "DATETIME2(3)";
             }
+            return "DATETIME2(0)";
         }
 
         /// <inheritdoc />
@@ -283,12 +284,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        override public string DateTimeOffsetColumnDefinition
+        override public string DateTimeOffsetColumnDefinition(TimeStorageUnit unit)
         {
-            get
+            if (unit == TimeStorageUnit.Milliseconds)
             {
-                return "datetimeoffset";
+                return "DATETIMEOFFSET(3)";
             }
+            return "DATETIMEOFFSET(0)";
         }
 
         /// <inheritdoc />

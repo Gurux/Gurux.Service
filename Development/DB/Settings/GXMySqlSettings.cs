@@ -48,6 +48,8 @@ namespace Gurux.Service.Orm.Settings
         public GXMySqlSettings()
             : base(DatabaseType.MySQL)
         {
+            // MySQL doesn't support time zone so all values are saving using UTC time zone.
+            UniversalTime = true;
         }
 
         /// <inheritdoc />
@@ -229,12 +231,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        override public string DateTimeColumnDefinition
+        override public string DateTimeColumnDefinition(TimeStorageUnit unit)
         {
-            get
+            if (unit == TimeStorageUnit.Milliseconds)
             {
-                return "datetime(3)";
+                return "DATETIME(3)";
             }
+            return "DATETIME(0)";
         }
 
         /// <inheritdoc />
@@ -247,12 +250,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        override public string DateTimeOffsetColumnDefinition
+        override public string DateTimeOffsetColumnDefinition(TimeStorageUnit unit)
         {
-            get
+            if (unit == TimeStorageUnit.Milliseconds)
             {
-                return "datetime(3)";
+                return "DATETIME(3)";
             }
+            return "DATETIME(0)";
         }
 
         /// <inheritdoc />
@@ -376,11 +380,11 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc/>
         public override string ConvertToString(object value, bool where)
         {
-            //MYSQL doesn't support time zone so all values are saving using current time zone.
-            if (value is DateTimeOffset)
+            //MYSQL doesn't support time zone so all values are saving using UTC time zone.
+            if (value is DateTimeOffset v)
             {
                 string format = "yyyy-MM-dd HH:mm:ss.fff";
-                return GetQuetedValue(((DateTimeOffset)value).ToString(format, CultureInfo.InvariantCulture));
+                return GetQuetedValue(v.UtcDateTime.ToString(format, CultureInfo.InvariantCulture));
             }
             return base.ConvertToString(value, where);
         }

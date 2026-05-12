@@ -61,6 +61,19 @@ namespace Gurux.Service.Orm
         {
             if (Updated || Parent.Parent.Updated)
             {
+                string cacheKey = Parent.Parent.QueryCache.BuildKey(
+                    "GroupBy",
+                    this,
+                    Parent.Parent.QueryCache.GetSettingsHash(Parent.Settings),
+                    List,
+                    Parent.Joins != null ? Parent.Joins.GetItemHash() : 0,
+                    Parent.Count);
+                if (Parent.Parent.QueryCache.TryGet(cacheKey, out string cached))
+                {
+                    sql = cached;
+                    Updated = false;
+                    return sql;
+                }
                 List<GXJoin> joinList = new List<GXJoin>();
                 List<GXOrder> orderList = new List<GXOrder>();
                 UpdateJoins(Parent.Settings, Parent.Joins, joinList);
@@ -71,9 +84,15 @@ namespace Gurux.Service.Orm
                 StringBuilder sb = new StringBuilder();
                 GroupByToString(Parent, sb, orderList, joinList);
                 sql = sb.ToString();
+                Parent.Parent.QueryCache.Set(cacheKey, sql);
                 Updated = false;
             }
             return sql;
+        }
+
+        internal int GetItemHash()
+        {
+            return Parent.Parent.QueryCache.GetHash(List);
         }
 
         /// <summary>

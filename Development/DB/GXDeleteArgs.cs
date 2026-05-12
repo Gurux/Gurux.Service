@@ -41,9 +41,13 @@ using Gurux.Common.Internal;
 using System.Diagnostics;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Common;
+using Gurux.Service.DB;
 
 namespace Gurux.Service.Orm
 {
+    /// <summary>
+    /// Arguments for building a SQL DELETE statement.
+    /// </summary>
     public class GXDeleteArgs
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
@@ -71,10 +75,31 @@ namespace Gurux.Service.Orm
             Where.Clear();
         }
 
+        /// <summary>
+        /// Sets the query cache to use for this delete operation.
+        /// </summary>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        /// <returns>This <see cref="GXDeleteArgs"/> instance.</returns>
+        public GXDeleteArgs UseQueryCache(GXQueryCache queryCache)
+        {
+            Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            return this;
+        }
+
+        /// <summary>
+        /// Last execution time in ms.
+        /// </summary>
+        public int ExecutionTime
+        {
+            get;
+            internal set;
+        }
+
+
         /// <inheritdoc/>
         public override string ToString()
         {
-            return ToString(true);
+            return ToString(false);
         }
 
         /// <summary>
@@ -84,6 +109,18 @@ namespace Gurux.Service.Orm
         /// <returns>The constructed SQL DELETE statement as a string, or an empty string if no updates are necessary.</returns>
         public string ToString(bool addExecutionTime)
         {
+            var sw = Stopwatch.StartNew();
+            string cacheKey = Parent.QueryCache.BuildKey(
+                "DeleteArgs",
+                this,
+                Parent.QueryCache.GetSettingsHash(Settings),
+                Table,
+                Where,
+                Count);
+            if (Parent.QueryCache.TryGet(cacheKey, out string cachedSql))
+            {
+                return cachedSql;
+            }
             if (Parent.Updated || Updated)
             {
                 StringBuilder sb = new StringBuilder();
@@ -103,7 +140,21 @@ namespace Gurux.Service.Orm
                     sb.Append(str);
                 }
                 Updated = false;
-                return sb.ToString();
+                string sql = sb.ToString();
+                Parent.QueryCache.Set(cacheKey, sql);
+                sw.Stop();
+                ExecutionTime = (int)sw.ElapsedMilliseconds;
+                if (addExecutionTime && ExecutionTime != 0)
+                {
+                    sb.Clear();
+                    sb.Append("Execution time: ");
+                    sb.Append(ExecutionTime);
+                    sb.Append(" ms. ");
+                    sb.Append(Environment.NewLine);
+                    sb.Append(sql);
+                    sql = sb.ToString();
+                }
+                return sql;
             }
             return string.Empty;
         }
@@ -143,11 +194,26 @@ namespace Gurux.Service.Orm
             return Delete(typeof(T));
         }
 
+        /// <summary>
+        /// Delete all items from the table and use the specified query cache.
+        /// </summary>
+        /// <typeparam name="T">Table where items are deleted.</typeparam>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXDeleteArgs DeleteAll<T>(GXQueryCache queryCache)
+        {
+            return DeleteAll<T>().UseQueryCache(queryCache);
+        }
+
         internal static GXDeleteArgs Delete(Type type)
         {
             return new GXDeleteArgs() { Table = type, Updated = true };
         }
 
+        /// <summary>
+        /// Delete the specified item.
+        /// </summary>
+        /// <typeparam name="T">Type of the item to delete.</typeparam>
+        /// <param name="item">Item to delete.</param>
         public static GXDeleteArgs Delete<T>(T item)
         {
             if (item == null)
@@ -179,6 +245,22 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        /// <summary>
+        /// Delete the specified item and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the item to delete.</typeparam>
+        /// <param name="item">Item to delete.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXDeleteArgs Delete<T>(T item, GXQueryCache queryCache)
+        {
+            return Delete(item).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Delete items matching the where expression.
+        /// </summary>
+        /// <typeparam name="T">Type of the items to delete.</typeparam>
+        /// <param name="where">Filter expression.</param>
         public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where)
         {
             GXDeleteArgs arg = DeleteAll<T>();
@@ -189,6 +271,22 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        /// <summary>
+        /// Delete items matching the where expression and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the items to delete.</typeparam>
+        /// <param name="where">Filter expression.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where, GXQueryCache queryCache)
+        {
+            return Delete(where).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Delete a range of items.
+        /// </summary>
+        /// <typeparam name="T">Type of the items to delete.</typeparam>
+        /// <param name="collection">Collection of items to delete.</param>
         public static GXDeleteArgs DeleteRange<T>(IEnumerable<T> collection)
         {
             if (!collection.GetEnumerator().MoveNext())
@@ -201,6 +299,22 @@ namespace Gurux.Service.Orm
             return args;
         }
 
+        /// <summary>
+        /// Delete a range of items and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the items to delete.</typeparam>
+        /// <param name="collection">Collection of items to delete.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXDeleteArgs DeleteRange<T>(IEnumerable<T> collection, GXQueryCache queryCache)
+        {
+            return DeleteRange(collection).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Delete item by ID.
+        /// </summary>
+        /// <typeparam name="T">Type of the item to delete.</typeparam>
+        /// <param name="id">Primary key of the item to delete.</param>
         public static GXDeleteArgs DeleteById<T>(object id)
         {
             if (id == null)
@@ -218,16 +332,48 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        /// <summary>
+        /// Delete item by ID and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the item to delete.</typeparam>
+        /// <param name="id">Primary key of the item to delete.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXDeleteArgs DeleteById<T>(object id, GXQueryCache queryCache)
+        {
+            return DeleteById<T>(id).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Remove the association between an item and a collection of destination items.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the source item.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination items.</typeparam>
+        /// <param name="item">Source item.</param>
+        /// <param name="collections">Destination items to disassociate.</param>
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem item, TDestination[] collections)
         {
             return Remove<TItem, TDestination>(new TItem[] { item }, collections);
         }
 
+        /// <summary>
+        /// Remove the association between a collection of items and a destination item.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the source items.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination item.</typeparam>
+        /// <param name="items">Source items.</param>
+        /// <param name="collection">Destination item to disassociate.</param>
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem[] items, TDestination collection)
         {
             return Remove<TItem, TDestination>(items, new TDestination[] { collection });
         }
 
+        /// <summary>
+        /// Remove the associations between collections of items and destination items.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the source items.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination items.</typeparam>
+        /// <param name="items">Source items.</param>
+        /// <param name="collections">Destination items to disassociate.</param>
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem[] items, TDestination[] collections)
         {
             object collectionId, id;
@@ -266,13 +412,13 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add given item to the n:n collection.
         /// </summary>
-        /// <typeparam name="TSource"></typeparam>
+        /// <typeparam name="TItem"></typeparam>
         /// <typeparam name="TDestination"></typeparam>
-        /// <param name="source"></param>
-        /// <param name="destination"></param>
+        /// <param name="item"></param>
+        /// <param name="collection"></param>
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem item, TDestination collection)
         {
-            return Remove<TItem, TDestination>(new TItem[] { item }, new TDestination[] { collection });
+            return Remove(new TItem[] { item }, new TDestination[] { collection });
         }
 
         /// <summary>

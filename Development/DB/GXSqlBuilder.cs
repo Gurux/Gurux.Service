@@ -155,9 +155,9 @@ namespace Gurux.Service.Orm
             DbTypeMap[typeof(char)] = Settings.CharColumnDefinition;
             DbTypeMap[typeof(bool)] = Settings.BoolColumnDefinition;
             DbTypeMap[typeof(Guid)] = Settings.GuidColumnDefinition;
-            DbTypeMap[typeof(DateTime)] = Settings.DateTimeColumnDefinition;
+            DbTypeMap[typeof(DateTime)] = Settings.DateTimeColumnDefinition(TimeStorageUnit.Seconds);
             DbTypeMap[typeof(TimeSpan)] = Settings.TimeSpanColumnDefinition;
-            DbTypeMap[typeof(DateTimeOffset)] = Settings.DateTimeOffsetColumnDefinition;
+            DbTypeMap[typeof(DateTimeOffset)] = Settings.DateTimeOffsetColumnDefinition(TimeStorageUnit.Seconds);
             DbTypeMap[typeof(byte)] = Settings.ByteColumnDefinition;
             DbTypeMap[typeof(sbyte)] = Settings.SByteColumnDefinition;
             DbTypeMap[typeof(Int16)] = Settings.ShortColumnDefinition;

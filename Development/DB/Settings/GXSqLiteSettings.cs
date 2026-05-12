@@ -231,12 +231,9 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        override public string DateTimeColumnDefinition
+        override public string DateTimeColumnDefinition(TimeStorageUnit unit)
         {
-            get
-            {
-                return "VARCHAR(30)";
-            }
+            return "TEXT";
         }
 
         /// <inheritdoc />
@@ -244,17 +241,14 @@ namespace Gurux.Service.Orm.Settings
         {
             get
             {
-                return "VARCHAR(30)";
+                return "TEXT";
             }
         }
 
         /// <inheritdoc />
-        override public string DateTimeOffsetColumnDefinition
+        override public string DateTimeOffsetColumnDefinition(TimeStorageUnit unit)
         {
-            get
-            {
-                return "DATETIMEOFFSET";
-            }
+            return "TEXT";
         }
 
         /// <inheritdoc />

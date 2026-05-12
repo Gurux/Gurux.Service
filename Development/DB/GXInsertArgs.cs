@@ -39,6 +39,7 @@ using System.Collections;
 using System.Diagnostics;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Internal;
+using Gurux.Service.DB;
 
 namespace Gurux.Service.Orm
 {
@@ -145,26 +146,64 @@ namespace Gurux.Service.Orm
         /// <param name="addExecutionTime"> is execution time added to string.</param>
         public string ToString(bool addExecutionTime)
         {
+            string cacheKey = Parent.QueryCache.BuildKey(
+                "InsertArgs",
+                this,
+                Parent.QueryCache.GetSettingsHash(Settings),
+                Values,
+                Excluded);
+            if (Parent.QueryCache.TryGet(cacheKey, out string cachedSql))
+            {
+                sql = cachedSql;
+                return sql;
+            }
             if (Parent.Updated)
             {
                 List<string> queries = new List<string>();
                 GXDbHelpers.GetQueries(null, Parent.Settings, Values, Excluded, queries, null, insertedObjects);
                 sql = string.Join(" ", queries.ToArray());
+                Parent.QueryCache.Set(cacheKey, sql);
             }
             return sql;
         }
 
+        /// <summary>
+        /// Sets the query cache to use for this insert operation.
+        /// </summary>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        /// <returns>This <see cref="GXInsertArgs"/> instance.</returns>
+        public GXInsertArgs UseQueryCache(GXQueryCache queryCache)
+        {
+            Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            return this;
+        }
+
+        /// <summary>
+        /// Insert a value into the table.
+        /// </summary>
+        /// <typeparam name="T">Type of the value to insert.</typeparam>
+        /// <param name="value">Value to insert.</param>
         public static GXInsertArgs Insert<T>(T value)
         {
-            return Insert<T>(value, null);
+            return Insert<T>(value, (Expression<Func<T, object>>)null);
+        }
+
+        /// <summary>
+        /// Insert a value into the table and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the value to insert.</typeparam>
+        /// <param name="value">Value to insert.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs Insert<T>(T value, GXQueryCache queryCache)
+        {
+            return Insert<T>(value, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
         }
 
         /// <summary>
         /// Copy rows from the same table.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="select"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">Table type to insert into.</typeparam>
+        /// <param name="select">Select arguments defining the rows to copy.</param>
         public static GXInsertArgs Insert<T>(GXSelectArgs select)
         {
             GXInsertArgs args = new GXInsertArgs();
@@ -176,11 +215,22 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Copy rows from the table 
+        /// Copy rows from the same table and use the query cache.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="select"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">Table type to insert into.</typeparam>
+        /// <param name="select">Select arguments defining the rows to copy.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs Insert<T>(GXSelectArgs select, GXQueryCache queryCache)
+        {
+            return Insert<T>(select).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Copy rows from the table into selected columns.
+        /// </summary>
+        /// <typeparam name="T">Table type to insert into.</typeparam>
+        /// <param name="select">Select arguments defining the rows to copy.</param>
+        /// <param name="columns">Columns to insert into.</param>
         public static GXInsertArgs Insert<T>(GXSelectArgs select, Expression<Func<T, object>> columns)
         {
             GXInsertArgs args = new GXInsertArgs();
@@ -190,26 +240,70 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Add updated column(s).
+        /// Copy rows from the table into selected columns and use the query cache.
         /// </summary>
-        /// <param name="columns">Updated columns.</param>
+        /// <typeparam name="T">Table type to insert into.</typeparam>
+        /// <param name="select">Select arguments defining the rows to copy.</param>
+        /// <param name="columns">Columns to insert into.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs Insert<T>(GXSelectArgs select, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return Insert<T>(select, columns).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Add a value with specific columns to insert.
+        /// </summary>
+        /// <typeparam name="T">Type of the value to insert.</typeparam>
+        /// <param name="value">Value to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
         public void Add<T>(T value, Expression<Func<T, object>> columns)
         {
             Parent.Updated = true;
             Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
         }
 
+        /// <summary>
+        /// Add select-based rows with specific columns to insert.
+        /// </summary>
+        /// <typeparam name="T">Type of the target table.</typeparam>
+        /// <param name="select">Select arguments defining the rows to copy.</param>
+        /// <param name="columns">Columns to insert into.</param>
         public void Add<T>(GXSelectArgs select, Expression<Func<T, object>> columns)
         {
             Parent.Updated = true;
             Values.Add(new KeyValuePair<object, LambdaExpression>(select, columns));
         }
 
+        /// <summary>
+        /// Insert an array of values into selected columns.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to insert.</typeparam>
+        /// <param name="value">Array of values to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
         public static GXInsertArgs Insert<T>(T[] value, Expression<Func<T, object>> columns)
         {
             return InsertRange<T>(value, columns);
         }
 
+        /// <summary>
+        /// Insert an array of values into selected columns and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to insert.</typeparam>
+        /// <param name="value">Array of values to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs Insert<T>(T[] value, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return InsertRange<T>(value, columns).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Insert a value into selected columns.
+        /// </summary>
+        /// <typeparam name="T">Type of the value to insert.</typeparam>
+        /// <param name="value">Value to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
         public static GXInsertArgs Insert<T>(T value, Expression<Func<T, object>> columns)
         {
             if (value is GXSelectArgs)
@@ -238,11 +332,45 @@ namespace Gurux.Service.Orm
             return args;
         }
 
-        public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection)
+        /// <summary>
+        /// Insert a value into selected columns and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the value to insert.</typeparam>
+        /// <param name="value">Value to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs Insert<T>(T value, Expression<Func<T, object>> columns, GXQueryCache queryCache)
         {
-            return InsertRange(collection, null);
+            return Insert<T>(value, columns).UseQueryCache(queryCache);
         }
 
+        /// <summary>
+        /// Insert a collection of values into the table.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to insert.</typeparam>
+        /// <param name="collection">Collection of values to insert.</param>
+        public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection)
+        {
+            return InsertRange(collection, (Expression<Func<T, object>>)null);
+        }
+
+        /// <summary>
+        /// Insert a collection of values into the table and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to insert.</typeparam>
+        /// <param name="collection">Collection of values to insert.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection, GXQueryCache queryCache)
+        {
+            return InsertRange(collection, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Insert a collection of values into selected columns.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to insert.</typeparam>
+        /// <param name="collection">Collection of values to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
         public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection, Expression<Func<T, object>> columns)
         {
             if (collection == null)
@@ -262,16 +390,49 @@ namespace Gurux.Service.Orm
             return args;
         }
 
+        /// <summary>
+        /// Insert a collection of values into selected columns and use the query cache.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to insert.</typeparam>
+        /// <param name="collection">Collection of values to insert.</param>
+        /// <param name="columns">Columns to insert into.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXInsertArgs InsertRange<T>(IEnumerable<T> collection, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        {
+            return InsertRange(collection, columns).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Add the association between an item and a collection of destination items.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the source item.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination items.</typeparam>
+        /// <param name="item">Source item.</param>
+        /// <param name="collections">Destination items to associate.</param>
         public static GXInsertArgs Add<TItem, TDestination>(TItem item, TDestination[] collections)
         {
             return Add<TItem, TDestination>(new TItem[] { item }, collections);
         }
 
+        /// <summary>
+        /// Add the association between a collection of items and a destination item.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the source items.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination item.</typeparam>
+        /// <param name="items">Source items.</param>
+        /// <param name="collection">Destination item to associate.</param>
         public static GXInsertArgs Add<TItem, TDestination>(TItem[] items, TDestination collection)
         {
             return Add<TItem, TDestination>(items, new TDestination[] { collection });
         }
 
+        /// <summary>
+        /// Add the associations between collections of items and destination items.
+        /// </summary>
+        /// <typeparam name="TItem">Type of the source items.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination items.</typeparam>
+        /// <param name="items">Source items.</param>
+        /// <param name="collections">Destination items to associate.</param>
         public static GXInsertArgs Add<TItem, TDestination>(TItem[] items, TDestination[] collections)
         {
             object collectionId, id;
@@ -309,10 +470,10 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add given item to the n:n collection.
         /// </summary>
-        /// <typeparam name="TSource"></typeparam>
-        /// <typeparam name="TDestination"></typeparam>
-        /// <param name="source"></param>
-        /// <param name="destination"></param>
+        /// <typeparam name="TItem">Type of the source item.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination item.</typeparam>
+        /// <param name="item">Source item.</param>
+        /// <param name="collection">Destination item to associate.</param>
         public static GXInsertArgs Add<TItem, TDestination>(TItem item, TDestination collection)
         {
             return Add<TItem, TDestination>(new TItem[] { item }, new TDestination[] { collection });
@@ -321,10 +482,10 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Remove item from the n:n collection.
         /// </summary>
-        /// <typeparam name="TSource"></typeparam>
-        /// <typeparam name="TDestination"></typeparam>
-        /// <param name="source"></param>
-        /// <param name="destination"></param>
+        /// <typeparam name="TItem">Type of the source item.</typeparam>
+        /// <typeparam name="TDestination">Type of the destination item.</typeparam>
+        /// <param name="item">Source item.</param>
+        /// <param name="collection">Destination item to disassociate.</param>
         public static GXInsertArgs Remove<TItem, TDestination>(TItem item, TDestination collection)
         {
             return null;
@@ -333,8 +494,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Exclude columns from the insert.
         /// </summary>
-        /// <param name="value">Updated value.</param>
-        /// <returns>Created update attribute.</returns>
+        /// <typeparam name="T">Table type.</typeparam>
+        /// <param name="columns">Columns to exclude.</param>
         public void Exclude<T>(Expression<Func<T, object>> columns)
         {
             Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));

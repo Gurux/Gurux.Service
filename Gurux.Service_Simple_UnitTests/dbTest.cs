@@ -33,10 +33,7 @@
 using Gurux.Service.Orm;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Enums;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Globalization;
-using System.Linq.Expressions;
-using System.Reflection.Metadata.Ecma335;
 using System.Runtime.Serialization;
 
 namespace Gurux.Service_Test
@@ -97,6 +94,16 @@ namespace Gurux.Service_Test
         // public void MyTestCleanup() { }
         //
         #endregion
+
+        /// <summary>
+        /// Create  test.
+        /// </summary>
+        [TestMethod]
+        public void CreateTest()
+        {
+            GXSelectArgs arg = GXSelectArgs.SelectAll<TestClass>();
+            Assert.AreEqual("SELECT `ID`, `Guid`, `Time`, `Text`, `SimpleText`, `Text3`, `Text4`, `BooleanTest`, `IntTest`, `DoubleTest`, `FloatTest`, `Span`, `Object`, `Status` FROM TestClass", arg.ToString());
+        }
 
         /// <summary>
         /// Select test.
@@ -638,6 +645,27 @@ namespace Gurux.Service_Test
         }
 
         /// <summary>
+        /// Select Guid where Text starts with Gurux.
+        /// </summary>
+        [TestMethod]
+        public void WhereContainsTest2()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            string name = "Gurux";
+            arg.Where.And<TestClass>(q => q.Text.Contains(name.ToUpper()));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%GURUX%')", arg.ToString());
+            arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => q.Text.StartsWith(name.ToUpper()));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('GURUX%')", arg.ToString());
+            arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => q.Text.EndsWith(name.ToUpper()));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Text` LIKE('%GURUX')", arg.ToString());
+        }
+
+
+        /// <summary>
         /// Select Guid where list contains Gurux.
         /// </summary>
         [TestMethod]
@@ -832,6 +860,31 @@ namespace Gurux.Service_Test
             arg.Where.And<TestClass>(q => new int[] { 1, 2, 3 }.Contains(q.Id));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
         }
+
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlInTest1()
+        {
+
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => new byte[] { 1, 2, 3 }.Contains((byte) q.Id));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where ID in array.
+        /// </summary>
+        [TestMethod]
+        public void SqlInTest1_1()
+        {
+
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => new long[] { 1, 2, 3 }.Contains(q.Id));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
+        }
+
 
         /// <summary>
         /// Select Guid where ID in array.
@@ -1052,7 +1105,7 @@ namespace Gurux.Service_Test
             c.Text = "Gurux";
             GXInsertArgs args = GXInsertArgs.Insert(c);
             string str = args.ToString();
-            Assert.AreEqual("INSERT INTO NullableTestClass (`Id`, `Active`, `Text`) VALUES('" + c.Id + "', NULL, 'Gurux')", str);
+            Assert.AreEqual("INSERT INTO NullableTestClass (`Id`, `Active`, `Text`) VALUES('" + c.Id + "', 1, 'Gurux')", str);
         }
 
         /// <summary>
@@ -1101,6 +1154,21 @@ namespace Gurux.Service_Test
             Assert.AreEqual("UPDATE TestClass SET `Guid` = '00000000-0000-0000-0000-000000000000', `Time` = '" + dt.ToString(format) + "' WHERE TestClass.`Text` = 'Gurux'", args.ToString());
         }
 
+        /// <summary>
+        /// Update default null test.
+        /// </summary>
+        [TestMethod]
+        public void UpdateDefaultNullTest()
+        {
+            NullableTestClass value = new NullableTestClass();
+            value.Id = Guid.NewGuid();
+            GXUpdateArgs args = GXUpdateArgs.Update(value);
+            Assert.AreEqual("UPDATE NullableTestClass SET `Active` = 1, `Text` = NULL WHERE `Id` = '" + value.Id.ToString() + "'", args.ToString());
+            value.Active = true;
+            Assert.AreEqual("UPDATE NullableTestClass SET `Active` = 1, `Text` = NULL WHERE `Id` = '" + value.Id.ToString() + "'", args.ToString());
+            value.Active = false;
+            Assert.AreEqual("UPDATE NullableTestClass SET `Active` = 0, `Text` = NULL WHERE `Id` = '" + value.Id.ToString() + "'", args.ToString());
+        }
 
         /// <summary>
         /// Update test.
