@@ -975,7 +975,15 @@ namespace Gurux.Common.Internal
                 }
                 return GetPropertyType(target.BaseType);
             }
-            return types[0];
+            if (types.Length == 1)
+            {
+                return types[0];
+            }
+            if (types.Length == 2)
+            {
+                return types[1];
+            }
+            throw new ArgumentException("Unsupported number of generic arguments.");
         }
 
         /// <summary>

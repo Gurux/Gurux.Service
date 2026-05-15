@@ -731,14 +731,24 @@ namespace Gurux.Service_Test
         [TestMethod]
         public void WhereContainsIEnumerableGuidTest()
         {
-            TestClass t = new TestClass();
-            t.Id = 1;
-            List<Guid> tmp = [Guid.Empty];
-            IEnumerable<Guid> list = tmp.Where(x => x == Guid.Empty);
+            List<Guid> tmp = [Guid.NewGuid(), Guid.NewGuid()];
+            IEnumerable<Guid> list = tmp.Where(x => x != Guid.Empty);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
             arg.Where.And<TestClass>(q => list.Contains(q.Guid));
-            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000-0000-0000-0000-000000000000')", arg.ToString());
-        }        
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('" + string.Join("', '", list) + "')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where list contains Guid.
+        /// </summary>
+        [TestMethod]
+        public void WhereContainsIEnumerableGuidTest2()
+        {
+            List<TestClass> tmp = [new TestClass() { Guid = Guid.NewGuid() }, new TestClass() { Guid = Guid.NewGuid() }];
+            IEnumerable<Guid> list = tmp.Select(s => s.Guid);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid, w => list.Contains(w.Guid));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('" + string.Join("', '", list) + "')", arg.ToString());
+        }
 
         /// <summary>
         /// Select Guid where Text equals with Gurux.
