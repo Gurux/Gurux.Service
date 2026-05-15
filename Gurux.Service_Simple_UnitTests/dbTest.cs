@@ -34,6 +34,7 @@ using Gurux.Service.Orm;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Enums;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.Serialization;
 
 namespace Gurux.Service_Test
@@ -710,6 +711,34 @@ namespace Gurux.Service_Test
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, -1)", arg.ToString());
         }
 
+        /// <summary>
+        /// Select Guid where list contains Guid.
+        /// </summary>
+        [TestMethod]
+        public void WhereContainsListGuidTest()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            List<Guid> list = [Guid.Empty];
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => list.Contains(q.Guid));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000-0000-0000-0000-000000000000')", arg.ToString());
+        }
+
+        /// <summary>
+        /// Select Guid where list contains Guid.
+        /// </summary>
+        [TestMethod]
+        public void WhereContainsIEnumerableGuidTest()
+        {
+            TestClass t = new TestClass();
+            t.Id = 1;
+            List<Guid> tmp = [Guid.Empty];
+            IEnumerable<Guid> list = tmp.Where(x => x == Guid.Empty);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
+            arg.Where.And<TestClass>(q => list.Contains(q.Guid));
+            Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`Guid` IN ('00000000-0000-0000-0000-000000000000')", arg.ToString());
+        }        
 
         /// <summary>
         /// Select Guid where Text equals with Gurux.
@@ -869,7 +898,7 @@ namespace Gurux.Service_Test
         {
 
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid);
-            arg.Where.And<TestClass>(q => new byte[] { 1, 2, 3 }.Contains((byte) q.Id));
+            arg.Where.And<TestClass>(q => new byte[] { 1, 2, 3 }.Contains((byte)q.Id));
             Assert.AreEqual("SELECT `Guid` FROM TestClass WHERE TestClass.`ID` IN (1, 2, 3)", arg.ToString());
         }
 

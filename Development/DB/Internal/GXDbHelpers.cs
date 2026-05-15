@@ -1731,7 +1731,32 @@ namespace Gurux.Service.Orm.Internal
                         return new string[] { null };
                     }
                     Dictionary<string, GXSerializedItem> properties;
-                    if (target is IList)
+                    if (target is string || target is GXSelectArgs || !target.GetType().IsClass)//String is class.
+                    {
+                        if (target is GXSelectArgs)
+                        {
+                            ((GXSelectArgs)target).Settings = settings;
+                        }
+                        string str;
+                        if (target is DateTime || target is DateTimeOffset)
+                        {
+                            str = settings.ConvertToString(target, where);
+                        }
+                        else
+                        {
+                            str = GetString(target);
+                        }
+                        if (where && getValue && target is string)
+                        {
+                            return new string[] { "'" + str + "'" };
+                        }
+                        if (where && getValue && target is Guid)
+                        {
+                            return new string[] { "'" + str + "'" };
+                        }
+                        return new string[] { str };
+                    }
+                    else if (target is IEnumerable)
                     {
                         properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
                         //If this is a basic type list. example int[].
@@ -1764,34 +1789,10 @@ namespace Gurux.Service.Orm.Internal
                                     sb.Append(Convert.ToString(it, CultureInfo.InvariantCulture));
                                 }
                             }
-                            return new string[] { sb.ToString() };
+                            return [sb.ToString()];
                         }
                     }
-                    else if (target is string || target is GXSelectArgs || !target.GetType().IsClass)//String is class.
-                    {
-                        if (target is GXSelectArgs)
-                        {
-                            ((GXSelectArgs)target).Settings = settings;
-                        }
-                        string str;
-                        if (target is DateTime || target is DateTimeOffset)
-                        {
-                            str = settings.ConvertToString(target, where);
-                        }
-                        else
-                        {
-                            str = GetString(target);
-                        }
-                        if (where && getValue && target is string)
-                        {
-                            return new string[] { "'" + str + "'" };
-                        }
-                        if (where && getValue && target is Guid)
-                        {
-                            return new string[] { "'" + str + "'" };
-                        }
-                        return new string[] { str };
-                    }
+
                     else
                     {
                         properties = GXSqlBuilder.GetProperties(target.GetType());

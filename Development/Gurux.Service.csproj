@@ -27,7 +27,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Gurux.Service.Common" Version="3.0.2605.602" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.7" />
+    <PackageReference Include="System.Data.Odbc" Version="10.0.8" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
  </ItemGroup>
 
