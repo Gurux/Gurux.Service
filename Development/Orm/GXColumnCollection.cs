@@ -1,0 +1,1038 @@
+﻿//
+// --------------------------------------------------------------------------
+//  Gurux Ltd
+//
+//
+//
+// Filename:        $HeadURL$
+//
+// Version:         $Revision$,
+//                  $Date$
+//                  $Author$
+//
+// Copyright (c) Gurux Ltd
+//
+//---------------------------------------------------------------------------
+//
+//  DESCRIPTION
+//
+// This file is a part of Gurux Device Framework.
+//
+// Gurux Device Framework is Open Source software; you can redistribute it
+// and/or modify it under the terms of the GNU General Public License
+// as published by the Free Software Foundation; version 2 of the License.
+// Gurux Device Framework is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+// See the GNU General Public License for more details.
+//
+// This code is licensed under the GNU General Public License v2.
+// Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
+//---------------------------------------------------------------------------
+
+using Gurux.Common.Internal;
+using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Settings;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Text;
+
+namespace Gurux.Service.Orm
+{
+    /// <summary>
+    /// Collection of columns in select expression.
+    /// </summary>
+    public class GXColumnCollection
+    {
+        /// <summary>
+        /// SelectUsingAs is not used when select is used in insert.
+        /// </summary>
+        internal bool Insert = false;
+
+        /// <summary>
+        /// List of tables and columns to get.
+        /// </summary>
+        internal Dictionary<Type, List<(string, Type)>> ColumnList = new Dictionary<Type, List<(string, Type)>>();
+        internal Dictionary<string, string> Maps = new Dictionary<string, string>();
+
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        internal List<KeyValuePair<LambdaExpression, LambdaExpression>> List = new List<KeyValuePair<LambdaExpression, LambdaExpression>>();
+        /// <summary>
+        /// List of values to exlude from update.
+        /// </summary>
+        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
+        internal List<KeyValuePair<Type, LambdaExpression>> Excluded = new List<KeyValuePair<Type, LambdaExpression>>();
+
+        internal GXJoinCollection Joins;
+        GXSettingsArgs Parent;
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        internal GXColumnCollection(GXSettingsArgs parent, GXJoinCollection joins)
+        {
+            Parent = parent;
+            Joins = joins;
+        }
+
+        static private bool IsExcluded(string it, List<string> excluded)
+        {
+            return excluded != null && excluded.Count != 0 && excluded.Contains(it);
+        }
+
+        private void GetRelations(Type type, List<GXJoin> joinList, List<Type> tables,
+            Dictionary<Type, List<string>> columns, bool getRelations)
+        {
+            if (!tables.Contains(type))
+            {
+                //TODO: lisää shared table attribute.
+                bool ignorebaseType = false;
+                foreach (var it in tables)
+                {
+                    if (GXDbHelpers.IsSharedTable(it) && type.IsAssignableFrom(it.BaseType))
+                    {
+                        ignorebaseType = true;
+                        break;
+                    }
+                }
+                if (ignorebaseType)
+                {
+                    return;
+                }
+                tables.Add(type);
+
+                Type tp;
+                bool added;
+                List<string> excluded = null;
+                List<string> cols = null;
+                string tableName = null;
+                if (columns != null && columns.ContainsKey(type))
+                {
+                    cols = columns[type];
+                    if (cols.Contains("*"))
+                    {
+                        cols = null;
+                    }
+                }
+                Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(type);
+                foreach (var it in properties)
+                {
+                    if (cols != null && !cols.Contains(it.Key))
+                    {
+                        continue;
+                    }
+                    if (!IsExcluded(it.Key, excluded))
+                    {
+                        if (it.Value.Relation != null && getRelations)
+                        {
+                            GXJoin j = new GXJoin();
+                            tp = it.Value.Relation.PrimaryTable;
+                            j.Table1Type = tp;
+                            bool shared = GXDbHelpers.IsSharedTable(tp);
+                            if (shared || GXDbHelpers.IsAliasName(tp))
+                            {
+                                j.Alias1 = GXDbHelpers.OriginalTableName(tp);
+                            }
+                            j.Table2Type = it.Value.Relation.ForeignTable;
+                            j.UpdateTables(tp, it.Value.Relation.ForeignTable);
+                            //If nullable.
+                            Type tp2 = it.Value.Relation.ForeignId.Type;
+                            j.AllowNull1 = !shared && tp2.IsGenericType && tp2.GetGenericTypeDefinition() == typeof(Nullable<>);
+                            if (!j.AllowNull1)
+                            {
+                                tp2 = it.Value.Relation.PrimaryId.Type;
+                                j.AllowNull2 = !GXDbHelpers.IsSharedTable(it.Value.Relation.ForeignTable)
+                                    && tp2.IsGenericType && tp2.GetGenericTypeDefinition() == typeof(Nullable<>);
+                            }
+                            if (GXDbHelpers.IsSharedTable(it.Value.Relation.ForeignTable) ||
+                                 GXDbHelpers.IsAliasName(it.Value.Relation.ForeignTable))
+                            {
+                                j.Alias2 = GXDbHelpers.OriginalTableName(it.Value.Relation.ForeignTable);
+                            }
+                            if (it.Value.Relation.RelationType == RelationType.OneToOne ||
+                                it.Value.Relation.RelationType == RelationType.Relation)
+                            {
+                                j.Column2 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Value.Relation.PrimaryId.Relation.ForeignId.Target as PropertyInfo, null);
+                                j.Column1 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Value.Relation.PrimaryId.Target as PropertyInfo, null);
+                                if (tables.Contains(it.Value.Relation.ForeignTable))
+                                {
+                                    continue;
+                                }
+                                //If nullable.
+                                tp2 = it.Value.Relation.PrimaryId.Relation.ForeignId.Type;
+                                j.AllowNull1 = !shared && tp2.IsGenericType && tp2.GetGenericTypeDefinition() == typeof(Nullable<>);
+                                if (!j.AllowNull1)
+                                {
+                                    tp2 = it.Value.Relation.PrimaryId.Relation.PrimaryId.Type;
+                                    j.AllowNull2 = !GXDbHelpers.IsSharedTable(it.Value.Relation.ForeignTable) &&
+                                            tp2.IsGenericType && tp2.GetGenericTypeDefinition() == typeof(Nullable<>);
+                                }
+                            }
+                            else if (it.Value.Relation.RelationType == RelationType.OneToMany)
+                            {
+                                j.Column1 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Value.Relation.PrimaryId.Relation.ForeignId.Target as PropertyInfo, null);
+                                j.Column2 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Value.Relation.PrimaryId.Target as PropertyInfo, null);
+                                //If nullable.
+                                tp2 = it.Value.Relation.ForeignId.Type;
+                                j.AllowNull1 = !shared && tp2.IsGenericType && tp2.GetGenericTypeDefinition() == typeof(Nullable<>);
+                                if (!j.AllowNull1)
+                                {
+                                    tp2 = it.Value.Relation.PrimaryId.Type;
+                                    j.AllowNull2 = !GXDbHelpers.IsSharedTable(it.Value.Relation.ForeignTable) &&
+                                        tp2.IsGenericType && tp2.GetGenericTypeDefinition() == typeof(Nullable<>);
+                                }
+                            }
+                            else if (it.Value.Relation.RelationType == RelationType.ManyToMany)
+                            {
+                                j.Table2Type = it.Value.Relation.RelationMapTable.Relation.PrimaryTable;
+                                j.UpdateTables(tp, it.Value.Relation.RelationMapTable.Relation.PrimaryTable);
+                                j.Column2 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, GXSqlBuilder.FindRelation(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, tp).Target as PropertyInfo, null);
+                                j.Column1 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, GXSqlBuilder.FindUnique(tp).Target as PropertyInfo, null);
+                                added = false;
+                                //Check that join is not added already.
+                                string j1 = j.Table1;
+                                string j2 = j.Table2;
+                                foreach (var it4 in joinList)
+                                {
+                                    string t1 = it4.Table1;
+                                    string t2 = it4.Table2;
+                                    if ((j1 == t1 && j2 == t2) || (j2 == t1 && j1 == t2))
+                                    {
+                                        added = true;
+                                        break;
+                                    }
+                                }
+                                if (!added)
+                                {
+                                    joinList.Add(j);
+                                    j = new GXJoin();
+                                    Type tmp = it.Value.Type;
+                                    j.AllowNull1 = !!GXDbHelpers.IsSharedTable(tmp) && tmp.IsGenericType && tmp.GetGenericTypeDefinition() == typeof(Nullable<>);
+                                    j.UpdateTables(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, it.Value.Relation.ForeignTable);
+                                    j.Column1 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Value.Relation.RelationMapTable.Target as PropertyInfo, null);
+                                    j.Column2 = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Value.Relation.ForeignId.Target as PropertyInfo, null);
+                                    joinList.Add(j);
+                                    tables.Add(it.Value.Relation.RelationMapTable.Relation.PrimaryTable);
+                                    if (cols != null)
+                                    {
+                                        tables.Add(it.Value.Relation.ForeignTable);
+                                    }
+                                }
+                                j = null;
+                            }
+                            if (j != null)
+                            {
+                                //Check that join is not added already.
+                                added = false;
+                                string j1 = j.Table1;
+                                string j2 = j.Table2;
+                                int index = -1;
+                                foreach (var it4 in joinList)
+                                {
+                                    string t1 = it4.Table1;
+                                    string t2 = it4.Table2;
+                                    if ((j1 == t1 && j2 == t2) || (j2 == t1 && j1 == t2))
+                                    {
+                                        added = true;
+                                        break;
+                                    }
+                                    if (j.Alias2 != null && it4.Alias2 == j.Alias2)
+                                    {
+                                        ++index;
+                                    }
+                                }
+                                //If we have multiple referenced to same table.
+                                if (index != -1)
+                                {
+                                    j.Index = index + 1;
+                                }
+                                if (!added)
+                                {
+                                    joinList.Add(j);
+                                }
+                            }
+                            if (cols == null || cols.Contains(it.Key))
+                            {
+                                GetRelations(it.Value.Relation.ForeignTable, joinList, tables, columns, getRelations);
+                            }
+
+                        }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("Column " + tableName + "." + it.Key + " Skipped.");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get columns that are wanted to execute select query.
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="columns"></param>
+        /// <param name="tables"></param>
+        private void GetColumns(
+            Type type,
+            Dictionary<Type, List<(string, Type)>> columns,
+            Dictionary<Type, GXSerializedItem> tables)
+        {
+            if (type == null)
+            {
+                throw new AccessViolationException("Type can't be null.");
+            }
+            if (tables.ContainsKey(type))
+            {
+                bool exists = columns.ContainsKey(type);
+                List<(string, Type)> list;
+                if (exists)
+                {
+                    list = columns[type];
+                }
+                else
+                {
+                    list = new List<(string, Type)>();
+                }
+                tables.Remove(type);
+                string tableName = null;
+                Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(type);
+                foreach (var it in properties)
+                {
+                    if (!list.Where(w => w.Item1 == it.Key).Any())
+                    {
+                        if (it.Value.Relation != null)
+                        {
+                            if (it.Value.Relation.RelationType == RelationType.ManyToMany)
+                            {
+                                GetColumns(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, columns, tables);
+                            }
+                            else
+                            {
+                                GetColumns(it.Value.Relation.ForeignTable, columns, tables);
+                            }
+                            if (it.Value.Relation.RelationType == RelationType.OneToOne ||
+                                it.Value.Relation.RelationType == RelationType.Relation)
+                            {
+                                list.Add((it.Key, it.Value.Type));
+                            }
+                        }
+                        else
+                        {
+                            list.Add((it.Key, it.Value.Type));
+                        }
+                    }
+                    else
+                    {
+                        Debug.WriteLine("Column " + tableName + "." + it.Key + " is excluded.");
+                    }
+                }
+                if (!exists && list.Count != 0)
+                {
+                    columns.Add(type, list);
+                }
+            }
+        }
+
+        /// <inheritdoc/>
+        public override string ToString()
+        {
+            string post = null;
+            return ToString(ref post);
+        }
+
+        internal string ToString(ref string post)
+        {
+            string cacheKey = Parent.QueryCache.BuildKey(
+                List,
+                Excluded,
+                Joins != null ? Joins.GetItemHash() : 0,
+                Parent.QueryCache.GetHash(Maps),
+                Parent.Distinct,
+                Parent.Index,
+                Parent.Count,
+                Insert);
+            if (Parent.QueryCache.TryGet(cacheKey, out string cachedSql))
+            {
+                Debug.WriteLine("Cache SQL: " + cachedSql);
+                return cachedSql;
+            }
+            ColumnList.Clear();
+            List<GXJoin> joinList = new List<GXJoin>();
+            GXOrderByCollection.UpdateJoins(Parent.Settings, Joins, joinList);
+            string[] list;
+            StringBuilder sb = new StringBuilder();
+            //Get columns.
+            Dictionary<string, GXSerializedItem> properties;
+            Dictionary<Type, GXSerializedItem> neededTables = new Dictionary<Type, GXSerializedItem>();
+            GXGetMembersArgs args = new GXGetMembersArgs(Parent.Settings, TargetType.Column | TargetType.Plain)
+            {
+                SingleTable = true
+            };
+            foreach (var it in List)
+            {
+                //No relations.
+                if (!neededTables.ContainsKey(it.Key.Parameters[0].Type))
+                {
+                    neededTables.Add(it.Key.Parameters[0].Type, null);
+                }
+                args.Expression = it.Key;
+                list = GXDbHelpers.GetMemberList(args);
+                post = args.Post;
+                foreach (var it2 in list)
+                {
+                    properties = GXSqlBuilder.GetProperties(it.Key.Parameters[0].Type);
+                    if (it2 != "*" && ColumnList.ContainsKey(it.Key.Parameters[0].Type))
+                    {
+                        if (properties.ContainsKey(it2))
+                        {
+                            GXSerializedItem si = properties[it2];
+                            if (si.Relation != null)
+                            {
+                                //Get properties.
+                                GetColumns(si.Relation.ForeignTable, ColumnList, neededTables);
+                            }
+                            if (si.Relation == null || si.Relation.RelationType != RelationType.ManyToMany)
+                            {
+                                ColumnList[it.Key.Parameters[0].Type].Add((it2, si.Type));
+                            }
+                        }
+                        else
+                        {
+                            string str = it2;
+                            if (it.Value != null)
+                            {
+                                args.Expression = it.Value;
+                                string[] tmp = GXDbHelpers.GetMembers(args);
+                                str += " AS " + tmp[0];
+                            }
+                            ColumnList[it.Key.Parameters[0].Type].Add((str, it.Value.Type));
+                        }
+                    }
+                    else
+                    {
+                        if (it2 == "*")
+                        {
+                            GetColumns(it.Key.Parameters[0].Type, ColumnList, neededTables);
+                        }
+                        else
+                        {
+                            if (neededTables.ContainsKey(it.Key.Parameters[0].Type))
+                            {
+                                neededTables.Remove(it.Key.Parameters[0].Type);
+                            }
+                            Type type = it.Key.Parameters[0].Type;
+                            ColumnList.Add(it.Key.Parameters[0].Type, [(it2, type)]);
+                            if (properties.ContainsKey(it2))
+                            {
+                                GXSerializedItem si = properties[it2];
+                                if (si.Relation != null)
+                                {
+                                    //Get properties.
+                                    GetColumns(si.Relation.ForeignTable, ColumnList, neededTables);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            foreach (var it in ColumnList)
+            {
+                foreach (KeyValuePair<Type, LambdaExpression> x in Excluded)
+                {
+                    if (x.Key == it.Key)
+                    {
+                        args.Expression = x.Value;
+                        string[] removed = GXDbHelpers.GetMembers(args);
+                        foreach (string col in removed)
+                        {
+                            bool includeQuery = false;
+                            string col2 = GXDbHelpers.AddQuotes(col,
+                                Parent.Settings.DataQuotaReplacement,
+                                Parent.Settings.ColumnNameQuoteCharacter);
+                            //Joins are not removed from the qyery or 1:1 doesn't work.
+                            foreach (var j in joinList)
+                            {
+                                if ((it.Key == j.Table1Type && j.Column1 == col2) ||
+                                    (it.Key == j.Table2Type && j.Column2 == col2))
+                                {
+                                    includeQuery = true;
+                                    break;
+                                }
+                            }
+                            if (!includeQuery)
+                            {
+                                it.Value.RemoveAll(w => w.Item1 == col);
+                            }
+                        }
+                    }
+                }
+            }
+            SelectToString(Parent.Settings, sb, Parent.Distinct, ColumnList, joinList, Parent.Index, Parent.Count, post);
+            string sql = sb.ToString();
+            Parent.QueryCache.Set(cacheKey, sql);
+            Debug.WriteLine("New SQL: " + sql);
+            return sql;
+        }
+
+        internal int GetItemHash()
+        {
+            int hash = Parent.QueryCache.GetHash(List);
+            unchecked
+            {
+                hash = hash * 31 + Parent.QueryCache.GetHash(Excluded);
+                hash = hash * 31 + (Joins != null ? Joins.GetItemHash() : 0);
+                hash = hash * 31 + Parent.Distinct.GetHashCode();
+                hash = hash * 31 + Parent.Index.GetHashCode();
+                hash = hash * 31 + Parent.Count.GetHashCode();
+                hash = hash * 31 + Insert.GetHashCode();
+            }
+            return hash;
+        }
+
+        /// <summary>
+        /// Select all columns from the table.
+        /// </summary>
+        /// <typeparam name="T">Table type.</typeparam>
+        public void Add<T>()
+        {
+            Add<T>(_ => "*");
+        }
+
+        /// <summary>
+        /// Add new item to expression list.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="expression"></param>
+        public void Add<T>(Expression<Func<T, object>> expression)
+        {
+            List.Add(new KeyValuePair<LambdaExpression, LambdaExpression>(expression, null));
+        }
+
+        /// <summary>
+        /// Add new item to expression list where result is saved to target property.
+        /// </summary>
+        /// <remarks>
+        /// This can be used when items count is read from the database and it's saved to the variable.
+        /// </remarks>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="expression">Lambda expression.</param>
+        /// <param name="target">Target where read data is saved.</param>
+        /// <example>
+        /// <code>
+        /// GXSelectArgs arg = GXSelectArgs.Select&lt;TestClass&gt;(q => q.Text);
+        /// arg.Columns.&lt;TestClass&gt;(q => GXSql.Count(q), n => n.IntTest);
+        /// </code>
+        /// </example>
+        public void Add<T>(Expression<Func<T, object>> expression, Expression<Func<T, object>> target)
+        {
+            List.Add(new KeyValuePair<LambdaExpression, LambdaExpression>(expression, target));
+        }
+
+        /// <summary>
+        /// Clear expression list.
+        /// </summary>
+        public void Clear()
+        {
+            List.Clear();
+        }
+
+        /// <summary>
+        /// Get as name.
+        /// </summary>
+        /// <param name="joinList">List of joins.</param>
+        /// <param name="type">Type of the table.</param>
+        /// <param name="selectUsingAs">Indicates whether to use alias names.</param>
+        /// <returns>Alias name if applicable, otherwise null.</returns>
+        /// <remarks>
+        /// As name is used if:
+        /// 1. Data from different classes is saved to same table.
+        /// 2. Several classes are using same class.
+        /// 3. User is defined it using Alias attribute.
+        /// </remarks>
+        internal static string GetAsName(List<GXJoin> joinList, Type type, bool selectUsingAs)
+        {
+            //Data from different classes is saved to same table.
+            if (selectUsingAs || joinList.Any() || GXDbHelpers.IsSharedTable(type))
+            {
+                string name = GXDbHelpers.OriginalTableName(type);
+                int cnt = 0;
+                GXJoin target = null;
+                foreach (GXJoin it in joinList)
+                {
+                    if (type == it.Table1Type)
+                    {
+                        target = it;
+                    }
+                    else if (it.Alias2 == name || it.Table2 == name)
+                    {
+                        ++cnt;
+                        //If we have more than one class that are sharing same table.
+                        if (cnt != 1)
+                        {
+                            break;
+                        }
+                    }
+                }
+                if (cnt > 1)
+                {
+                    name = GXDbHelpers.ConvertToString(null, TargetType.Table, null, type.GetProperty("Name"), null);
+                    if (target != null)
+                    {
+                        target.Alias2 = name;
+                    }
+                    return name;
+                }
+                if (selectUsingAs)
+                {
+                    return name;
+                }
+            }
+            if (GXDbHelpers.IsAliasName(type))
+            {
+                return GXDbHelpers.OriginalTableName(type);
+            }
+            return null;
+        }
+
+        private void SelectToString(GXDBSettings settings, StringBuilder sb, bool distinct,
+                Dictionary<Type, List<(string, Type)>> columnList, List<GXJoin> joinList, UInt32 index, UInt32 count, string post)
+        {
+            Dictionary<Type, string> asTable = new Dictionary<Type, string>();
+            string name;
+            foreach (var it in columnList)
+            {
+                name = GetAsName(joinList, it.Key, !Insert && settings.SelectUsingAs);
+                if (name != null)
+                {
+                    asTable.Add(it.Key, name);
+                }
+            }
+            sb.Append("SELECT ");
+            if (distinct)
+            {
+                sb.Append("DISTINCT ");
+            }
+            if (index != 0 || count != 0)
+            {
+                if (index != 0 && count == 0)
+                {
+                    throw new ArgumentOutOfRangeException("Count can't be zero if index is given.");
+                }
+                if (index != 0)
+                {
+                    if (settings.LimitType == LimitType.Top)
+                    {
+                        sb.Length = 0;
+                        sb.Append("SELECT * FROM (SELECT TOP ");
+                        sb.Append(count);
+                        sb.Append(" GX.* FROM (");
+                        sb.Append("SELECT ");
+                        if (distinct)
+                        {
+                            sb.Append("DISTINCT ");
+                        }
+                        sb.Append("TOP ");
+                        sb.Append(index + count);
+                        sb.Append(" ");
+                    }
+                }
+                else
+                {
+                    if (settings.LimitType == LimitType.Top)
+                    {
+                        sb.Append("TOP ");
+                        sb.Append(count);
+                        sb.Append(" ");
+                    }
+                }
+            }
+            string tableAs, table;
+            bool first = true;
+            foreach (var it in columnList)
+            {
+                if (asTable.ContainsKey(it.Key))
+                {
+                    tableAs = asTable[it.Key];
+                }
+                else
+                {
+                    tableAs = null;
+                }
+                if (GXDbHelpers.IsSharedTable(it.Key) || GXDbHelpers.IsAliasName(it.Key))
+                {
+                    table = GXDbHelpers.AddQuotes(GXDbHelpers.OriginalTableName(it.Key),
+                        Parent.Settings.DataQuotaReplacement,
+                        settings.TableNameQuoteCharacter);
+                }
+                else
+                {
+                    table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Key, null);
+                }
+                foreach (var col in it.Value)
+                {
+                    name = null;
+                    if (first)
+                    {
+                        first = false;
+                    }
+                    else
+                    {
+                        sb.Append(", ");
+                    }
+                    //Check is this method.
+                    int pos = col.Item1.LastIndexOf('(');
+                    if (pos == -1) //If table field.
+                    {
+                        if (col.Item1 == "*")
+                        {
+                            sb.Append(col.Item1);
+                        }
+                        else
+                        {
+                            if (settings.Type == DatabaseType.MySQL && col.Item2 == typeof(Guid))
+                            {
+                                if (joinList.Any())
+                                {
+                                    name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, col.Item1, null);
+                                }
+                                else
+                                {
+                                    name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, col.Item1, null);
+                                }
+                                sb.Append("BIN_TO_UUID(");
+                                sb.Append(name);
+                                sb.Append(", 1) AS ");
+                            }
+                            else
+                            {
+                                if (joinList.Any())
+                                {
+                                    name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table | TargetType.Plain, null, table, null);
+                                }
+                                else
+                                {
+                                    name = null;
+                                }
+                                name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, name, col.Item1, Maps);
+                            }
+                            sb.Append(name);
+                        }
+                        if (tableAs != null)
+                        {
+                            sb.Append(" AS ");
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col.Item1,
+                                Parent.Settings.DataQuotaReplacement,
+                                settings.ColumnNameQuoteCharacter);
+                            sb.Append(name);
+                        }
+                        else if (settings.SelectUsingAs && index == 0)
+                        {
+                            sb.Append(" AS ");
+                            name = GXDbHelpers.AddQuotes(tableAs + "." + col.Item1,
+                                Parent.Settings.DataQuotaReplacement,
+                                settings.ColumnNameQuoteCharacter);
+                            sb.Append(name);
+                        }
+                    }
+                    else //If method like COUNT(*)
+                    {
+                        if (col.Item1 == "1()")
+                        {
+                            sb.Append('1');
+                            if (it.Value.Count == 1)
+                            {
+                                //As is ignored if there is only one column.
+                                continue;
+                            }
+                        }
+                        else if (col.Item1 == "COUNT(1())")
+                        {
+                            sb.Append("COUNT(1)");
+                            pos -= 2;
+                        }
+                        else if (col.Item1 == "COUNT(1)")
+                        {
+                            sb.Append("COUNT(1)");
+                        }
+                        else
+                        {
+                            if (joinList == null || joinList.Count == 0)
+                            {
+                                sb.Append(col.Item1);
+                            }
+                            else
+                            {
+                                if (col.Item1.StartsWith("COUNT(DISTINCT"))
+                                {
+                                    pos = 14;
+                                }
+                                name = col.Item1.Substring(pos + 1, col.Item1.Length - pos - 2);
+                                if (settings.TableNameQuoteCharacter != '\0' &&
+                                    name.StartsWith(settings.TableNameQuoteCharacter))
+                                {
+                                    name = name.Substring(1, name.Length - 2);
+                                }
+                                name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, name, null);
+                                name = col.Item1.Substring(0, pos + 1) + name + ")";
+                                sb.Append(name);
+                            }
+                        }
+                        if (post == null && settings.SelectUsingAs && index == 0)
+                        {
+                            int i = col.Item1.IndexOf(" AS ");
+                            if (i == -1)
+                            {
+                                if (col.Item1.StartsWith("COUNT(DISTINCT"))
+                                {
+                                    pos = 5;
+                                }
+                                sb.Append(" AS ");
+                                name = GXDbHelpers.AddQuotes(tableAs + "." + col.Item1.Substring(0, pos),
+                                    Parent.Settings.DataQuotaReplacement,
+                                    settings.ColumnNameQuoteCharacter);
+                                sb.Append(name);
+                            }
+                            else
+                            {
+                                sb.Length -= col.Item1.Length;
+                                sb.Append(col.Item1.Substring(0, i));
+                                name = col.Item1.Substring(i + 4);
+                                sb.Append(" AS ");
+                                name = GXDbHelpers.AddQuotes(tableAs + "." + name,
+                                    Parent.Settings.DataQuotaReplacement,
+                                    settings.ColumnNameQuoteCharacter);
+                                sb.Append(name);
+                            }
+                        }
+                    }
+                    if (Maps.ContainsKey(col.Item1))
+                    {
+                        sb.Append(" AS ");
+                        sb.Append(GXDbHelpers.AddQuotes(Maps[col.Item1],
+                            Parent.Settings.DataQuotaReplacement,
+                            settings.ColumnNameQuoteCharacter));
+                    }
+                }
+            }
+            if (columnList.Count == 0)
+            {
+                sb.Append("*");
+            }
+            if (joinList.Count == 0)
+            {
+                sb.Append(" FROM ");
+                first = true;
+                foreach (var it in columnList)
+                {
+                    if (first)
+                    {
+                        first = false;
+                    }
+                    else
+                    {
+                        sb.Append(", ");
+                    }
+                    sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Key, null));
+                    if (asTable.ContainsKey(it.Key))
+                    {
+                        sb.Append(" ");
+                        sb.Append(GXDbHelpers.AddQuotes(asTable[it.Key],
+                            Parent.Settings.DataQuotaReplacement,
+                            settings.TableNameQuoteCharacter));
+                    }
+                }
+            }
+            else
+            {
+                //If we are adding relation to same table more than once.
+                Dictionary<string, int> list = new Dictionary<string, int>();
+                sb.Append(" FROM ");
+                first = true;
+                if (joinList.Count != 1)
+                {
+                    for (int pos = 0; pos < joinList.Count; ++pos)
+                    {
+                        sb.Append("(");
+                    }
+                }
+                foreach (var it in joinList)
+                {
+                    if (first)
+                    {
+                        sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null));
+                        if (asTable.ContainsKey(it.Table1Type))
+                        {
+                            sb.Append(" ");
+                            sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1Type, null));
+                        }
+                        else
+                        {
+                            if (it.Alias1 != null)
+                            {
+                                sb.Append(" ");
+                                sb.Append(it.Alias1);
+                            }
+                        }
+                        first = false;
+                    }
+
+                    switch (it.Type)
+                    {
+                        case JoinType.Inner:
+                            sb.Append(" INNER JOIN ");
+                            break;
+                        case JoinType.Left:
+                            sb.Append(" LEFT OUTER JOIN ");
+                            break;
+                        case JoinType.Right:
+                            sb.Append(" RIGHT OUTER JOIN ");
+                            break;
+                        case JoinType.Full:
+                            sb.Append(" FULL OUTER JOIN ");
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException("Invalid join type.");
+                    }
+                    sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2, null));
+                    //Add alias if used and it is not same as table name.
+                    if (asTable.ContainsKey(it.Table2Type))
+                    {
+                        sb.Append(" ");
+                        sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2Type, null));
+                    }
+                    sb.Append(" ON ");
+                    if (asTable.ContainsKey(it.Table1Type))
+                    {
+                        sb.Append(" ");
+                        sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1Type, null));
+                    }
+                    else
+                    {
+                        sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null));
+                    }
+                    sb.Append('.');
+                    sb.Append(it.Column1);
+                    sb.Append(" = ");
+                    //Add alias if used.
+                    if (asTable.ContainsKey(it.Table2Type))
+                    {
+                        sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, asTable[it.Table2Type], null));
+                    }
+                    else
+                    {
+                        sb.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2, null));
+                        if (it.Alias2 == null && it.Index != 0)
+                        {
+                            sb.Append(it.Index);
+                        }
+                    }
+                    sb.Append('.');
+                    sb.Append(it.Column2);
+                    if (it.AllowNull1)
+                    {
+                        sb.Append(" OR ");
+                        //Add alias if used.
+                        if (asTable.ContainsKey(it.Table1Type))
+                        {
+                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table1Type],
+                                Parent.Settings.DataQuotaReplacement,
+                                settings.TableNameQuoteCharacter));
+                        }
+                        else
+                        {
+                            sb.Append(GXDbHelpers.AddQuotes(it.Table1,
+                                Parent.Settings.DataQuotaReplacement,
+                                settings.TableNameQuoteCharacter));
+                        }
+                        sb.Append('.');
+                        sb.Append(it.Column1);
+                        sb.Append(" IS NULL");
+                    }
+
+                    if (it.AllowNull2)
+                    {
+                        sb.Append(" OR ");
+                        //Add alias if used.
+                        if (asTable.ContainsKey(it.Table2Type))
+                        {
+                            sb.Append(GXDbHelpers.AddQuotes(asTable[it.Table2Type],
+                                Parent.Settings.DataQuotaReplacement,
+                                settings.TableNameQuoteCharacter));
+                        }
+                        else
+                        {
+                            sb.Append(GXDbHelpers.AddQuotes(it.Table2,
+                                Parent.Settings.DataQuotaReplacement,
+                                settings.TableNameQuoteCharacter));
+                        }
+                        sb.Append('.');
+                        sb.Append(it.Column2);
+                        sb.Append(" IS NULL");
+                    }
+
+                    if (joinList.Count != 1)
+                    {
+                        sb.Append(")");
+                    }
+                }
+            }
+            if (index != 0)
+            {
+                if (settings.LimitType == LimitType.Top)
+                {
+                    List<Type> tables = new List<Type>();
+                    foreach (var it in columnList)
+                    {
+                        if (!tables.Contains(it.Key))
+                        {
+                            tables.Add(it.Key);
+                        }
+                    }
+                    GXSerializedItem si = null;
+                    foreach (var it in tables)
+                    {
+                        if ((si = GXSqlBuilder.FindUnique(it)) != null)
+                        {
+                            break;
+                        }
+                    }
+                    string id;
+                    //Add alias if used.
+                    if (asTable.ContainsKey((si.Target as PropertyInfo).ReflectedType))
+                    {
+                        id = GXDbHelpers.AddQuotes(asTable[(si.Target as PropertyInfo).ReflectedType] + "." + GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, si.Target as PropertyInfo, null),
+                            Parent.Settings.DataQuotaReplacement,
+                            settings.TableNameQuoteCharacter);
+                    }
+                    else
+                    {
+                        id = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, si.Target as PropertyInfo, null);
+                    }
+                    if (Parent.Descending)
+                    {
+                        sb.Append(string.Format(" ORDER BY {0} DESC) AS GX ORDER BY GX.{0}) AS GX2", id));
+                    }
+                    else
+                    {
+                        sb.Append(string.Format(" ORDER BY {0}) AS GX ORDER BY GX.{0} DESC) AS GX2", id));
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Exclude columns from the query or update.
+        /// </summary>
+        /// <typeparam name="T">Object where columns are excluded.</typeparam>
+        /// <param name="columns">Excluded columns.</param>
+        public void Exclude<T>(Expression<Func<T, object>> columns)
+        {
+            Excluded.Add(new KeyValuePair<Type, LambdaExpression>(typeof(T), columns));
+        }
+    }
+}

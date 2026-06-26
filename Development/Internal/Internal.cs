@@ -30,16 +30,16 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Reflection.Emit;
-using System.Reflection;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Runtime.Serialization;
-using System.Text;
-using System.Collections;
-using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Settings;
+using System;
+using System.Collections;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.Serialization;
 
 namespace Gurux.Common.Internal
 {
@@ -48,22 +48,14 @@ namespace Gurux.Common.Internal
     /// </summary>
     /// <param name="instance">Target.</param>
     /// <returns>Property value</returns>
-    delegate object GetHandler(object instance);
+    delegate object? GetHandler(object instance);
 
     /// <summary>
     /// Property setter delegate.
     /// </summary>
     /// <param name="instance">Target.</param>
     /// <param name="value">New value.</param>
-    delegate void SetHandler(object instance, object value);
-
-    /// <summary>
-    /// Gurux.Service.Rest method invoke handler.
-    /// </summary>
-    /// <param name="instance"></param>
-    /// <param name="value"></param>
-    /// <returns></returns>
-    delegate object InvokeHandler(object instance, object value);
+    delegate void SetHandler(object instance, object? value);
 
     [Flags]
     enum Attributes : int
@@ -118,7 +110,11 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Filter is used.
         /// </summary>
-        Filter = 0x1000
+        Filter = 0x1000,
+        /// <summary>
+        /// Millisecond is ignored.
+        /// </summary>
+        MsIgnored = 0x2000,
     }
 
     enum RelationType
@@ -214,21 +210,6 @@ namespace Gurux.Common.Internal
         public Attributes Attributes;
 
         public GXRelationTable Relation;
-
-        public GXSerializedItem Clone()
-        {
-            GXSerializedItem item = new GXSerializedItem(); ;
-            item.Type = Type;
-            item.Target = Target;
-            item.DefaultValue = DefaultValue;
-            item.FilterType = FilterType;
-            item.FilterValue = FilterValue;
-            item.Set = Set;
-            item.Get = Get;
-            item.Attributes = Attributes;
-            item.Relation = Relation;
-            return item;
-        }
     }
 
     /// <summary>
@@ -236,35 +217,54 @@ namespace Gurux.Common.Internal
     /// </summary>
     class GXInternal
     {
-#if !NETSTANDARD2_0
+#if !NETSTANDARD2_0 && !NETSTANDARD2_1  
         /// <summary>
-        /// Create method handler for Gurux.Service.Rest methods.
+        /// Cache of compiled IL get-delegates keyed by MemberInfo to avoid repeated reflection.
         /// </summary>
-        /// <param name="type"></param>
-        /// <param name="methodinfo"></param>
-        /// <returns></returns>
-        internal static InvokeHandler CreateMethodHandler(Type type, MethodInfo methodinfo)
+        private static readonly ConcurrentDictionary<MemberInfo, Tuple<GetHandler, SetHandler>> _handlerCache =
+            new ConcurrentDictionary<MemberInfo, Tuple<GetHandler, SetHandler>>();
+
+        private static readonly ConcurrentDictionary<Type, Func<object>> ClassCache = new();
+
+        internal static object CreateClass(Type type)
         {
-            DynamicMethod dynamic = new DynamicMethod(methodinfo.Name, typeof(object), new Type[] { typeof(object), typeof(object) }, methodinfo.DeclaringType, true);
-            // Get an ILGenerator and emit a body for the dynamic method.
-            ILGenerator il = dynamic.GetILGenerator();
-            il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Call, methodinfo);
+            return ClassCache.GetOrAdd(type, CreateFactory)();
+        }
+
+        private static Func<object> CreateFactory(Type type)
+        {
+            var ctor = type.GetConstructor(Type.EmptyTypes)
+                ?? throw new InvalidOperationException($"No default constructor: {type}");
+
+            var dm = new DynamicMethod(
+                "Create",
+                typeof(object),
+                Type.EmptyTypes,
+                type.Module,
+                true);
+
+            var il = dm.GetILGenerator();
+
+            il.Emit(OpCodes.Newobj, ctor);
+
+            if (type.IsValueType)
+                il.Emit(OpCodes.Box, type);
+
             il.Emit(OpCodes.Ret);
-            return (InvokeHandler)dynamic.CreateDelegate(typeof(InvokeHandler));
+
+            return (Func<object>)dm.CreateDelegate(typeof(Func<object>));
         }
 
         private static DynamicMethod CreateGetDynamicMethod(Type type)
         {
             return new DynamicMethod("Get", typeof(object),
-                                     new Type[] { typeof(object) }, type, true);
+                                     [typeof(object)], type.Module, true);
         }
 
         private static DynamicMethod CreateSetDynamicMethod(Type type)
         {
             return new DynamicMethod("Set", typeof(void),
-                                     new Type[] { typeof(object), typeof(object) }, type, true);
+                                     [typeof(object), typeof(object)], type.Module, true);
         }
 
         private static void BoxIfNeeded(Type type, ILGenerator generator)
@@ -336,30 +336,7 @@ namespace Gurux.Common.Internal
             setGenerator.Emit(OpCodes.Ret);
             return (SetHandler)dynamicSet.CreateDelegate(typeof(SetHandler));
         }
-#endif
-        /// <summary>
-        /// Split sent data to packets.
-        /// </summary>
-        /// <param name="str"></param>
-        /// <param name="length"></param>
-        /// <returns></returns>
-        public static List<string> SplitInParts(String str, Int32 length)
-        {
-            if (str == null)
-            {
-                throw new ArgumentNullException("String");
-            }
-            if (length <= 0)
-            {
-                throw new ArgumentException("Length has to be positive.");
-            }
-            List<string> items = new List<string>();
-            for (int pos = 0; pos < str.Length; pos += length)
-            {
-                items.Add(str.Substring(pos, Math.Min(length, str.Length - pos)));
-            }
-            return items;
-        }
+#endif //!NETSTANDARD2_0 && !NETSTANDARD2_1
 
         /// <summary>
         /// Get custom attribute.
@@ -403,20 +380,6 @@ namespace Gurux.Common.Internal
             return atts[0];
         }
 
-#if !NETSTANDARD2_0 && !NETSTANDARD2_1
-        /// <summary>
-        /// Cache of compiled IL get-delegates keyed by MemberInfo to avoid repeated reflection.
-        /// </summary>
-        private static readonly ConcurrentDictionary<MemberInfo, GetHandler> _getHandlerCache =
-            new ConcurrentDictionary<MemberInfo, GetHandler>();
-
-        /// <summary>
-        /// Cache of compiled IL set-delegates keyed by MemberInfo to avoid repeated reflection.
-        /// </summary>
-        private static readonly ConcurrentDictionary<MemberInfo, SetHandler> _setHandlerCache =
-            new ConcurrentDictionary<MemberInfo, SetHandler>();
-#endif
-
         /// <summary>
         /// Get property value.
         /// </summary>
@@ -428,8 +391,8 @@ namespace Gurux.Common.Internal
             if (pi != null)
             {
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
-                GetHandler handler = _getHandlerCache.GetOrAdd(pi, p =>
-                    CreateGetHandler(((PropertyInfo)p).DeclaringType, (PropertyInfo)p));
+                Tuple<GetHandler, SetHandler> propertyHandlers = GetHandlers(pi.DeclaringType, pi);
+                GetHandler handler = propertyHandlers.Item1;
                 return handler(instance);
 #else
                 return pi.GetValue(instance, null);
@@ -437,8 +400,8 @@ namespace Gurux.Common.Internal
             }
             FieldInfo fi = target as FieldInfo;
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
-            GetHandler fieldHandler = _getHandlerCache.GetOrAdd(fi, f =>
-                CreateGetHandler(((FieldInfo)f).DeclaringType, (FieldInfo)f));
+            Tuple<GetHandler, SetHandler> fieldHandlers = GetHandlers(fi.DeclaringType, fi);
+            GetHandler fieldHandler = fieldHandlers.Item1;
             return fieldHandler(instance);
 #else
             return fi.GetValue(instance);
@@ -446,71 +409,32 @@ namespace Gurux.Common.Internal
         }
 
         /// <summary>
-        /// Set property value.
+        /// Get property value.
         /// </summary>
-        /// <param name="instance">Instance where value is set.</param>
-        /// <param name="target">Property type.</param>
-        /// <param name="value">New value.</param>
-        public static void SetValue(object instance, object target, object value)
+        /// <param name="type">Class instance where value is get.</param>
+        /// <param name="target">Property what is get from the instance.</param>
+        public static Tuple<GetHandler, SetHandler> GetHandlers(Type type, object target)
         {
             PropertyInfo pi = target as PropertyInfo;
             if (pi != null)
             {
-                if (value is IEnumerable)
-                {
-                    if (!pi.PropertyType.IsAssignableFrom(value.GetType()))
-                    {
-                        if (pi.PropertyType.IsArray)
-                        {
-                            int pos = 0;
-                            Array items = Array.CreateInstance(GXInternal.GetPropertyType(pi.PropertyType), ((IList)value).Count);
-                            foreach (object it in (IList)value)
-                            {
-                                items.SetValue(it, pos);
-                                ++pos;
-                            }
-                            value = items;
-                        }
-#if !NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NET5_0 && !NET6_0 && !NET8_0  && !NET9_0 && !NET10_0
-                        else if (pi.PropertyType.IsGenericType && pi.PropertyType.GetGenericTypeDefinition() == typeof(System.Data.Linq.EntitySet<>))
-                        {
-                            Type listT = typeof(System.Data.Linq.EntitySet<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
-                            IList list = (IList)Activator.CreateInstance(listT);
-                            foreach (object it in (IList)value)
-                            {
-                                list.Add(it);
-                            }
-                            value = list;
-                        }
-#endif //!NETCOREAPP2_0 && !NETSTANDARD2_0 && !NETSTANDARD2_1 && !NETCOREAPP2_1 && !NETCOREAPP3_1 && !NET5_0 && !NET6_0 && !NET8_0
-                        else
-                        {
-                            Type listT = typeof(List<>).MakeGenericType(new[] { GXInternal.GetPropertyType(pi.PropertyType) });
-                            IList list = (IList)Activator.CreateInstance(listT);
-                            foreach (object it in (IList)value)
-                            {
-                                list.Add(it);
-                            }
-                            value = list;
-                        }
-                    }
-                }
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
-                SetHandler handler = _setHandlerCache.GetOrAdd(pi, p =>
-                    CreateSetHandler(((PropertyInfo)p).DeclaringType, (PropertyInfo)p));
-                handler(instance, value);
+                Tuple<GetHandler, SetHandler> handlers = _handlerCache.GetOrAdd(pi, p =>
+                    new Tuple<GetHandler, SetHandler>(CreateGetHandler(type, pi),
+                        CreateSetHandler(type, pi)));
+                return handlers;
 #else
-                pi.SetValue(instance, value, null);
+                return pi.GetValue(instance, null);
 #endif
-                return;
             }
             FieldInfo fi = target as FieldInfo;
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
-            SetHandler fieldHandler = _setHandlerCache.GetOrAdd(fi, f =>
-                CreateSetHandler(((FieldInfo)f).DeclaringType, (FieldInfo)f));
-            fieldHandler(instance, value);
+            Tuple<GetHandler, SetHandler> handlers2 = _handlerCache.GetOrAdd(fi, f =>
+                new Tuple<GetHandler, SetHandler>(CreateGetHandler(type, fi),
+                CreateSetHandler(type, fi)));
+            return handlers2;
 #else
-            fi.SetValue(instance, value);
+            return fi.GetValue(instance);
 #endif
         }
 
@@ -578,13 +502,11 @@ namespace Gurux.Common.Internal
                         }
                         if ((s.Attributes & Attributes.Ignored) == 0)
                         {
-                            if (!it.PropertyType.IsArray)
-                            {
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
-                                s.Get = GXInternal.CreateGetHandler(it.PropertyType, it);
-                                s.Set = GXInternal.CreateSetHandler(it.PropertyType, it);
+                            var tmp = GetHandlers(it.PropertyType, it);
+                            s.Get = tmp.Item1;
+                            s.Set = tmp.Item2;
 #endif
-                            }
                             list.Add(name, s);
                         }
                     }
@@ -618,13 +540,11 @@ namespace Gurux.Common.Internal
                             }
                             if ((s.Attributes & Attributes.Ignored) == 0)
                             {
-                                if (!it.FieldType.IsArray)
-                                {
 #if !NETSTANDARD2_0
-                                    s.Get = GXInternal.CreateGetHandler(it.FieldType, it);
-                                    s.Set = GXInternal.CreateSetHandler(it.FieldType, it);
+                                var tmp = GetHandlers(it.FieldType, it);
+                                s.Get = tmp.Item1;
+                                s.Set = tmp.Item2;
 #endif
-                                }
                                 list.Add(name, s);
                             }
                         }
@@ -633,313 +553,7 @@ namespace Gurux.Common.Internal
             }
             return list;
         }
-
-        /// <summary>
-        /// Change DB value type.
-        /// </summary>
-        /// <param name="value"></param>
-        /// <param name="type"></param>
-        /// <param name="utc"></param>
-        /// <returns></returns>
-        static public object ChangeType(object value, Type type, bool utc)
-        {
-            if (value == null || value is DBNull)
-            {
-                return null;
-            }
-            if (type == typeof(byte[]))
-            {
-                if (value is string)
-                {
-                    return Convert.FromHexString((string)value);
-                }
-                return Convert.FromHexString(ASCIIEncoding.ASCII.GetString((byte[])value));
-            }
-            //Date times are saved in UTC format.
-            if (type == typeof(DateTime))
-            {
-                DateTime dt = (DateTime)Convert.ChangeType(value, type);
-                if (dt == DateTime.MinValue)
-                {
-                    return dt;
-                }
-                //Milliseconst are not saved.
-                if (dt.Ticks == DateTime.MaxValue.AddTicks(-9999999).Ticks)
-                {
-                    return DateTime.MaxValue;
-                }
-                if (utc)
-                {
-                    dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
-                }
-                else
-                {
-                    dt = DateTime.SpecifyKind(dt, DateTimeKind.Local);
-                }
-                return dt.ToLocalTime();
-            }
-            if (value.GetType() == type)
-            {
-                if (type == typeof(string) && value is string s)
-                {
-                    return s.Replace(@"\\", @"\");
-                }
-                return value;
-            }
-            if (type == typeof(Guid))
-            {
-                if (value is string)
-                {
-                    Guid g = new Guid((string)value);
-                    return g;
-                }
-            }
-            else if (type.IsEnum)
-            {
-                if (value is string)
-                {
-                    return Enum.Parse(type, (string)value);
-                }
-                return Enum.Parse(type, value.ToString());
-            }
-            else if (type == typeof(System.Decimal))
-            {
-                if (Convert.ToDouble(value) == -7.9228162514264338E+28)
-                {
-                    return System.Decimal.MinValue;
-                }
-                if (Convert.ToDouble(value) == 7.9228162514264338E+28)
-                {
-                    return System.Decimal.MaxValue;
-                }
-                Convert.ToDecimal(value);
-            }
-            else if (type == typeof(Int64))
-            {
-                if (value is double)
-                {
-                    if ((double)value == 9.2233720368547758E+18)
-                    {
-                        return Int64.MaxValue;
-                    }
-                }
-            }
-            else if (type == typeof(UInt64))
-            {
-                if (value is double)
-                {
-                    if ((double)value == 1.8446744073709552E+19)
-                    {
-                        return UInt64.MaxValue;
-                    }
-                }
-            }
-            else if (type == typeof(TimeSpan))
-            {
-                return new TimeSpan(Convert.ToInt64(value) * 10000);
-            }
-            else if (type == typeof(DateTimeOffset))
-            {
-                DateTime dt = (DateTime)Convert.ChangeType(value, typeof(DateTime));
-                if (utc)
-                {
-                    dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
-                }
-                else
-                {
-                    dt = DateTime.SpecifyKind(dt, DateTimeKind.Local);
-                }
-                if (dt == DateTime.MinValue)
-                {
-                    return DateTimeOffset.MinValue;
-                }
-                if (dt == DateTime.MaxValue)
-                {
-                    return DateTimeOffset.MaxValue;
-                }
-                return new DateTimeOffset(dt.ToLocalTime());
-            }
-            //If nullable.
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-            {
-                if (value == null)
-                {
-                    return null;
-                }
-                Type tp = Nullable.GetUnderlyingType(type);
-                //Date times are saved in UTC format.
-                if (tp == typeof(DateTime))
-                {
-                    DateTime dt = (DateTime)Convert.ChangeType(value, tp);
-                    if (utc)
-                    {
-                        dt = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
-                    }
-                    else
-                    {
-                        dt = DateTime.SpecifyKind(dt, DateTimeKind.Local);
-                    }
-                    return dt.ToLocalTime();
-                }
-                if (value.GetType() != tp)
-                {
-                    return ChangeType(value, tp, utc);
-                }
-                return value;
-            }
-            if (type.IsArray)
-            {
-                Type pt = GXInternal.GetPropertyType(type);
-                string[] tmp = ((string)value).Split(new char[] { ';' });
-                Array items = Array.CreateInstance(pt, tmp.Length);
-                int pos2 = -1;
-                foreach (string it in tmp)
-                {
-                    items.SetValue(GXInternal.ChangeType(it, pt, utc), ++pos2);
-                }
-                return items;
-            }
-            if (type == typeof(Type))
-            {
-                return Type.GetType(value.ToString());
-            }
-            return Convert.ChangeType(value, type);
-        }
-
-        internal static object ShouldSerializeValue(object value)
-        {
-            //If value is nullable.
-            if (value == null)
-            {
-                return null;
-            }
-            if (value is sbyte)
-            {
-                if ((sbyte)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is Int16)
-            {
-                if ((Int16)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is Int32)
-            {
-                if ((Int32)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is Int64)
-            {
-                if ((Int64)value == 0)
-                {
-                    return null;
-                }
-            }
-            if (value is byte)
-            {
-                if ((byte)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is UInt16)
-            {
-                if ((UInt16)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is UInt32)
-            {
-                if ((UInt32)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is UInt64)
-            {
-                if ((UInt64)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is double)
-            {
-                if ((double)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is float)
-            {
-                if ((float)value == 0)
-                {
-                    return null;
-                }
-            }
-            else if (value is bool)
-            {
-                if (!(bool)value)
-                {
-                    return null;
-                }
-            }
-            else if (value is string)
-            {
-                if (string.IsNullOrEmpty((string)value))
-                {
-                    return null;
-                }
-            }
-            else if (value is DateTime)
-            {
-                if ((DateTime)value == DateTime.MinValue)
-                {
-                    return null;
-                }
-            }
-            else if (value is TimeSpan)
-            {
-                if ((TimeSpan)value == TimeSpan.Zero)
-                {
-                    return null;
-                }
-            }
-            else if (value is Guid)
-            {
-                if ((Guid)value == Guid.Empty)
-                {
-                    return null;
-                }
-            }
-            else if (value is Type)
-            {
-                return value;
-            }
-            else if (value is System.Collections.IEnumerable)
-            {
-                //If collection is empty.
-                if (!(value as System.Collections.IEnumerable).GetEnumerator().MoveNext())
-                {
-                    return null;
-                }
-            }
-            else if (value is object)
-            {
-                if (value.GetType() == typeof(object))
-                {
-                    return null;
-                }
-            }
-            return value;
-        }
-
+       
         internal static bool IsGenericDataType(Type type)
         {
             //If nullable.
@@ -950,6 +564,36 @@ namespace Gurux.Common.Internal
             return type.IsPrimitive || type.IsEnum || type == typeof(Guid) || type == typeof(DateTime) ||
                    type == typeof(string) || type == typeof(Type) || type == typeof(object) ||
                    type == typeof(decimal) || type == typeof(TimeSpan) || type == typeof(DateTimeOffset);
+        }
+
+        public static object ConvertListIfNeeded(object value, Type targetType)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            Type sourceType = value.GetType();
+
+            if (targetType.IsAssignableFrom(sourceType))
+            {
+                return value;
+            }
+
+            if (targetType.IsGenericType &&
+                targetType.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                Type targetItemType = targetType.GetGenericArguments()[0];
+
+                var result = (IList)Activator.CreateInstance(targetType)!;
+
+                foreach (object item in (IEnumerable)value)
+                {
+                    result.Add(item);
+                }
+                return result;
+            }
+            throw new InvalidCastException($"Cannot convert {sourceType.FullName} to {targetType.FullName}");
         }
 
         internal static Type GetPropertyType(Type target)

@@ -32,12 +32,10 @@
 
 using System.Runtime.Serialization;
 using System.ComponentModel;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.ComponentModel.DataAnnotations;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Common.Enums;
 
-namespace Gurux.Service_Test
+namespace Gurux.Service_Simple_Unit_Test
 {
     class TestItem
     {
@@ -45,16 +43,16 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         public string Address
         {
             get;
             set;
-        }
+        } = default!;
     }
 
-    enum State
+    public enum State
     {
         OK = 100,
         Failed = 200
@@ -93,7 +91,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
-        public string Text
+        public string? Text
         {
             get;
             set;
@@ -203,7 +201,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public float? Float
@@ -252,14 +250,14 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public char[] CharArray
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -278,7 +276,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -289,28 +287,28 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember]
         public string Text
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "TestClassID"), ForeignKey]
         public TestClass[] Items
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "Items2ID"), ForeignKey]
         public List<TestIDClass> Items2
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -324,7 +322,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember, ForeignKey]
-        public CircularRelation2 Target
+        public CircularRelation2? Target
         {
             get;
             set;
@@ -342,7 +340,7 @@ namespace Gurux.Service_Test
         }
 
         [DataMember, ForeignKey]
-        public CircularRelation1 Target
+        public CircularRelation1? Target
         {
             get;
             set;
@@ -388,7 +386,7 @@ namespace Gurux.Service_Test
             Assert.AreEqual(expected.Span, Span);
             if (Items != null)
             {
-                Assert.AreEqual(expected.Items.Length, Items.Length);
+                Assert.AreEqual(expected.Items!.Length, Items.Length);
                 Assert.AreEqual(expected.Items[0].Address, Items[0].Address);
                 Assert.AreEqual(expected.Items[0].Name, Items[0].Name);
                 Assert.AreEqual(expected.Items[1].Address, Items[1].Address);
@@ -428,7 +426,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "SimpleText")]
         [Filter(FilterType.Exact)]
@@ -436,7 +434,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         [DefaultValue(null)]
@@ -445,14 +443,14 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public String Text4
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public bool BooleanTest
@@ -490,14 +488,14 @@ namespace Gurux.Service_Test
         }
 
         [DataMember()]
-        public object Object
+        public object? Object
         {
             get;
             set;
         }
 
         [DataMember(), Gurux.Service.Orm.Common.Ignore]
-        public TestItem[] Items
+        public TestItem[]? Items
         {
             get;
             set;
@@ -528,7 +526,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public List<Product> Items
@@ -566,7 +564,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "TargetID"), ForeignKey(typeof(Supplier))]
         public int SupplierID
@@ -591,10 +589,10 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "Target2ID"), ForeignKey]
-        public Supplier Supplier
+        public Supplier? Supplier
         {
             get;
             set;
@@ -623,7 +621,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -663,11 +661,11 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "CountryID")]
         [ForeignKey]
-        public Country Country
+        public Country? Country
         {
             get;
             set;
@@ -689,7 +687,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "CountryID")]
         [ForeignKey]
@@ -697,14 +695,14 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember]
         public string ExtraField
         {
             get;
             set;
-        }
+        } = default!;
     }
 
 
@@ -723,7 +721,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
 
@@ -742,7 +740,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember]
         [ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
@@ -750,7 +748,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -776,7 +774,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -794,11 +792,11 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember]
         [ForeignKey]
-        public Child2[] Childrens
+        public Child2[]? Childrens
         {
             get;
             set;
@@ -819,7 +817,7 @@ namespace Gurux.Service_Test
 
         [DataMember, ForeignKey(typeof(Parent2),
             OnDelete = ForeignKeyDelete.Cascade)]
-        public Parent2 Parent
+        public Parent2? Parent
         {
             get;
             set;
@@ -830,7 +828,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -848,14 +846,15 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
+
         [DataMember]
         [ForeignKey(typeof(UserGroup2), typeof(UserToUserGroup))]
         public UserGroup2[] Groups
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract]
@@ -894,11 +893,11 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember]
         [ForeignKey(typeof(User2), typeof(UserToUserGroup))]
-        public User2[] Users
+        public User2[]? Users
         {
             get;
             set;
@@ -921,14 +920,14 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember]
         public string Value
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember, ForeignKey(typeof(Device2))]
         public int DeviceID
@@ -954,10 +953,10 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "DeviceID"), ForeignKey]
-        public Parameter2[] Parameters
+        public Parameter2[]? Parameters
         {
             get;
             set;
@@ -980,7 +979,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract, Alias("DP")]
@@ -1003,7 +1002,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 
     [DataContract, Alias("D")]
@@ -1022,11 +1021,11 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
 
         [DataMember, ForeignKey]
-        public DeviceProperty[] Properties
+        public DeviceProperty[]? Properties
         {
             get;
             set;
@@ -1057,21 +1056,21 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember, ForeignKey]
         public Device3[] Devices
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember, ForeignKey]
         public DeviceGroupProperty[] Properties
         {
             get;
             set;
-        }
+        } = default!;
 
     }
 
@@ -1098,7 +1097,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember(Name = "SimpleText")]
         [DefaultValue("")]
@@ -1106,7 +1105,7 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         [DefaultValue(null)]
@@ -1114,14 +1113,14 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public String Text4
         {
             get;
             set;
-        }
+        } = default!;
 
         [DataMember()]
         public bool BooleanTest
@@ -1150,6 +1149,6 @@ namespace Gurux.Service_Test
         {
             get;
             set;
-        }
+        } = default!;
     }
 }

@@ -1,0 +1,302 @@
+﻿//
+// --------------------------------------------------------------------------
+//  Gurux Ltd
+// 
+//
+//
+// Filename:        $HeadURL$
+//
+// Version:         $Revision$,
+//                  $Date$
+//                  $Author$
+//
+// Copyright (c) Gurux Ltd
+//
+//---------------------------------------------------------------------------
+//
+//  DESCRIPTION
+//
+// This file is a part of Gurux Device Framework.
+//
+// Gurux Device Framework is Open Source software; you can redistribute it
+// and/or modify it under the terms of the GNU General Public License 
+// as published by the Free Software Foundation; version 2 of the License.
+// Gurux Device Framework is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of 
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// See the GNU General Public License for more details.
+//
+// This code is licensed under the GNU General Public License v2. 
+// Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
+//---------------------------------------------------------------------------
+using System;
+using System.Collections.Generic;
+
+namespace Gurux.Service.Orm.Settings
+{
+    /// <summary>
+    /// Utility class to handle reserved words in MySQL.
+    /// </summary>
+    public static class GXMySqlReservedWords
+    {
+        /// <summary>
+        /// A set of reserved words in MySQL. 
+        /// This list is based on the official documentation and may not be exhaustive.
+        /// </summary>
+        private static readonly HashSet<string> ReservedWords =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+            "FUNCTION",
+            "ACCESSIBLE",
+            "ADD",
+            "ALL",
+            "ALTER",
+            "ANALYZE",
+            "AND",
+            "AS",
+            "ASC",
+            "ASENSITIVE",
+            "BEFORE",
+            "BETWEEN",
+            "BIGINT",
+            "BINARY",
+            "BLOB",
+            "BOTH",
+            "BY",
+            "CALL",
+            "CASCADE",
+            "CASE",
+            "CHANGE",
+            "CHAR",
+            "CHARACTER",
+            "CHECK",
+            "COLLATE",
+            "COLUMN",
+            "CONDITION",
+            "CONSTRAINT",
+            "CONTINUE",
+            "CONVERT",
+            "CREATE",
+            "CROSS",
+            "CURRENT_DATE",
+            "CURRENT_TIME",
+            "CURRENT_TIMESTAMP",
+            "CURRENT_USER",
+            "CURSOR",
+            "DATABASE",
+            "DATABASES",
+            "DAY_HOUR",
+            "DAY_MICROSECOND",
+            "DAY_MINUTE",
+            "DAY_SECOND",
+            "DEC",
+            "DECIMAL",
+            "DECLARE",
+            "DEFAULT",
+            "DELAYED",
+            "DELETE",
+            "DESC",
+            "DESCRIBE",
+            "DETERMINISTIC",
+            "DISTINCT",
+            "DISTINCTROW",
+            "DIV",
+            "DOUBLE",
+            "DROP",
+            "DUAL",
+            "EACH",
+            "ELSE",
+            "ELSEIF",
+            "ENCLOSED",
+            "ESCAPED",
+            "EXISTS",
+            "EXIT",
+            "EXPLAIN",
+            "FALSE",
+            "FETCH",
+            "FLOAT",
+            "FLOAT4",
+            "FLOAT8",
+            "FOR",
+            "FORCE",
+            "FOREIGN",
+            "FROM",
+            "FULLTEXT",
+            "GENERATED",
+            "GET",
+            "GRANT",
+            "GROUP",
+            "HAVING",
+            "HIGH_PRIORITY",
+            "IF",
+            "IGNORE",
+            "IN",
+            "INDEX",
+            "INFILE",
+            "INNER",
+            "INOUT",
+            "INSENSITIVE",
+            "INSERT",
+            "INT",
+            "INT1",
+            "INT2",
+            "INT3",
+            "INT4",
+            "INT8",
+            "INTEGER",
+            "INTERVAL",
+            "INTO",
+            "IS",
+            "ITERATE",
+            "JOIN",
+            "KEY",
+            "KEYS",
+            "KILL",
+            "LEADING",
+            "LEAVE",
+            "LEFT",
+            "LIKE",
+            "LIMIT",
+            "LINEAR",
+            "LINES",
+            "LOAD",
+            "LOCALTIME",
+            "LOCALTIMESTAMP",
+            "LOCK",
+            "LONG",
+            "LONGBLOB",
+            "LONGTEXT",
+            "LOOP",
+            "LOW_PRIORITY",
+            "MASTER_BIND",
+            "MASTER_SSL_VERIFY_SERVER_CERT",
+            "MATCH",
+            "MAXVALUE",
+            "MEDIUMBLOB",
+            "MEDIUMINT",
+            "MEDIUMTEXT",
+            "MIDDLEINT",
+            "MINUTE_MICROSECOND",
+            "MINUTE_SECOND",
+            "MOD",
+            "MODIFIES",
+            "NATURAL",
+            "NOT",
+            "NO_WRITE_TO_BINLOG",
+            "NULL",
+            "NUMERIC",
+            "ON",
+            "OPTIMIZE",
+            "OPTIMIZER_COSTS",
+            "OPTION",
+            "OPTIONALLY",
+            "OR",
+            "ORDER",
+            "OUT",
+            "OUTER",
+            "OUTFILE",
+            "PARTITION",
+            "PRECISION",
+            "PRIMARY",
+            "PROCEDURE",
+            "PURGE",
+            "RANGE",
+            "READ",
+            "READS",
+            "READ_WRITE",
+            "REAL",
+            "REFERENCES",
+            "REGEXP",
+            "RELEASE",
+            "RENAME",
+            "REPEAT",
+            "REPLACE",
+            "REQUIRE",
+            "RESIGNAL",
+            "RESTRICT",
+            "RETURN",
+            "REVOKE",
+            "RIGHT",
+            "RLIKE",
+            "SCHEMA",
+            "SCHEMAS",
+            "SECOND_MICROSECOND",
+            "SELECT",
+            "SENSITIVE",
+            "SEPARATOR",
+            "SET",
+            "SHOW",
+            "SIGNAL",
+            "SMALLINT",
+            "SPATIAL",
+            "SPECIFIC",
+            "SQL",
+            "SQLEXCEPTION",
+            "SQLSTATE",
+            "SQLWARNING",
+            "SQL_BIG_RESULT",
+            "SQL_CALC_FOUND_ROWS",
+            "SQL_SMALL_RESULT",
+            "SSL",
+            "STARTING",
+            "STORED",
+            "STRAIGHT_JOIN",
+            "TABLE",
+            "TERMINATED",
+            "THEN",
+            "TINYBLOB",
+            "TINYINT",
+            "TINYTEXT",
+            "TO",
+            "TRAILING",
+            "TRIGGER",
+            "TRUE",
+            "UNDO",
+            "UNION",
+            "UNIQUE",
+            "UNLOCK",
+            "UNSIGNED",
+            "UPDATE",
+            "USAGE",
+            "USE",
+            "USING",
+            "UTC_DATE",
+            "UTC_TIME",
+            "UTC_TIMESTAMP",
+            "VALUES",
+            "VARBINARY",
+            "VARCHAR",
+            "VARCHARACTER",
+            "VARYING",
+            "VIRTUAL",
+            "WHEN",
+            "WHERE",
+            "WHILE",
+            "WITH",
+            "WRITE",
+            "XOR",
+            "YEAR_MONTH",
+            "ZEROFILL"
+            };
+
+        /// <summary>
+        /// Checks if the given identifier is a reserved word in MySQL.
+        /// </summary>
+        /// <param name="identifier">The identifier to check.</param>
+        /// <returns>True if the identifier is a reserved word, otherwise false.</returns>
+        public static bool IsReservedWord(string identifier)
+        {
+            return !string.IsNullOrWhiteSpace(identifier) &&
+                   ReservedWords.Contains(identifier);
+        }
+
+        /// <summary>
+        /// Gets the collection of reserved words in MySQL.
+        /// </summary>
+        /// <returns>A read-only collection of reserved words.</returns>
+        public static IReadOnlyCollection<string> GetReservedWords()
+        {
+            return ReservedWords;
+        }
+    }
+}
