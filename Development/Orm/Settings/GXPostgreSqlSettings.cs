@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -106,6 +106,41 @@ namespace Gurux.Service.Orm.Settings
         public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
         {
             return string.Format("SELECT ccu.table_name, rc.delete_rule, rc.update_rule FROM information_schema.table_constraints AS tc INNER JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema INNER JOIN information_schema.referential_constraints AS rc ON tc.constraint_name = rc.constraint_name AND tc.table_schema = rc.constraint_schema INNER JOIN information_schema.constraint_column_usage AS ccu ON ccu.constraint_name = rc.unique_constraint_name AND ccu.constraint_schema = rc.unique_constraint_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND kcu.table_schema = CURRENT_SCHEMA() AND kcu.table_name = '{1}' AND kcu.column_name = '{2}'", schema, tableName, columnName);
+        }
+
+        /// <inheritdoc />
+        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"SELECT obj_description(c.oid, 'pg_class') FROM pg_class c INNER JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = current_schema() AND c.relname = '{tableName}'";
+            }
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT col_description(c.oid, a.attnum) FROM pg_class c INNER JOIN pg_namespace n ON n.oid = c.relnamespace INNER JOIN pg_attribute a ON a.attrelid = c.oid WHERE n.nspname = current_schema() AND c.relname = '{tableName}' AND a.attname = '{columnName}'";
+        
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''");
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT ordinal_position FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '{tableName}' AND column_name = '{columnName}'";
+        
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            tableName = tableName.Replace("\"", "\"\"");
+            comment = comment.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"COMMENT ON TABLE \"{tableName}\" IS '{comment}'";
+            }
+            columnName = columnName.Replace("\"", "\"\"");
+            return $"COMMENT ON COLUMN \"{tableName}\".\"{columnName}\" IS '{comment}'";
         }
 
         /// <inheritdoc />
@@ -339,7 +374,31 @@ $$;");
         /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT column_default FROM information_schema.columns WHERE table_schema = CURRENT_SCHEMA() AND table_name = '{1}' AND column_name = '{2}'", schema, tableName, columnName);
+            return string.Format(@"SELECT CASE
+    WHEN column_default LIKE '''%' AND position('''::' in column_default) > 0
+        THEN substring(column_default from 2 for position('''::' in column_default) - 2)
+    ELSE column_default
+END FROM information_schema.columns WHERE table_schema = CURRENT_SCHEMA() AND table_name = '{1}' AND column_name = '{2}'", schema, tableName, columnName);
+        }
+
+        /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) => "CURRENT_DATE",
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) => "CURRENT_TIME",
+                    DefaultValueKind.Now => "CURRENT_TIMESTAMP",
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) => "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date",
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) => "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::time",
+                    DefaultValueKind.UtcNow => "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')",
+                    DefaultValueKind.NewGuid => "gen_random_uuid()",
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+            return ConvertToString(value, ConvertOption.Quete);
         }
 
         /// <inheritdoc />
@@ -353,6 +412,18 @@ $$;");
         {
             index = 0;
             return string.Format("SELECT column_name FROM information_schema.columns WHERE table_schema = CURRENT_SCHEMA() AND table_name = '{0}'", name);
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"ALTER TABLE \"{oldTableName}\" RENAME TO \"{newTableName}\"";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"ALTER TABLE \"{tableName}\" RENAME COLUMN \"{oldColumnName}\" TO \"{newColumnName}\"";
         }
 
         /// <inheritdoc />
@@ -499,6 +570,24 @@ $$;");
                 return "TIMESTAMP(3) WITHOUT TIME ZONE";
             }
             return "TIMESTAMP(0) WITHOUT TIME ZONE";
+        }
+
+        /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "TIME WITHOUT TIME ZONE";
+            }
         }
 
         /// <inheritdoc />

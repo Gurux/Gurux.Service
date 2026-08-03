@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -81,6 +81,40 @@ WHERE child.constraint_type = 'R' AND parent.table_name = UPPER('{tableName}')";
             throw new System.NotImplementedException();
         }
 
+        /// <inheritdoc />
+        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''").ToUpperInvariant();
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"SELECT COMMENTS FROM USER_TAB_COMMENTS WHERE TABLE_NAME = '{tableName}'";
+            }
+            columnName = columnName.Replace("'", "''").ToUpperInvariant();
+            return $"SELECT COMMENTS FROM USER_COL_COMMENTS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''").ToUpperInvariant();
+            columnName = columnName.Replace("'", "''").ToUpperInvariant();
+            return $"SELECT COLUMN_ID FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            tableName = tableName.Replace("\"", "").ToUpperInvariant();
+            comment = comment.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"COMMENT ON TABLE {tableName} IS '{comment}'";
+            }
+            columnName = columnName.Replace("\"", "").ToUpperInvariant();
+            return $"COMMENT ON COLUMN {tableName}.{columnName} IS '{comment}'";
+        }
         /// <inheritdoc />
         public override bool IsNullable(object value)
         {
@@ -272,9 +306,9 @@ WHERE grantee = UPPER('{userName}')";
         }
 
         /// <inheritdoc />
-        public override void AddUsersToDatabaseQuery(List<string> queries, 
-            string database, 
-            DatabasePermission permissions, 
+        public override void AddUsersToDatabaseQuery(List<string> queries,
+            string database,
+            DatabasePermission permissions,
             params IEnumerable<string> users)
         {
             foreach (string user in users)
@@ -328,7 +362,13 @@ END;");
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            throw new System.NotImplementedException();
+            return string.Format(
+        @"SELECT NULLABLE
+          FROM ALL_TAB_COLUMNS
+          WHERE OWNER = UPPER('{0}')
+            AND TABLE_NAME = UPPER('{1}')
+            AND COLUMN_NAME = UPPER('{2}')",
+        schema, tableName, columnName);
         }
 
         /// <inheritdoc />
@@ -340,43 +380,159 @@ END;");
         /// <inheritdoc />
         public override bool IsPrimaryKey(object value)
         {
-            throw new System.NotImplementedException();
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
         public override bool IsAutoIncrement(object value)
         {
-            throw new System.NotImplementedException();
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
         public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            throw new System.NotImplementedException();
+            return string.Format(
+       "SELECT COUNT(*) FROM ALL_TAB_IDENTITY_COLS " +
+       "WHERE OWNER = UPPER('{0}') " +
+       "AND TABLE_NAME = UPPER('{1}') " +
+       "AND COLUMN_NAME = UPPER('{2}')",
+       schema, tableName, columnName);
         }
 
         /// <inheritdoc />
         public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
         {
-            throw new System.NotImplementedException();
+            return string.Format(
+        @"SELECT pk.TABLE_NAME
+          FROM ALL_CONSTRAINTS fk
+          INNER JOIN ALL_CONS_COLUMNS fkc
+            ON fk.OWNER = fkc.OWNER
+           AND fk.CONSTRAINT_NAME = fkc.CONSTRAINT_NAME
+          INNER JOIN ALL_CONSTRAINTS pk
+            ON fk.R_OWNER = pk.OWNER
+           AND fk.R_CONSTRAINT_NAME = pk.CONSTRAINT_NAME
+          WHERE fk.CONSTRAINT_TYPE = 'R'
+            AND fk.OWNER = UPPER('{0}')
+            AND fk.TABLE_NAME = UPPER('{1}')
+            AND fkc.COLUMN_NAME = UPPER('{2}')",
+        schema, tableName, columnName);
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            throw new System.NotImplementedException();
+            return string.Format(
+         @"SELECT COUNT(1)
+          FROM ALL_CONSTRAINTS c
+          INNER JOIN ALL_CONS_COLUMNS cc
+            ON c.OWNER = cc.OWNER
+           AND c.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+           AND c.TABLE_NAME = cc.TABLE_NAME
+          WHERE c.CONSTRAINT_TYPE = 'P'
+            AND c.OWNER = UPPER('{0}')
+            AND c.TABLE_NAME = UPPER('{1}')
+            AND cc.COLUMN_NAME = UPPER('{2}')",
+         schema, tableName, columnName);
         }
 
         /// <inheritdoc />
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            throw new System.NotImplementedException();
+            tableName = tableName.Replace("'", "''").ToUpperInvariant();
+            columnName = columnName.Replace("'", "''").ToUpperInvariant();
+            if (string.IsNullOrEmpty(schema))
+            {
+                return string.Format(
+@"SELECT CASE
+    WHEN UPPER(c.DATA_TYPE) LIKE 'INTERVAL DAY%TO SECOND%' THEN 'CURRENT_TIMESTAMP'
+    ELSE (
+        SELECT CASE
+            WHEN UPPER(DATA_DEFAULT) LIKE '%SYS_EXTRACT_UTC%' THEN 'UTC_TIMESTAMP'
+            WHEN UPPER(DATA_DEFAULT) LIKE '%SYSTIMESTAMP%' OR UPPER(DATA_DEFAULT) LIKE '%SYSDATE%' THEN 'CURRENT_TIMESTAMP'
+            ELSE DATA_DEFAULT
+        END
+        FROM (
+            SELECT EXTRACTVALUE(XMLTYPE(DBMS_XMLGEN.GETXML('SELECT DATA_DEFAULT FROM USER_TAB_COLUMNS WHERE TABLE_NAME = ''{0}'' AND COLUMN_NAME = ''{1}''')), '/ROWSET/ROW/DATA_DEFAULT') DATA_DEFAULT FROM DUAL
+        )
+    )
+END FROM USER_TAB_COLUMNS c WHERE c.TABLE_NAME = '{0}' AND c.COLUMN_NAME = '{1}'",
+tableName, columnName);
+            }
+            schema = schema.Replace("'", "''").ToUpperInvariant();
+            return string.Format(
+       @"SELECT CASE
+    WHEN UPPER(c.DATA_TYPE) LIKE 'INTERVAL DAY%TO SECOND%' THEN 'CURRENT_TIMESTAMP'
+    ELSE (
+        SELECT CASE
+            WHEN UPPER(DATA_DEFAULT) LIKE '%SYS_EXTRACT_UTC%' THEN 'UTC_TIMESTAMP'
+            WHEN UPPER(DATA_DEFAULT) LIKE '%SYSTIMESTAMP%' OR UPPER(DATA_DEFAULT) LIKE '%SYSDATE%' THEN 'CURRENT_TIMESTAMP'
+            ELSE DATA_DEFAULT
+        END
+        FROM (
+            SELECT EXTRACTVALUE(XMLTYPE(DBMS_XMLGEN.GETXML('SELECT DATA_DEFAULT FROM ALL_TAB_COLUMNS WHERE OWNER = ''{0}'' AND TABLE_NAME = ''{1}'' AND COLUMN_NAME = ''{2}''')), '/ROWSET/ROW/DATA_DEFAULT') DATA_DEFAULT FROM DUAL
+        )
+    )
+END FROM ALL_TAB_COLUMNS c WHERE c.OWNER = '{0}' AND c.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'",
+       schema, tableName, columnName);
+        }
+
+        /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) =>
+                        "TRUNC(SYSDATE)",
+
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) =>
+                        "(SYSTIMESTAMP - TRUNC(SYSTIMESTAMP))",
+
+                    DefaultValueKind.Now when columnType == typeof(DateTimeOffset) =>
+                        "SYSTIMESTAMP",
+
+                    DefaultValueKind.Now => "SYSDATE",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) =>
+                        "TRUNC(SYS_EXTRACT_UTC(SYSTIMESTAMP))",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) =>
+                        "(SYS_EXTRACT_UTC(SYSTIMESTAMP) - TRUNC(SYS_EXTRACT_UTC(SYSTIMESTAMP)))",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(DateTimeOffset) =>
+                        "SYS_EXTRACT_UTC(SYSTIMESTAMP)",
+
+                    DefaultValueKind.UtcNow => "SYS_EXTRACT_UTC(SYSTIMESTAMP)",
+                    DefaultValueKind.NewGuid => "SYS_GUID()",
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+            if (columnType == typeof(bool))
+            {
+                return ConvertToString(value, ConvertOption.None);
+            }
+            return ConvertToString(value, ConvertOption.Quete);
         }
 
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            throw new System.NotImplementedException();
+            return $@"SELECT DATA_TYPE,
+    CASE
+        WHEN DATA_TYPE IN ('CHAR', 'NCHAR', 'VARCHAR2', 'NVARCHAR2')
+            THEN CHAR_LENGTH
+        WHEN DATA_TYPE = 'RAW'
+            THEN DATA_LENGTH
+        WHEN DATA_TYPE = 'NUMBER'
+            THEN DATA_PRECISION
+        ELSE DATA_LENGTH
+    END AS TYPE_LENGTH,
+    DATA_PRECISION,
+    DATA_SCALE
+FROM USER_TAB_COLUMNS
+WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnName.ToUpperInvariant()}'";
         }
 
         /// <inheritdoc />
@@ -384,6 +540,18 @@ END;");
         {
             index = 0;
             return string.Format("SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{0}'", name.ToUpper());
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"ALTER TABLE {oldTableName} RENAME TO {newTableName}";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"ALTER TABLE {tableName} RENAME COLUMN {oldColumnName} TO {newColumnName}";
         }
 
         /// <inheritdoc />
@@ -564,11 +732,29 @@ END;");
         }
 
         /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "INTERVAL DAY TO SECOND";
+            }
+        }
+
+        /// <inheritdoc />
         override public string TimeSpanColumnDefinition
         {
             get
             {
-                return "NUMBER";
+                return "INTERVAL DAY TO SECOND";
             }
         }
 
@@ -587,7 +773,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(3)";
             }
         }
 
@@ -596,7 +782,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(3)";
             }
         }
 
@@ -605,7 +791,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(5)";
             }
         }
 
@@ -614,7 +800,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(5)";
             }
         }
 
@@ -623,7 +809,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(10)";
             }
         }
 
@@ -632,7 +818,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(10)";
             }
         }
 
@@ -641,7 +827,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(19)";
             }
         }
 
@@ -650,7 +836,7 @@ END;");
         {
             get
             {
-                return "NUMBER";
+                return "NUMBER(20)";
             }
         }
 
@@ -722,7 +908,7 @@ END;");
         {
             if (type == typeof(Guid) && value is string str)
             {
-                return Guid.Parse(str);
+                return Guid.Parse(str, CultureInfo.InvariantCulture);
             }
             if (type == typeof(Guid) && value is byte[] bytes)
             {
@@ -730,10 +916,10 @@ END;");
             }
             if (type == typeof(DateTime) && value is DateTime dt)
             {
-                if (dt == DateTime.MinValue)
-                {
-
-                }
+            }
+            if (type == typeof(TimeSpan) && value is string str2)
+            {
+                return TimeSpan.Parse(str2, CultureInfo.InvariantCulture);
             }
             return base.ChangeType(value, type);
         }

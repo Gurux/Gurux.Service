@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -105,6 +105,41 @@ namespace Gurux.Service.Orm.Settings
         public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
         {
             return string.Format("SELECT OBJECT_NAME(f.parent_object_id) AS 'Table name', delete_referential_action_desc AS 'On Delete', update_referential_action_desc AS 'On Update' FROM sys.foreign_keys AS f, sys.foreign_key_columns AS fc, sys.tables t WHERE f.OBJECT_ID = fc.constraint_object_id AND t.OBJECT_ID = fc.referenced_object_id AND f.parent_object_id = OBJECT_ID('{1}') AND COL_NAME(fc.parent_object_id, fc.parent_column_id) = '{2}'", schema, tableName, columnName);
+        }
+
+        /// <inheritdoc />
+        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"SELECT CAST(value AS nvarchar(max)) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'{tableName}') AND minor_id = 0 AND name = N'MS_Description'";
+            }
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT CAST(ep.value AS nvarchar(max)) FROM sys.extended_properties ep INNER JOIN sys.columns c ON c.object_id = ep.major_id AND c.column_id = ep.minor_id WHERE ep.major_id = OBJECT_ID(N'{tableName}') AND c.name = N'{columnName}' AND ep.name = N'MS_Description'";
+        
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''");
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT column_id FROM sys.columns WHERE object_id = OBJECT_ID(N'{tableName}') AND name = N'{columnName}'";        
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            tableName = tableName.Replace("'", "''");
+            comment = comment.Replace("'", "''");
+            string query = $"EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'{comment}', @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'{tableName}'";
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return query;
+            }
+            columnName = columnName.Replace("'", "''");
+            return query + $", @level2type=N'COLUMN', @level2name=N'{columnName}'";
         }
 
         /// <inheritdoc />
@@ -438,13 +473,38 @@ END");
         /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT object_definition(default_object_id) AS definition FROM sys.columns WHERE object_id = object_id('{0}.{1}') AND name = '{2}'", schema, tableName, columnName);
+            return $"SELECT object_definition(default_object_id) AS definition FROM sys.columns WHERE object_id = OBJECT_ID(N'{tableName}') AND name = N'{columnName}'";
+        }
+
+        /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) => "CAST(GETDATE() AS date)",
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) => "CAST(GETDATE() AS time)",
+                    DefaultValueKind.Now when columnType == typeof(DateTimeOffset) => "SYSDATETIMEOFFSET()",
+                    DefaultValueKind.Now => "GETDATE()",
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) => "CAST(SYSUTCDATETIME() AS date)",
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) => "CAST(SYSUTCDATETIME() AS time)",
+                    DefaultValueKind.UtcNow => "SYSUTCDATETIME()",
+                    DefaultValueKind.NewGuid => "NEWID()",
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+            if (columnType == typeof(bool))
+            {
+                return ConvertToString(value, ConvertOption.None);
+            }
+            return ConvertToString(value, ConvertOption.Quete);
         }
 
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_CATALOG = '{0}' AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT CASE WHEN DATA_TYPE IN ('decimal', 'numeric') THEN CONCAT(DATA_TYPE, '(', NUMERIC_PRECISION, ',', NUMERIC_SCALE, ')') ELSE DATA_TYPE END, CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_CATALOG = '{0}' AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
         }
 
         /// <inheritdoc />
@@ -453,6 +513,19 @@ END");
             index = 0;
             return string.Format("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}'", name);
         }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"EXEC sp_rename '{oldTableName}', '{newTableName}'";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"EXEC sp_rename '{tableName}.{oldColumnName}', '{newColumnName}', 'COLUMN'";
+        }
+
 
         /// <inheritdoc />
         override public char ColumnNameQuoteCharacter
@@ -592,6 +665,24 @@ END");
         }
 
         /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "TIME";
+            }
+        }
+
+        /// <inheritdoc />
         override public string TimeSpanColumnDefinition
         {
             get
@@ -624,7 +715,7 @@ END");
         {
             get
             {
-                return "SMALLINT";
+                return "NUMERIC(3,0)";
             }
         }
 
@@ -642,7 +733,7 @@ END");
         {
             get
             {
-                return "INT";
+                return "NUMERIC(5,0)";
             }
         }
 
@@ -660,7 +751,7 @@ END");
         {
             get
             {
-                return "BIGINT";
+                return "NUMERIC(10,0)";
             }
         }
 
@@ -687,7 +778,7 @@ END");
         {
             get
             {
-                return "FLOAT(53)";
+                return "REAL";
             }
         }
 
@@ -705,7 +796,7 @@ END");
         {
             get
             {
-                return "FLOAT(23)";
+                return "DECIMAL(29,9)";
             }
         }
 

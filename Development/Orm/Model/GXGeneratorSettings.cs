@@ -1,19 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace Gurux.Service.Orm
+﻿namespace Gurux.Service.Orm.Model
 {
     /// <summary>
     /// Import settings.
     /// </summary>
-    public class GXImportSettings
+    public class GXGeneratorSettings
     {
         /// <summary>
         /// Constructor.
         /// </summary>
-        public GXImportSettings()
+        public GXGeneratorSettings()
         {
             Serializable = true;
         }

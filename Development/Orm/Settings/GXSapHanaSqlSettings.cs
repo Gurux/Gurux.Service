@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -121,7 +121,72 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT rc.REFERENCED_TABLE_NAME, rc.DELETE_RULE, rc.UPDATE_RULE FROM REFERENTIAL_CONSTRAINTS rc INNER JOIN CONSTRAINTS c ON rc.SCHEMA_NAME = c.SCHEMA_NAME AND rc.TABLE_NAME = c.TABLE_NAME AND rc.CONSTRAINT_NAME = c.CONSTRAINT_NAME WHERE rc.SCHEMA_NAME = CURRENT_SCHEMA AND rc.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT rc.REFERENCED_TABLE_NAME, rc.DELETE_RULE, rc.UPDATE_RULE FROM REFERENTIAL_CONSTRAINTS rc INNER JOIN CONSTRAINTS c ON rc.SCHEMA_NAME = c.SCHEMA_NAME AND rc.TABLE_NAME = c.TABLE_NAME AND rc.CONSTRAINT_NAME = c.CONSTRAINT_NAME WHERE rc.SCHEMA_NAME = CURRENT_SCHEMA AND rc.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+        }
+
+        /// <inheritdoc />
+        public override string GetDescriptionQuery(
+            string schema,
+            string tableName,
+            string columnName)
+        {
+            schema = schema.Replace("'", "''");
+            if (tableName.StartsWith("'"))
+            {
+                tableName = tableName.Replace("'", "''");
+            }
+            else
+            {
+                tableName = tableName.ToUpperInvariant();
+            }
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return
+                    $"SELECT COMMENTS " +
+                    $"FROM SYS.TABLES " +
+                    $"WHERE SCHEMA_NAME = CURRENT_SCHEMA " +
+                    $"AND TABLE_NAME = '{tableName}'";
+            }
+            columnName = columnName.Replace("'", "''");
+            return
+                $"SELECT COMMENTS " +
+                $"FROM SYS.TABLE_COLUMNS " +
+                $"WHERE SCHEMA_NAME = CURRENT_SCHEMA " +
+                $"AND TABLE_NAME = '{tableName}' " +
+                $"AND COLUMN_NAME = '{columnName}'";
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            schema = "CURRENT_SCHEMA";
+            if (tableName.StartsWith("'"))
+            {
+                tableName = tableName.Replace("'", "''");
+            }
+            else
+            {
+                tableName = tableName.ToUpperInvariant();
+            }
+            columnName = columnName.Replace("'", "''");
+            return
+                $"SELECT POSITION " +
+                $"FROM SYS.TABLE_COLUMNS " +
+                $"WHERE SCHEMA_NAME = {schema} " +
+                $"AND TABLE_NAME = '{tableName}' " +
+                $"AND COLUMN_NAME = '{columnName}'";
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            tableName = tableName.ToUpperInvariant();
+            comment = comment.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"COMMENT ON TABLE {tableName} IS '{comment}'";
+            }
+            return $"COMMENT ON COLUMN {tableName}.{columnName} IS '{comment}'";
         }
 
         /// <inheritdoc />
@@ -307,7 +372,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT IS_NULLABLE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT IS_NULLABLE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
@@ -339,38 +404,100 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         /// <inheritdoc />
         public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT IS_IDENTITY FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            schema = schema.Replace("'", "''");
+            tableName = tableName.Replace("'", "''");
+            columnName = columnName.Replace("'", "''");
+            return
+                $"SELECT CASE " +
+                $"WHEN GENERATION_TYPE IN ('ALWAYS AS IDENTITY', 'BY DEFAULT AS IDENTITY') THEN 1 " +
+                $"ELSE 0 END " +
+                $"FROM SYS.TABLE_COLUMNS " +
+                $"WHERE SCHEMA_NAME = '{schema}' " +
+                $"AND TABLE_NAME = '{tableName}' " +
+                $"AND COLUMN_NAME = '{columnName}'";
         }
 
         /// <inheritdoc />
         public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT rc.REFERENCED_TABLE_NAME FROM REFERENTIAL_CONSTRAINTS rc INNER JOIN CONSTRAINTS c ON rc.SCHEMA_NAME = c.SCHEMA_NAME AND rc.TABLE_NAME = c.TABLE_NAME AND rc.CONSTRAINT_NAME = c.CONSTRAINT_NAME WHERE rc.SCHEMA_NAME = CURRENT_SCHEMA AND rc.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT rc.REFERENCED_TABLE_NAME FROM REFERENTIAL_CONSTRAINTS rc INNER JOIN CONSTRAINTS c ON rc.SCHEMA_NAME = c.SCHEMA_NAME AND rc.TABLE_NAME = c.TABLE_NAME AND rc.CONSTRAINT_NAME = c.CONSTRAINT_NAME WHERE rc.SCHEMA_NAME = CURRENT_SCHEMA AND rc.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT COUNT(1) FROM CONSTRAINTS WHERE IS_PRIMARY_KEY = 'TRUE' AND SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT COUNT(1) FROM CONSTRAINTS WHERE IS_PRIMARY_KEY = 'TRUE' AND SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT DEFAULT_VALUE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT DEFAULT_VALUE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+        }
+        /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) =>
+                        "CURRENT_DATE",
+
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) =>
+                        "CURRENT_TIME",
+
+                    DefaultValueKind.Now when columnType == typeof(DateTimeOffset) =>
+                        "CURRENT_TIMESTAMP",
+
+                    DefaultValueKind.Now =>
+                        "CURRENT_TIMESTAMP",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) =>
+                        "CURRENT_UTCDATE",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) =>
+                        "CURRENT_UTCTIME",
+
+                    DefaultValueKind.UtcNow =>
+                        "CURRENT_UTCTIMESTAMP",
+
+                    DefaultValueKind.NewGuid =>
+                        "SYSUUID",
+
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+            if (columnType == typeof(bool))
+            {
+                return ConvertToString(value, ConvertOption.None);
+            }
+            return ConvertToString(value, ConvertOption.Quete);
         }
 
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT DATA_TYPE_NAME, LENGTH, SCALE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT DATA_TYPE_NAME, LENGTH, SCALE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetColumnsQuery(string schema, string name, out int index)
         {
             index = 0;
-            return string.Format("SELECT COLUMN_NAME FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{0}' ORDER BY POSITION", name);
+            return string.Format("SELECT COLUMN_NAME FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{0}' ORDER BY POSITION", name.ToUpperInvariant());
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"RENAME TABLE {oldTableName} TO {newTableName}";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"RENAME COLUMN {tableName}.{oldColumnName} TO {newColumnName}";
         }
 
         /// <inheritdoc />
@@ -414,7 +541,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         {
             get
             {
-                return 1000;
+                return 1;
             }
         }
 
@@ -496,7 +623,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         {
             get
             {
-                return "NVARCHAR(36)";
+                return "VARBINARY(16)";
             }
         }
 
@@ -508,6 +635,24 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
                 return "TIMESTAMP";
             }
             return "TIMESTAMP";
+        }
+
+        /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "TIME";
+            }
         }
 
         /// <inheritdoc />
@@ -597,7 +742,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         {
             get
             {
-                return "NUMERIC(20,0)";
+                return "DECIMAL(20,0)";
             }
         }
 
@@ -675,6 +820,10 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
                 }
                 return "TO_TIMESTAMP(" + GetQuetedValue(utc.ToString(DateTimeFormat + ".fff", CultureInfo.InvariantCulture)) + ")";
             }
+            if (value is Guid guid)
+            {
+                return "X'" + Convert.ToHexString(guid.ToByteArray()) + "'";
+            }
             if (value is byte[] ba)
             {
                 return "X'" + Convert.ToHexString(ba) + "'";
@@ -705,6 +854,24 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
                     return DateTimeOffset.MaxValue;
                 }
                 return new DateTimeOffset(dt, TimeSpan.Zero).ToLocalTime();
+            }
+            if (type == typeof(Guid))
+            {
+                if (value is byte[] b)
+                {
+                    return new Guid(b);
+                }
+                if (value is string s)
+                {
+                    return new Guid(s);
+                }
+            }
+            if (type == typeof(DateTime) && value is string str)
+            {
+                if (str == "CURRENT_UTCTIMESTAMP")
+                {
+                    return DefaultValueKind.UtcNow;
+                }
             }
             return base.ChangeType(value, type);
         }

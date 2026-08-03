@@ -26,6 +26,9 @@ Its goal is to provide a **fast** and **easy-to-use** ORM that works across mult
 - [Microsoft SQL Server](http://www.microsoft.com/)
 - [Oracle](http://www.oracle.com/)
 - [SQLite](http://www.sqlite.com/)
+- [PostgreSql](https://www.postgresql.org/)
+- [SAP Hana](https://help.sap.com/docs/HANA_CLOUD)
+- [DB2](https://www.ibm.com/products/db2)
 
 ---
 
@@ -430,6 +433,104 @@ Connection.Update(GXUpdateArgs.Update(user, q => q.Name));
 
 ---
 
+## 🛠️ Schema Management
+
+`GXSchemaManager` is used when you need to create, inspect, update, rename, or drop database schema objects directly from ORM model classes.
+
+```csharp
+using Gurux.Service.Orm;
+using Gurux.Service.Orm.Model;
+
+GXDbConnection Connection = new GXDbConnection(dbConnection, null);
+GXSchemaManager manager = new GXSchemaManager(Connection);
+
+// Create the table from the current model.
+manager.CreateTable<GXUser>(createRelations: true, ignoreErrors: false);
+
+// Update an existing table to match the current model.
+manager.UpdateTable<GXUser>();
+
+// Inspect the current database schema.
+GXTableSchema schema = manager.Describe<GXUser>();
+
+// Rename a table or column when needed.
+manager.RenameTable<GXUser>("Users");
+manager.RenameTableColumn<GXUser>(q => q.Name, "UserName");
+```
+
+### Changing a Column Data Type
+
+To change a column from one data type to another, update the C# model property type and call `UpdateTable<T>()`. `GXSchemaManager` compares the existing database table with the current model, creates a temporary converted column, copies converted values into it, drops the old column, and renames the converted column back to the original name.
+
+For example, if `GXDevice.SerialNumber` was previously stored as `string` and you want to store it as `int`, change the model:
+
+```csharp
+[DataContract]
+class GXDevice : IUnique<int>
+{
+    [DataMember, AutoIncrement]
+    public int Id { get; set; }
+
+    [DataMember]
+    public int SerialNumber { get; set; }
+}
+```
+
+Then update the table:
+
+```csharp
+GXSchemaManager manager = new GXSchemaManager(Connection);
+manager.UpdateTable<GXDevice>();
+```
+
+The default conversion uses the database settings' normal type conversion. This is enough for simple conversions such as numeric text to numeric values when all existing values are valid.
+
+### Custom Value Conversion
+
+Use `ColumnValueConverting` when existing values need special handling during a column type change. The event is raised for each distinct non-null value before it is written into the converted column.
+
+Set `e.Value` to the converted value and `e.IsConverted` to `true` when your handler has completed the conversion. If `IsConverted` is left as `false`, Gurux ORM uses the default conversion.
+
+```csharp
+EventHandler<GXColumnValueConvertingEventArgs> converter = (sender, e) =>
+{
+    if (e.TableName == "GXDevice" &&
+        e.ColumnName == "SerialNumber" &&
+        e.OldType == typeof(string) &&
+        e.NewType == typeof(int))
+    {
+        string value = (string)e.Value;
+
+        // Example: convert values like "SN-12345" to 12345.
+        e.Value = int.Parse(value.Replace("SN-", ""));
+        e.IsConverted = true;
+    }
+};
+
+try
+{
+    manager.ColumnValueConverting += converter;
+    manager.UpdateTable<GXDevice>();
+}
+finally
+{
+    manager.ColumnValueConverting -= converter;
+}
+```
+
+`GXColumnValueConvertingEventArgs` contains:
+
+| Property | Description |
+| --- | --- |
+| `TableName` | Name of the table being updated. |
+| `ColumnName` | Name of the column being converted. |
+| `OldType` | Previous C# type mapped from the existing database column. |
+| `NewType` | New C# type from the current model. |
+| `Value` | Current value. Set this to the converted value. |
+| `IsConverted` | Set to `true` when the handler has converted `Value`. |
+
+---
+
 ## ❌ Delete
 
 ```csharp
@@ -475,7 +576,7 @@ For examples and tests, check:
 `Gurux.Service_Simple_UnitTests` directory
 
 Need help?  
-Ask your questions on the [Gurux Forum](https://gurux.fi/forum/103).
+Ask your questions on the [Gurux Forum](https://www.gurux.fi/forum/gurux.service).
 
 ---
 

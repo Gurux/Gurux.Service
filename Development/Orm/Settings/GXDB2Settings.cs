@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -134,8 +134,38 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT r.REFTABNAME, r.DELETERULE, r.UPDATERULE FROM SYSCAT.REFERENCES r INNER JOIN SYSCAT.KEYCOLUSE k ON r.TABSCHEMA = k.TABSCHEMA AND r.TABNAME = k.TABNAME AND r.CONSTNAME = k.CONSTNAME WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT r.REFTABNAME, r.DELETERULE, r.UPDATERULE FROM SYSCAT.REFERENCES r INNER JOIN SYSCAT.KEYCOLUSE k ON r.TABSCHEMA = k.TABSCHEMA AND r.TABNAME = k.TABNAME AND r.CONSTNAME = k.CONSTNAME WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
+
+        /// <inheritdoc />
+        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        {
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return string.Format("SELECT REMARKS FROM SYSCAT.TABLES WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}'", schema, tableName.ToUpperInvariant());
+            }
+            return string.Format("SELECT REMARKS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            return string.Format("SELECT COLNO + 1 FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            tableName = tableName.Replace("\"", "\"\"");
+            comment = comment.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"COMMENT ON TABLE \"{tableName}\" IS '{comment}'";
+            }
+            columnName = columnName.Replace("\"", "\"\"");
+            return $"COMMENT ON COLUMN \"{tableName}\".\"{columnName}\" IS '{comment}'";
+        }
+
 
         /// <inheritdoc />
         public override bool IsNullable(object value)
@@ -342,7 +372,7 @@ ORDER BY PERMISSION;";
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT NULLS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT NULLS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
@@ -373,38 +403,56 @@ ORDER BY PERMISSION;";
         /// <inheritdoc />
         public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT IDENTITY FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT IDENTITY FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT r.REFTABNAME FROM SYSCAT.REFERENCES r INNER JOIN SYSCAT.KEYCOLUSE k ON r.TABSCHEMA = k.TABSCHEMA AND r.TABNAME = k.TABNAME AND r.CONSTNAME = k.CONSTNAME WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT r.REFTABNAME FROM SYSCAT.REFERENCES r INNER JOIN SYSCAT.KEYCOLUSE k ON r.TABSCHEMA = k.TABSCHEMA AND r.TABNAME = k.TABNAME AND r.CONSTNAME = k.CONSTNAME WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT COUNT(1) FROM SYSCAT.TABCONST tc INNER JOIN SYSCAT.KEYCOLUSE k ON tc.TABSCHEMA = k.TABSCHEMA AND tc.TABNAME = k.TABNAME AND tc.CONSTNAME = k.CONSTNAME WHERE tc.TYPE = 'P' AND tc.TABSCHEMA = CURRENT SCHEMA AND tc.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT COUNT(1) FROM SYSCAT.TABCONST tc INNER JOIN SYSCAT.KEYCOLUSE k ON tc.TABSCHEMA = k.TABSCHEMA AND tc.TABNAME = k.TABNAME AND tc.CONSTNAME = k.CONSTNAME WHERE tc.TYPE = 'P' AND tc.TABSCHEMA = CURRENT SCHEMA AND tc.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT \"DEFAULT\" FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT \"DEFAULT\" FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+        }
+
+        /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            throw new NotImplementedException();
         }
 
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT TYPENAME, LENGTH, SCALE FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT TYPENAME, LENGTH, SCALE FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetColumnsQuery(string schema, string name, out int index)
         {
             index = 0;
-            return string.Format("SELECT COLNAME FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{0}' ORDER BY COLNO", name);
+            return string.Format("SELECT COLNAME FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{0}' ORDER BY COLNO", name.ToUpperInvariant());
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"RENAME TABLE {oldTableName} TO {newTableName}";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"ALTER TABLE {tableName} RENAME COLUMN {oldColumnName} TO {newColumnName}";
         }
 
         /// <inheritdoc />
@@ -542,6 +590,24 @@ ORDER BY PERMISSION;";
                 return "TIMESTAMP(3)";
             }
             return "TIMESTAMP(0)";
+        }
+
+        /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "TIME";
+            }
         }
 
         /// <inheritdoc />

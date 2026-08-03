@@ -204,6 +204,35 @@ namespace Gurux.Service.Orm.Settings
         public abstract string GetColumnConstraintsQuery(string schema, string tableName, string columnName);
 
         /// <summary>
+        /// Get description query for table and column.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns></returns>
+        public abstract string GetDescriptionQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Get column order query for the column.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns></returns>
+        public abstract string GetOrdinalQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Get column comment query for the column.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <param name="comment">Added comment.</param>
+        /// <returns>Generated SQL query.</returns>
+        public abstract string GetCommentQuery(string schema, string tableName, string columnName, string comment);
+
+
+        /// <summary>
         /// Is column nullable.
         /// </summary>
         /// <param name="value">Received string.</param>
@@ -269,7 +298,7 @@ namespace Gurux.Service.Orm.Settings
         /// </summary>
         /// <param name="queries">Generated SQL queries.</param>
         /// <param name="users">Users to add.</param>
-        public abstract void AddUsersQuery(List<string> queries, 
+        public abstract void AddUsersQuery(List<string> queries,
             params DatabaseUser[] users);
 
         /// <summary>
@@ -279,9 +308,9 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="databaseName">Database name.</param>
         /// <param name="permissions">Database permissions.</param>
         /// <param name="users">Users to add.</param>
-        public abstract void AddUsersToDatabaseQuery(List<string> queries, 
-            string databaseName, 
-            DatabasePermission permissions, 
+        public abstract void AddUsersToDatabaseQuery(List<string> queries,
+            string databaseName,
+            DatabasePermission permissions,
             params IEnumerable<string> users);
 
         /// <summary>
@@ -389,6 +418,12 @@ namespace Gurux.Service.Orm.Settings
         /// <returns>Column data type query.</returns>
         public abstract string GetColumnDefaultValueQuery(string schema, string tableName, string columnName);
 
+        /// <summary>
+        /// Convert default value to string. This is used when default value is set to the column.
+        /// </summary>
+        /// <param name="value">Default value.</param>
+        /// <returns>String representation of the default value.</returns>
+        public abstract string GetColumnDefaultValue(object value, Type columnType);        
 
         /// <summary>
         /// Get column query.
@@ -398,6 +433,21 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="columnName">Column name.</param>
         /// <returns>Column data type query.</returns>
         public abstract string GetColumnTypeQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Get rename table query.
+        /// </summary>
+        /// <param name="oldTableName">Old table name.</param>
+        /// <param name="newTableName">New table name.</param>
+        public abstract string GetRenameTableQuery(string oldTableName, string newTableName);
+
+        /// <summary>
+        /// Get rename table column query.
+        /// </summary>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="oldColumnName">Old column name.</param>
+        /// <param name="newColumnName">New column name.</param>
+        public abstract string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName);
 
         /// <summary>
         /// Used data quotation replacement.
@@ -520,6 +570,22 @@ namespace Gurux.Service.Orm.Settings
         /// Time span is saved in seconds because some DBs can save max few days.
         /// </summary>
         abstract public string TimeSpanColumnDefinition
+        {
+            get;
+        }
+
+        /// <summary>
+        /// Time only column definition.
+        /// </summary>
+        abstract public string TimeOnlyColumnDefinition
+        {
+            get;
+        }
+
+        /// <summary>
+        /// Date only column definition.
+        /// </summary>
+        abstract public string DateOnlyColumnDefinition
         {
             get;
         }
@@ -660,10 +726,22 @@ namespace Gurux.Service.Orm.Settings
                     }
                     return str;
                 }
+                if (type == typeof(DateOnly))
+                {
+                    return DateOnly.Parse(str, CultureInfo.InvariantCulture);
+                }
+                if (type == typeof(TimeOnly))
+                {
+                    return TimeOnly.Parse(str, CultureInfo.InvariantCulture);
+                }
             }
             if (value is Guid guid && type == typeof(string))
             {
                 return guid.ToString();
+            }
+            if (value is string str2 && type == typeof(decimal))
+            {
+                return Decimal.Parse(str2, CultureInfo.InvariantCulture);
             }
             return Convert.ChangeType(value, type);
         }
@@ -715,6 +793,16 @@ namespace Gurux.Service.Orm.Settings
             {
                 string format = "yyyy-MM-dd HH:mm:ss.fffzzz";
                 return GetQuetedValue(dto.ToString(format, CultureInfo.InvariantCulture));
+            }
+            if (value is DateOnly date)
+            {
+                return GetQuetedValue(date.ToString("yyyy-MM-dd",
+                    CultureInfo.InvariantCulture));
+            }
+            if (value is TimeOnly time)
+            {
+                return GetQuetedValue(time.ToString("HH:mm:ss.fffffff",
+                    CultureInfo.InvariantCulture));
             }
             if (value is float f)
             {

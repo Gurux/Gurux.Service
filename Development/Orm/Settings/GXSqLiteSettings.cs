@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -34,7 +34,9 @@ using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Globalization;
+using System.Linq;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -93,9 +95,32 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
+        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        {
+            return "SELECT ''";
+
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            tableName = tableName.Replace("'", "''");
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT cid + 1 FROM pragma_table_info('{tableName}') WHERE name = '{columnName}'";
+
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            //SQLIte doesn't support comments.
+            return "";
+        }
+
+        /// <inheritdoc />
         public override bool IsNullable(object value)
         {
-            throw new NotImplementedException();
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
@@ -142,8 +167,8 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override void AddUsersToDatabaseQuery(List<string> queries, 
-            string databaseName, 
+        public override void AddUsersToDatabaseQuery(List<string> queries,
+            string databaseName,
             DatabasePermission permissions, params IEnumerable<string> users)
         {
             throw new NotSupportedException("SQLite does not support database users or permissions.");
@@ -160,7 +185,7 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            throw new NotImplementedException();
+            return $"SELECT CASE WHEN \"notnull\" = 0 THEN 1 ELSE 0 END FROM pragma_table_info('{tableName}') WHERE name = '{columnName}'";
         }
 
         /// <inheritdoc />
@@ -172,44 +197,101 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override bool IsPrimaryKey(object value)
         {
-            throw new NotImplementedException();
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            throw new NotImplementedException();
+            return $"SELECT COUNT(*) FROM pragma_table_info('{tableName}') WHERE name = '{columnName}' AND pk > 0";
         }
 
         /// <inheritdoc />
         public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
         {
-            throw new NotImplementedException();
+            return $"SELECT DISTINCT \"table\" FROM pragma_foreign_key_list('{tableName}') " + $"WHERE \"from\" = '{columnName}'";        
         }
 
 
         /// <inheritdoc />
         public override bool IsAutoIncrement(object value)
         {
-            throw new NotImplementedException();
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
         public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            throw new NotImplementedException();
+            return string.Format(
+        @"SELECT CASE
+              WHEN sql LIKE '%""{0}"" INTEGER PRIMARY KEY AUTOINCREMENT%'
+                OR sql LIKE '%{0} INTEGER PRIMARY KEY AUTOINCREMENT%'
+                OR sql LIKE '%""{0}"" INTEGER PRIMARY KEY%'
+                OR sql LIKE '%{0} INTEGER PRIMARY KEY%'
+              THEN 1
+              ELSE 0
+          END
+          FROM sqlite_master
+          WHERE type = 'table'
+            AND name = '{1}'",
+        columnName,
+        tableName);
         }
 
         /// <inheritdoc />
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            throw new NotImplementedException();
+            return $"SELECT dflt_value FROM pragma_table_info('{tableName}') WHERE name = '{columnName}'";
         }
+
+        /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) =>
+                        "date('now', 'localtime')",
+
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) =>
+                        "time('now', 'localtime')",
+
+                    DefaultValueKind.Now when columnType == typeof(DateTimeOffset) =>
+                        "datetime('now', 'localtime')",
+
+                    DefaultValueKind.Now =>
+                        "datetime('now', 'localtime')",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) =>
+                        "date('now')",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) =>
+                        "time('now')",
+
+                    DefaultValueKind.UtcNow =>
+                        "CURRENT_TIMESTAMP",
+
+                    DefaultValueKind.NewGuid =>
+                        "randomblob(16)",
+
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+
+            if (columnType == typeof(bool))
+            {
+                return ConvertToString(value, ConvertOption.None);
+            }
+
+            return ConvertToString(value, ConvertOption.Quete);
+        }
+
 
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            throw new NotImplementedException();
+            return $"SELECT type FROM pragma_table_info('{tableName}') WHERE name = '{columnName}'";
         }
 
         /// <inheritdoc />
@@ -217,6 +299,18 @@ namespace Gurux.Service.Orm.Settings
         {
             index = 1;
             return string.Format("PRAGMA table_info('{0}')", name);
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"ALTER TABLE '{oldTableName}' RENAME TO '{newTableName}'";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"ALTER TABLE '{tableName}' RENAME COLUMN '{oldColumnName}' TO '{newColumnName}'";
         }
 
         /// <inheritdoc />
@@ -333,6 +427,24 @@ namespace Gurux.Service.Orm.Settings
         override public string DateTimeColumnDefinition(TimeStorageUnit unit)
         {
             return "TEXT";
+        }
+
+        /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "TIME";
+            }
         }
 
         /// <inheritdoc />
@@ -467,6 +579,23 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc/>
         internal override object ChangeType(object value, Type type)
         {
+            if (value is string str1)
+            {
+                string upper = str1.ToUpperInvariant();
+                if (upper.Contains("DATETIME('NOW', 'LOCALTIME')"))
+                {
+                    return DefaultValueKind.Now;
+                }
+                if (upper.Contains("TIME('NOW', 'LOCALTIME')") ||
+                    upper.Contains("DATE('NOW', 'LOCALTIME')"))
+                {
+                    return DefaultValueKind.Now;
+                }
+                if (upper.Contains("RANDOMBLOB(16)"))
+                {
+                    return DefaultValueKind.NewGuid;
+                }
+            }
             if (type == typeof(DateTimeOffset) && value is string str)
             {
                 string format = "yyyy-MM-dd HH:mm:ss.fffzzz";

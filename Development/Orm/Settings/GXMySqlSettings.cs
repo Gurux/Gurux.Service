@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -96,6 +96,41 @@ namespace Gurux.Service.Orm.Settings
         public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
         {
             return string.Format("SELECT tb1.REFERENCED_TABLE_NAME, tb2.UPDATE_RULE, tb2.DELETE_RULE FROM information_schema.KEY_COLUMN_USAGE AS tb1 INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS AS tb2 ON tb1.CONSTRAINT_NAME = tb2.CONSTRAINT_NAME WHERE table_schema = '{0}' AND tb1.table_name = '{1}' AND COLUMN_NAME = '{2}' AND referenced_column_name IS NOT NULL", schema, tableName, columnName);
+        }
+
+        /// <inheritdoc />
+        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        {
+            schema = schema.Replace("'", "''");
+            tableName = tableName.Replace("'", "''");
+            if (string.IsNullOrEmpty(columnName))
+            {
+                return $"SELECT TABLE_COMMENT FROM information_schema.TABLES WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{tableName}'";
+            }
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT COLUMN_COMMENT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+        
+        }
+
+        /// <inheritdoc />
+        public override string GetOrdinalQuery(string schema, string tableName, string columnName)
+        {
+            schema = schema.Replace("'", "''");
+            tableName = tableName.Replace("'", "''");
+            columnName = columnName.Replace("'", "''");
+            return $"SELECT ORDINAL_POSITION FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";        
+        }
+
+        /// <inheritdoc />
+        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        {
+            if (!string.IsNullOrEmpty(columnName))
+            {
+                return "";
+            }
+            tableName = tableName.Replace("`", "``");
+            comment = comment.Replace("'", "''");
+            return $"ALTER TABLE `{tableName}` COMMENT = '{comment}'";
         }
 
         internal static string GetPermissions(DatabasePermission value)
@@ -360,9 +395,33 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc />
+        public override string GetColumnDefaultValue(object value, Type columnType)
+        {
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) => "(CURRENT_DATE())",
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) => "(CURRENT_TIME())",
+                    DefaultValueKind.Now => "CURRENT_TIMESTAMP",
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) => "(UTC_DATE())",
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) => "(UTC_TIME())",
+                    DefaultValueKind.UtcNow => "(UTC_TIMESTAMP())",
+                    DefaultValueKind.NewGuid => "(UUID_TO_BIN(UUID()))",
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+            if (columnType == typeof(bool))
+            {
+                return "b'" + ConvertToString(value, ConvertOption.None) + "'";
+            }
+            return ConvertToString(value, ConvertOption.Quete);
+        }
+
+        /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'", tableName, columnName, schema);
+            return string.Format("SELECT CASE WHEN COLUMN_TYPE LIKE '% unsigned' THEN CONCAT(DATA_TYPE, ' unsigned') WHEN DATA_TYPE IN ('decimal', 'numeric') THEN COLUMN_TYPE ELSE DATA_TYPE END, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'", tableName, columnName, schema);
         }
 
         /// <inheritdoc />
@@ -371,6 +430,19 @@ FLUSH PRIVILEGES;
             index = 0;
             return string.Format("SHOW COLUMNS FROM {1}.{0}", name, schema);
         }
+
+        /// <inheritdoc />
+        public override string GetRenameTableQuery(string oldTableName, string newTableName)
+        {
+            return $"ALTER TABLE {oldTableName} RENAME TO {newTableName}";
+        }
+
+        /// <inheritdoc />
+        public override string GetRenameTableColumnQuery(string tableName, string oldColumnName, string newColumnName)
+        {
+            return $"ALTER TABLE {tableName} RENAME COLUMN {oldColumnName} TO {newColumnName}";
+        }
+
 
         /// <inheritdoc />
         public override char ColumnNameQuoteCharacter
@@ -487,11 +559,29 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc />
+        override public string DateOnlyColumnDefinition
+        {
+            get
+            {
+                return "DATE";
+            }
+        }
+
+        /// <inheritdoc />
+        override public string TimeOnlyColumnDefinition
+        {
+            get
+            {
+                return "TIME";
+            }
+        }
+
+        /// <inheritdoc />
         override public string TimeSpanColumnDefinition
         {
             get
             {
-                return DoubleColumnDefinition;
+                return "DECIMAL(24,9)";
             }
         }
 
@@ -582,7 +672,7 @@ FLUSH PRIVILEGES;
         {
             get
             {
-                return "FLOAT(53)";
+                return "FLOAT";
             }
         }
 
@@ -600,7 +690,7 @@ FLUSH PRIVILEGES;
         {
             get
             {
-                return "DOUBLE";
+                return "DECIMAL(29,9)";
             }
         }
 
