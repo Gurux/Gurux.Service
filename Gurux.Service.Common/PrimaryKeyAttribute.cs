@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,7 +35,7 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Property of field is primary key.
+    /// Marks a property or field as a primary key column.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class PrimaryKeyAttribute : Attribute

@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,25 +35,25 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Relation attribute.
+    /// Identifies a relationship to another mapped entity.
     /// </summary>
     /// <remarks>
-    /// Relation attribute is used to show relations between tables.
+    /// Apply this attribute to a property that represents a relationship between tables.
     /// </remarks>
     [AttributeUsage(AttributeTargets.Property)]
     public class RelationAttribute : Attribute
     {
         /// <summary>
-        /// Target type.
+        /// Gets or sets the related entity type.
         /// </summary>
-        public Type Target
+        public Type? Target
         {
             get;
             set;
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="RelationAttribute"/> class.
         /// </summary>
         public RelationAttribute()
         {
@@ -61,9 +61,9 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="RelationAttribute"/> class.
         /// </summary>
-        /// <param name="target">Relation target type.</param>
+        /// <param name="target">The related entity type.</param>
         public RelationAttribute(Type target)
         {
             Target = target;

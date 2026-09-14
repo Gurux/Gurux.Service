@@ -30,32 +30,26 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm.Common.Enums
+using System.Collections.Generic;
+
+namespace Gurux.Service.Orm.Common.Model
 {
     /// <summary>
-    /// Defines the behavior of a foreign key when a referenced key is updated.
+    /// Describes a database index and its columns.
     /// </summary>
-    public enum ForeignKeyUpdate
+    public sealed class GXIndex
     {
         /// <summary>
-        /// Leaves the update action unspecified. This is the default value.
+        /// Gets or sets the database index name.
         /// </summary>
-        None,
+        public string Name { get; set; } = "";
         /// <summary>
-        /// Propagates changes to a referenced key to referencing rows.
+        /// Gets or sets whether the index requires unique combinations of indexed values.
         /// </summary>
-        Cascade,
+        public bool Unique { get; set; }
         /// <summary>
-        /// Rejects changes that would invalidate existing references, using the default database action.
+        /// Gets or sets the columns that make up the index.
         /// </summary>
-        Reject,
-        /// <summary>
-        /// Explicitly restricts changes to a key that is still referenced.
-        /// </summary>
-        Restrict,
-        /// <summary>
-        /// Sets referencing foreign key values to NULL when the referenced key changes.
-        /// </summary>
-        Null
+        public List<GXIndexColumn> Columns { get; set; } = new();
     }
 }

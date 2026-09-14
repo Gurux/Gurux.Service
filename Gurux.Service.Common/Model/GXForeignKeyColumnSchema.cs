@@ -30,32 +30,26 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm.Common.Enums
+namespace Gurux.Service.Orm.Common.Model
 {
     /// <summary>
-    /// Defines the behavior of a foreign key when a referenced key is updated.
+    /// Maps a column in a foreign key to its corresponding referenced column.
     /// </summary>
-    public enum ForeignKeyUpdate
+    public sealed class GXForeignKeyColumnSchema
     {
         /// <summary>
-        /// Leaves the update action unspecified. This is the default value.
+        /// Gets or sets the referencing column name.
         /// </summary>
-        None,
+        public string Column { get; set; } = string.Empty;
+
         /// <summary>
-        /// Propagates changes to a referenced key to referencing rows.
+        /// Gets or sets the corresponding column name in the referenced table.
         /// </summary>
-        Cascade,
+        public string ReferencedColumn { get; set; } = string.Empty;
+
         /// <summary>
-        /// Rejects changes that would invalidate existing references, using the default database action.
+        /// Gets or sets the zero-based position of this column pair within the foreign key.
         /// </summary>
-        Reject,
-        /// <summary>
-        /// Explicitly restricts changes to a key that is still referenced.
-        /// </summary>
-        Restrict,
-        /// <summary>
-        /// Sets referencing foreign key values to NULL when the referenced key changes.
-        /// </summary>
-        Null
+        public int Position { get; set; }
     }
 }

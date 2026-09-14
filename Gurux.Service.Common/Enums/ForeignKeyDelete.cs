@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -33,24 +33,24 @@
 namespace Gurux.Service.Orm.Common.Enums
 {
     /// <summary>
-    /// Foreign key delete actions.
+    /// Defines the behavior of a foreign key when a referenced row is deleted.
     /// </summary>
     public enum ForeignKeyDelete
     {
         /// <summary>
-        /// Foreign key delete action is not used. This is a default.
+        /// Leaves the delete action unspecified. This is the default value.
         /// </summary>
         None,
         /// <summary>
-        /// Items are removed from child table when parent item is removed.
+        /// Deletes referencing rows when the referenced row is deleted.
         /// </summary>
         Cascade,
         /// <summary>
-        /// If parent item is try to remove and there are items on the child table deletion is rejected.
+        /// Rejects deletion of a referenced row if referencing rows exist, using the default database action.
         /// </summary>
         Empty,
         /// <summary>
-        /// Deletion is restrict.
+        /// Explicitly restricts deletion of a row that is still referenced.
         /// </summary>
         Restrict
     }

@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,43 +35,43 @@ using System.Runtime.Serialization;
 namespace Gurux.Service.Orm.Common.Enums
 {
     /// <summary>
-    /// Filter Type defines how filter is used with the property.
+    /// Defines the comparison used to filter a mapped property.
     /// </summary>
     public enum FilterType : int
     {
         /// <summary>
-        /// Filtered value must be exact the same.
+        /// Matches values exactly.
         /// </summary>
         /// <remarks>
-        /// For string values compare is case sensitive.
+        /// String comparisons are case-sensitive.
         /// </remarks>
         [EnumMember(Value = "0")]
         Exact = 0,
         /// <summary>
-        /// Value must be equal.
+        /// Matches values equal to the filter value.
         /// </summary>
         /// <remarks>
-        /// For string values compare is case-insensitive.
+        /// String comparisons are case-insensitive.
         /// </remarks>
         [EnumMember(Value = "1")]
         Equals = 1,
         /// <summary>
-        /// Value must be greater than.
+        /// Matches values greater than the filter value.
         /// </summary>
         [EnumMember(Value = "2")]
         Greater = 2,
         /// <summary>
-        /// Value must be less than.
+        /// Matches values less than the filter value.
         /// </summary>
         [EnumMember(Value = "3")]
         Less = 3,
         /// <summary>
-        /// Value must be greater or equal.
+        /// Matches values greater than or equal to the filter value.
         /// </summary>
         [EnumMember(Value = "4")]
         GreaterOrEqual = 4,
         /// <summary>
-        /// Value must be less or equal.
+        /// Matches values less than or equal to the filter value.
         /// </summary>
         [EnumMember(Value = "5")]
         LessOrEqual = 5,
@@ -91,17 +91,17 @@ namespace Gurux.Service.Orm.Common.Enums
         [EnumMember(Value = "8")]
         Contains = 8,
         /// <summary>
-        /// String value contains the filtered value.
+        /// Matches values that differ from the filter value.
         /// </summary>
         [EnumMember(Value = "9")]
         NotEqual = 9,
         /// <summary>
-        /// If value is set it must be null.
+        /// Matches null values when the filter is enabled.
         /// </summary>
         [EnumMember(Value = "10")]
         Null = 10,
         /// <summary>
-        /// If value is set it must be something else than null.
+        /// Matches non-null values when the filter is enabled.
         /// </summary>
         [EnumMember(Value = "11")]
         NotNull = 11,

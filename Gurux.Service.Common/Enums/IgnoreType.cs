@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,25 +35,25 @@ using System;
 namespace Gurux.Service.Orm.Common.Enums
 {
     /// <summary>
-    /// Ignore type enumeration.
+    /// Specifies operations that exclude a mapped member. Values can be combined.
     /// </summary>
     [Flags]
     public enum IgnoreType : int
     {
         /// <summary>
-        /// Nothing is ingoner.
+        /// Does not exclude the member from any operation.
         /// </summary>
         None = 0,
         /// <summary>
-        /// DB is ignored.
+        /// Excludes the member from database mapping.
         /// </summary>
         Db = 1,
         /// <summary>
-        /// JSON formatter is ignored.
+        /// Excludes the member from JSON serialization by formatters that honor this flag.
         /// </summary>
         Json = 2,
         /// <summary>
-        /// This is ignored always.
+        /// Excludes the member from all supported operations.
         /// </summary>
         All = -1
     }

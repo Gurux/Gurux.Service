@@ -33,29 +33,33 @@
 namespace Gurux.Service.Orm.Common.Enums
 {
     /// <summary>
-    /// Defines the behavior of a foreign key when a referenced key is updated.
+    /// Defines referential actions reported by a database foreign key constraint.
     /// </summary>
-    public enum ForeignKeyUpdate
+    public enum ForeignKeyAction
     {
         /// <summary>
-        /// Leaves the update action unspecified. This is the default value.
+        /// No action has been specified or the action is unknown.
         /// </summary>
         None,
         /// <summary>
-        /// Propagates changes to a referenced key to referencing rows.
+        /// Applies NO ACTION: rejects a change if the foreign key constraint is violated when checked.
         /// </summary>
-        Cascade,
+        NoAction,
         /// <summary>
-        /// Rejects changes that would invalidate existing references, using the default database action.
-        /// </summary>
-        Reject,
-        /// <summary>
-        /// Explicitly restricts changes to a key that is still referenced.
+        /// Rejects deleting or changing a referenced key while referencing rows exist.
         /// </summary>
         Restrict,
         /// <summary>
-        /// Sets referencing foreign key values to NULL when the referenced key changes.
+        /// Changes made to the referenced row are cascaded to the referencing rows.
         /// </summary>
-        Null
+        Cascade,
+        /// <summary>
+        /// Sets the foreign key column to NULL when the referenced row is deleted or updated.
+        /// </summary>
+        SetNull,
+        /// <summary>
+        /// Sets the foreign key column to its default value when the referenced row is deleted or updated.
+        /// </summary>
+        SetDefault
     }
 }

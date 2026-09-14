@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,7 +35,7 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Is table column marked as auto increment to the DB.
+    /// Marks a property or field as an auto-incrementing database column.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class AutoIncrementAttribute : Attribute

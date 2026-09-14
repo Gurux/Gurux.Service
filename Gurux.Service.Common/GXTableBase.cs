@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -33,37 +33,37 @@
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// This class is used add external functionality to the table object.
+    /// Provides overridable callbacks for database insert, update, and delete operations.
     /// </summary>
     public abstract class GXTableBase
     {
         /// <summary>
-        /// This method is called before Item is added to database.
+        /// Called before this entity is added to the database. The default implementation does nothing.
         /// </summary>
         public virtual void BeforeAdd() { }
 
         /// <summary>
-        /// This method is called after Item is added to database.
+        /// Called after this entity is added to the database. The default implementation does nothing.
         /// </summary>
         public virtual void AfterAdd() { }
 
         /// <summary>
-        /// This method is called before Item is updated to database.
+        /// Called before this entity is updated in the database. The default implementation does nothing.
         /// </summary>
         public virtual void BeforeUpdate() { }
 
         /// <summary>
-        /// This method is called after Item is updated to database.
+        /// Called after this entity is updated in the database. The default implementation does nothing.
         /// </summary>
         public virtual void AfterUpdate() { }
 
         /// <summary>
-        /// This method is called before Item is removed from database.
+        /// Called before this entity is removed from the database. The default implementation does nothing.
         /// </summary>
         public virtual void BeforeRemove() { }
 
         /// <summary>
-        /// This method is called after Item is removed from database.
+        /// Called after this entity is removed from the database. The default implementation does nothing.
         /// </summary>
         public virtual void AfterRemove() { }
     }

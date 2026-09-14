@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -36,13 +36,13 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Filter attribute can be used to filter columns.
+    /// Specifies how a mapped value is compared when building a filter.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
     public class FilterAttribute : Attribute
     {
         /// <summary>
-        /// Filter type.
+        /// Gets or sets the comparison used by the filter.
         /// </summary>
         public FilterType FilterType
         {
@@ -51,28 +51,28 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Default value when filter is ignored.
+        /// Gets or sets the value for which the filter is omitted.
         /// </summary>
-        public object DefaultValue
+        public object? DefaultValue
         {
             get;
             set;
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="FilterAttribute"/> class.
         /// </summary>
-        /// <param name="filterType">Filter type.</param>
+        /// <param name="filterType">The comparison used by the filter.</param>
         public FilterAttribute(FilterType filterType)
         {
             FilterType = filterType;
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="FilterAttribute"/> class.
         /// </summary>
-        /// <param name="filterType">Filter type.</param>
-        /// <param name="defaultValue">Default value.</param>
+        /// <param name="filterType">The comparison used by the filter.</param>
+        /// <param name="defaultValue">The value for which the filter is omitted.</param>
         public FilterAttribute(FilterType filterType, object defaultValue)
         {
             FilterType = filterType;

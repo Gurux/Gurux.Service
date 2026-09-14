@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -33,13 +33,13 @@
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// This interface is used to tell that database class has unique ID.
+    /// Exposes the unique identifier of a database entity.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
+    /// <typeparam name="T">The type of the entity identifier.</typeparam>
     public interface IUnique<T>
     {
         /// <summary>
-        /// Id of the object.
+        /// Gets the unique identifier of the entity.
         /// </summary>
         T Id
         {

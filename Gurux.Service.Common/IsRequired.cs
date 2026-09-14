@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,13 +35,13 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// IsRequired attribute can be used tell is null value allowed for the database column.
+    /// Specifies whether a mapped database column requires a non-null value.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class IsRequiredAttribute : Attribute
     {
         /// <summary>
-        /// Is value required.
+        /// Gets or sets whether null values are prohibited.
         /// </summary>
         public bool IsRequired
         {
@@ -50,16 +50,16 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes an attribute that prohibits null column values.
         /// </summary>
         public IsRequiredAttribute()
         {
             IsRequired = true;
         }
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IsRequiredAttribute"/> class.
         /// </summary>
-        /// <param name="required">Is null value allowed.</param>
+        /// <param name="required"><see langword="true"/> to prohibit null values; otherwise, <see langword="false"/>.</param>
         public IsRequiredAttribute(bool required)
         {
             IsRequired = required;

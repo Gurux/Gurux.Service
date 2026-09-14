@@ -30,32 +30,26 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm.Common.Enums
+using Gurux.Service.Orm.Common.Enums;
+
+namespace Gurux.Service.Orm.Common.Model
 {
     /// <summary>
-    /// Defines the behavior of a foreign key when a referenced key is updated.
+    /// Describes an indexed column, its sort direction, and its position.
     /// </summary>
-    public enum ForeignKeyUpdate
+    public sealed class GXIndexColumn
     {
         /// <summary>
-        /// Leaves the update action unspecified. This is the default value.
+        /// Gets or sets the indexed column name.
         /// </summary>
-        None,
+        public string Name { get; set; } = "";
         /// <summary>
-        /// Propagates changes to a referenced key to referencing rows.
+        /// Gets or sets the column sort direction. The default is ascending.
         /// </summary>
-        Cascade,
+        public IndexOrder Order { get; set; } = default;
         /// <summary>
-        /// Rejects changes that would invalidate existing references, using the default database action.
+        /// Gets or sets the zero-based position of the column within the index.
         /// </summary>
-        Reject,
-        /// <summary>
-        /// Explicitly restricts changes to a key that is still referenced.
-        /// </summary>
-        Restrict,
-        /// <summary>
-        /// Sets referencing foreign key values to NULL when the referenced key changes.
-        /// </summary>
-        Null
+        public int Position { get; set; }
     }
 }

@@ -30,32 +30,41 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm.Common.Enums
+using Gurux.Service.Orm.Common.Enums;
+using System.Collections.Generic;
+
+namespace Gurux.Service.Orm.Common.Model
 {
     /// <summary>
-    /// Defines the behavior of a foreign key when a referenced key is updated.
+    /// Describes a foreign key constraint and its referenced table.
     /// </summary>
-    public enum ForeignKeyUpdate
+    public sealed class GXForeignKeySchema
     {
         /// <summary>
-        /// Leaves the update action unspecified. This is the default value.
+        /// Gets or sets the foreign key constraint name.
         /// </summary>
-        None,
+        public string Name { get; set; } = string.Empty;
+
         /// <summary>
-        /// Propagates changes to a referenced key to referencing rows.
+        /// Gets or sets the schema name of the referenced table.
         /// </summary>
-        Cascade,
+        public string ReferencedSchema { get; set; } = string.Empty;
         /// <summary>
-        /// Rejects changes that would invalidate existing references, using the default database action.
+        /// Gets or sets the referenced table name.
         /// </summary>
-        Reject,
+        public string ReferencedTable { get; set; } = string.Empty;
         /// <summary>
-        /// Explicitly restricts changes to a key that is still referenced.
+        /// Gets or sets the column pairs that map referencing columns to referenced columns.
         /// </summary>
-        Restrict,
+        public List<GXForeignKeyColumnSchema> Columns { get; set; } = [];
+
         /// <summary>
-        /// Sets referencing foreign key values to NULL when the referenced key changes.
+        /// Gets or sets the action applied when a referenced row is deleted.
         /// </summary>
-        Null
+        public ForeignKeyAction OnDelete { get; set; }
+        /// <summary>
+        /// Gets or sets the action applied when a referenced key is updated.
+        /// </summary>
+        public ForeignKeyAction OnUpdate { get; set; }
     }
 }

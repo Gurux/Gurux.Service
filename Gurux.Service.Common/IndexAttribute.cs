@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,13 +35,13 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Is table column indexed to DB.
+    /// Specifies index options for a mapped type or member.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
     public class IndexAttribute : Attribute
     {
         /// <summary>
-        /// Is index unique.
+        /// Gets or sets whether the index requires unique values.
         /// </summary>
         public bool Unique
         {
@@ -50,7 +50,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Data is sorted in descending order.
+        /// Gets or sets whether index values are sorted in descending order.
         /// </summary>
         public bool Descend
         {
@@ -59,7 +59,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Only null values are included in the index.
+        /// Gets or sets whether the index includes only null values.
         /// </summary>
         public bool IncludeOnlyNull
         {
@@ -68,7 +68,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Are null values excluded in the index.
+        /// Gets or sets whether null values are excluded from the index.
         /// </summary>
         public bool ExcludeNull
         {
@@ -77,7 +77,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Is this clustered or non-clustered index.
+        /// Gets or sets whether the index is clustered.
         /// </summary>
         public bool Clustered
         {
@@ -86,7 +86,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// In default index is unique.
+        /// Initializes a unique index with ascending sort order.
         /// </summary>
         public IndexAttribute()
         {
@@ -94,19 +94,19 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexAttribute"/> class.
         /// </summary>
-        /// <param name="unique">Is index unique.</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
         public IndexAttribute(bool unique)
         {
             Unique = unique;
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexAttribute"/> class.
         /// </summary>
-        /// <param name="unique">Is index unique.</param>
-        /// <param name="descend">Data is sorted in descending order.</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="descend"><see langword="true"/> to sort in descending order; otherwise, <see langword="false"/>.</param>
         public IndexAttribute(bool unique, bool descend)
         {
             Unique = unique;

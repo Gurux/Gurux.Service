@@ -33,29 +33,17 @@
 namespace Gurux.Service.Orm.Common.Enums
 {
     /// <summary>
-    /// Defines the behavior of a foreign key when a referenced key is updated.
+    /// Defines the sort direction of an index column.
     /// </summary>
-    public enum ForeignKeyUpdate
+    public enum IndexOrder
     {
         /// <summary>
-        /// Leaves the update action unspecified. This is the default value.
+        /// Sorts values in ascending order. This is the default value.
         /// </summary>
-        None,
+        Ascending,
         /// <summary>
-        /// Propagates changes to a referenced key to referencing rows.
+        /// Sorts values in descending order.
         /// </summary>
-        Cascade,
-        /// <summary>
-        /// Rejects changes that would invalidate existing references, using the default database action.
-        /// </summary>
-        Reject,
-        /// <summary>
-        /// Explicitly restricts changes to a key that is still referenced.
-        /// </summary>
-        Restrict,
-        /// <summary>
-        /// Sets referencing foreign key values to NULL when the referenced key changes.
-        /// </summary>
-        Null
+        Descending
     }
 }

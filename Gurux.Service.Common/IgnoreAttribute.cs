@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -36,14 +36,13 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Properties with this IgnoreAttribute are ignored when building sql sentences 
-    /// and they are not saved to DB or JSON data.
+    /// Specifies whether a property or field is excluded from database mapping, JSON serialization, or both.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field)]
     public class IgnoreAttribute : Attribute
     {
         /// <summary>
-        /// Ignore types.
+        /// Gets the operations from which the member is excluded.
         /// </summary>
         public IgnoreType IgnoreType
         {
@@ -52,7 +51,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes an attribute that excludes the member from all supported operations.
         /// </summary>
         public IgnoreAttribute()
         {
@@ -60,8 +59,9 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IgnoreAttribute"/> class.
         /// </summary>
+        /// <param name="ignore">The operations from which the member is excluded.</param>
         public IgnoreAttribute(IgnoreType ignore)
         {
             IgnoreType = ignore;

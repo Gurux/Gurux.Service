@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -42,7 +42,7 @@ namespace Gurux.Service.Orm.Common
     public class TimeStorageUnitAttribute : Attribute
     {
         /// <summary>
-        /// Gets the time unit.
+        /// Gets the unit used to store the time value in the database.
         /// </summary>
         public TimeStorageUnit Unit
         {
@@ -52,7 +52,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Initializes a new instance of the <see cref="TimeStorageUnitAttribute"/> class.
         /// </summary>
-        /// <param name="unit">The time unit used for storage.</param>
+        /// <param name="unit">The unit used to store the time value.</param>
         public TimeStorageUnitAttribute(TimeStorageUnit unit)
         {
             Unit = unit;

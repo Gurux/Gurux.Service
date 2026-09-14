@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -35,14 +35,14 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Collection of indexed table column.
+    /// Defines a named or unnamed index over one or more table columns.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly, AllowMultiple = true, Inherited = false)]
     public class IndexCollectionAttribute
         : Attribute
     {
         /// <summary>
-        /// Is index unique.
+        /// Gets or sets whether the combination of indexed values must be unique.
         /// </summary>
         public bool Unique
         {
@@ -51,16 +51,12 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Name of the index.
+        /// Gets or sets the index name.
         /// </summary>
-        public string Name
-        {
-            get;
-            set;
-        }
+        public string Name { get; set; } = default!;
 
         /// <summary>
-        /// Names of composite index.
+        /// Gets the column names in index order.
         /// </summary>
         public string[] Columns
         {
@@ -69,7 +65,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Is this clustered or non-clustered index.
+        /// Gets or sets whether the index is clustered.
         /// </summary>
         public bool Clustered
         {
@@ -78,19 +74,19 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="column">Name of composite index.</param>
+        /// <param name="column">The column to include in the index.</param>
         public IndexCollectionAttribute(string column)
         {
             Columns = new string[] { column };
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="unique">Is index unique.</param>
-        /// <param column="column">Name of composite index.</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="column">The column to include in the index.</param>
         public IndexCollectionAttribute(bool unique, string column)
         {
             Unique = unique;
@@ -98,10 +94,11 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="unique">Is index unique.</param>
-        /// <param column="column">Name of composite index</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="column1">The first index column.</param>
+        /// <param name="colum2">The second index column.</param>
         public IndexCollectionAttribute(bool unique, string column1, string colum2)
         {
             Unique = unique;
@@ -109,40 +106,54 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="unique">Is index unique.</param>
-        /// <param column="column">Name of composite index</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="column1">The first index column.</param>
+        /// <param name="colum2">The second index column.</param>
+        /// <param name="column3">The third index column.</param>
         public IndexCollectionAttribute(bool unique, string column1, string colum2, string column3)
         {
             Unique = unique;
             Columns = new string[] { column1, colum2, column3 };
         }
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="unique">Is index unique.</param>
-        /// <param column="column">Name of composite index</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="column1">The first index column.</param>
+        /// <param name="colum2">The second index column.</param>
+        /// <param name="column3">The third index column.</param>
+        /// <param name="name4">The fourth index column.</param>
         public IndexCollectionAttribute(bool unique, string column1, string colum2, string column3, string name4)
         {
             Unique = unique;
             Columns = new string[] { column1, colum2, column3, name4 };
         }
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="unique">Is index unique.</param>
-        /// <param column="column">Name of composite index</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="column1">The first index column.</param>
+        /// <param name="colum2">The second index column.</param>
+        /// <param name="column3">The third index column.</param>
+        /// <param name="name4">The fourth index column.</param>
+        /// <param name="column5">The fifth index column.</param>
         public IndexCollectionAttribute(bool unique, string column1, string colum2, string column3, string name4, string column5)
         {
             Unique = unique;
             Columns = new string[] { column1, colum2, column3, name4, column5 };
         }
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.
         /// </summary>
-        /// <param column="unique">Is index unique.</param>
-        /// <param column="column">Name of composite index</param>
+        /// <param name="unique"><see langword="true"/> to require unique index values; otherwise, <see langword="false"/>.</param>
+        /// <param name="column1">The first index column.</param>
+        /// <param name="colum2">The second index column.</param>
+        /// <param name="column3">The third index column.</param>
+        /// <param name="name4">The fourth index column.</param>
+        /// <param name="column5">The fifth index column.</param>
+        /// <param name="column6">The sixth index column.</param>
         public IndexCollectionAttribute(bool unique, string column1, string colum2, string column3, string name4, string column5, string column6)
         {
             Unique = unique;

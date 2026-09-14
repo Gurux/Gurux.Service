@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -35,13 +35,13 @@ using System;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Alias name attribute.
+    /// Specifies the database table name used for a mapped class.
     /// </summary>
     [AttributeUsage(AttributeTargets.Class)]
     public class AliasAttribute : Attribute
     {
         /// <summary>
-        /// Alias name.
+        /// Gets the database table alias.
         /// </summary>
         public string Name
         {
@@ -50,9 +50,9 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="AliasAttribute"/> class.
         /// </summary>
-        /// <param name="name">Alias name.</param>
+        /// <param name="name">The alias name.</param>
         public AliasAttribute(string name)
         {
             Name = name;

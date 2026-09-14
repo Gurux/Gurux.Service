@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -37,31 +37,27 @@ using System.ComponentModel;
 namespace Gurux.Service.Orm.Common
 {
     /// <summary>
-    /// Foreign key attribute.
+    /// Defines a foreign key relationship for a mapped property.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property)]
     public class ForeignKeyAttribute : Attribute
     {
         /// <summary>
-        /// Foreign key attribute type.
+        /// Gets the referenced entity type, or null if no type was supplied.
         /// </summary>
-        public Type Type
+        public Type? Type
         {
             get;
             private set;
         }
 
         /// <summary>
-        /// Foreign key attribute map table type.
+        /// Gets the mapping table type, or null if no mapping table was supplied.
         /// </summary>
-        public Type MapTable
-        {
-            get;
-            private set;
-        }
+        public Type? MapTable { get; private set; }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="ForeignKeyAttribute"/> class.
         /// </summary>
         public ForeignKeyAttribute()
         {
@@ -70,9 +66,9 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="ForeignKeyAttribute"/> class.
         /// </summary>
-        /// <param name="type">Foreign key type.</param>
+        /// <param name="type">The referenced entity type.</param>
         public ForeignKeyAttribute(Type type)
         {
             Type = type;
@@ -81,10 +77,10 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Constructor.
+        /// Initializes a new instance of the <see cref="ForeignKeyAttribute"/> class.
         /// </summary>
-        /// <param name="type">Foreign key type.</param>
-        /// <param name="mapTable">Map type.</param>
+        /// <param name="type">The referenced entity type.</param>
+        /// <param name="mapTable">The entity type of the mapping table.</param>
         public ForeignKeyAttribute(Type type, Type mapTable)
         {
             OnDelete = ForeignKeyDelete.None;
@@ -94,7 +90,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Specify what happens to the items in the table when the corresponding items in the parent table are deleted.
+        /// Gets or sets the action applied to referencing rows when a referenced row is deleted.
         /// </summary>
         [DefaultValue(ForeignKeyDelete.None)]
         public ForeignKeyDelete OnDelete
@@ -104,7 +100,7 @@ namespace Gurux.Service.Orm.Common
         }
 
         /// <summary>
-        /// Specify what happens to the items in the table when the corresponding items in the parent table are updated.
+        /// Gets or sets the action applied to referencing rows when a referenced key is updated.
         /// </summary>
         [DefaultValue(ForeignKeyDelete.None)]
         public ForeignKeyUpdate OnUpdate
