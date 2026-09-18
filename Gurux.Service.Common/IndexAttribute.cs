@@ -37,6 +37,10 @@ namespace Gurux.Service.Orm.Common
     /// <summary>
     /// Specifies index options for a mapped type or member.
     /// </summary>
+    /// <remarks>
+    /// Support for clustered and filtered indexes depends on the database provider.
+    /// IncludeOnlyNull and ExcludeNull are mutually exclusive.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Property | AttributeTargets.Field)]
     public class IndexAttribute : Attribute
     {

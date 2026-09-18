@@ -1,3 +1,4 @@
+﻿//
 //
 // --------------------------------------------------------------------------
 //  Gurux Ltd
@@ -30,30 +31,47 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm.Common.Model
+namespace Gurux.Service.Orm.Common.Enums
 {
-    /// <summary>
-    /// Maps a column in a foreign key to its corresponding referenced column.
-    /// </summary>
-    /// <remarks>
-    /// Column names are stored instead of object references so the relationship can be described
-    /// without loading the referenced table. Position preserves the order of a composite key.
-    /// </remarks>
-    public sealed class GXForeignKeyColumnSchema
+    /// <Summary>
+    /// Available database types.
+    /// </Summary>
+    public enum DatabaseType
     {
-        /// <summary>
-        /// Gets or sets the referencing column name.
-        /// </summary>
-        public string Column { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the corresponding column name in the referenced table.
-        /// </summary>
-        public string ReferencedColumn { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the zero-based position of this column pair within the foreign key.
-        /// </summary>
-        public int Position { get; set; }
+        /// <Summary>
+        /// Target database is MySQL or Maria DB.
+        /// </Summary>
+        MySQL,
+        /// <Summary>
+        /// Target database is Microsoft SQL.
+        /// </Summary>
+        MSSQL,
+        /// <Summary>
+        /// Target database is SQLite.
+        /// </Summary>
+        /// <remarks>
+        /// http://www.sqlite.org
+        /// </remarks>
+        SqLite,
+        /// <Summary>
+        /// Target database is Oracle.
+        /// </Summary>        
+        Oracle,
+        /// <Summary>
+        /// Target database is PostgreSQL.
+        /// </Summary>
+        PostgreSQL,
+        /// <Summary>
+        /// Target database is MariaDB.
+        /// </Summary>
+        MariaDB,
+        /// <Summary>
+        /// Target database is IBM DB2.
+        /// </Summary>
+        DB2,
+        /// <Summary>
+        /// Target database is SAP HANA.
+        /// </Summary>
+        SapHana
     }
 }

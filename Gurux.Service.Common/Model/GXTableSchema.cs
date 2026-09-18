@@ -37,6 +37,10 @@ namespace Gurux.Service.Orm.Common.Model
     /// <summary>
     /// Describes a database table, its columns, indexes, and foreign keys.
     /// </summary>
+    /// <remarks>
+    /// This model contains metadata, not table rows. Columns and indexes are mutable collections
+    /// with no property setter; serializers must populate those collections when reading JSON.
+    /// </remarks>
     public sealed class GXTableSchema
     {
         /// <summary>

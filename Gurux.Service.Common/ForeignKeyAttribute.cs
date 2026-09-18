@@ -39,6 +39,10 @@ namespace Gurux.Service.Orm.Common
     /// <summary>
     /// Defines a foreign key relationship for a mapped property.
     /// </summary>
+    /// <remarks>
+    /// The referenced type identifies the entity, while MapTable identifies an optional relation table.
+    /// Delete and update actions describe database referential behavior; they do not execute an operation themselves.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Property)]
     public class ForeignKeyAttribute : Attribute
     {
