@@ -31,6 +31,7 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Internal;
 using System;
@@ -70,15 +71,15 @@ WHERE child.constraint_type = 'R' AND parent.table_name = UPPER('{tableName}')";
         }
 
         /// <inheritdoc />
-        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            throw new System.NotImplementedException();
-        }
-
-        /// <inheritdoc />
-        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
-        {
-            throw new System.NotImplementedException();
+            return $@"SELECT child.CONSTRAINT_NAME, parent.OWNER, parent.TABLE_NAME, childColumn.COLUMN_NAME, parentColumn.COLUMN_NAME, childColumn.POSITION, child.DELETE_RULE, 'NO ACTION'
+FROM USER_CONSTRAINTS child
+INNER JOIN USER_CONS_COLUMNS childColumn ON child.CONSTRAINT_NAME = childColumn.CONSTRAINT_NAME
+INNER JOIN USER_CONSTRAINTS parent ON child.R_CONSTRAINT_NAME = parent.CONSTRAINT_NAME
+INNER JOIN USER_CONS_COLUMNS parentColumn ON parent.CONSTRAINT_NAME = parentColumn.CONSTRAINT_NAME AND childColumn.POSITION = parentColumn.POSITION
+WHERE child.CONSTRAINT_TYPE = 'R' AND child.TABLE_NAME = UPPER('{tableName}')
+ORDER BY child.CONSTRAINT_NAME, childColumn.POSITION";
         }
 
         /// <inheritdoc />
@@ -90,7 +91,7 @@ WHERE child.constraint_type = 'R' AND parent.table_name = UPPER('{tableName}')";
                 return $"SELECT COMMENTS FROM USER_TAB_COMMENTS WHERE TABLE_NAME = '{tableName}'";
             }
             columnName = columnName.Replace("'", "''").ToUpperInvariant();
-            return $"SELECT COMMENTS FROM USER_COL_COMMENTS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+            return $"SELECT COMMENTS FROM USER_COL_COMMENTS WHERE TABLE_NAME = '{tableName}' AND UPPER(COLUMN_NAME) = '{columnName}'";
 
         }
 
@@ -99,26 +100,27 @@ WHERE child.constraint_type = 'R' AND parent.table_name = UPPER('{tableName}')";
         {
             tableName = tableName.Replace("'", "''").ToUpperInvariant();
             columnName = columnName.Replace("'", "''").ToUpperInvariant();
-            return $"SELECT COLUMN_ID FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+            return $"SELECT COLUMN_ID FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '{tableName}' AND UPPER(COLUMN_NAME) = '{columnName}'";
 
         }
 
         /// <inheritdoc />
         public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
         {
-            tableName = tableName.Replace("\"", "").ToUpperInvariant();
             comment = comment.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
             {
                 return $"COMMENT ON TABLE {tableName} IS '{comment}'";
             }
-            columnName = columnName.Replace("\"", "").ToUpperInvariant();
             return $"COMMENT ON COLUMN {tableName}.{columnName} IS '{comment}'";
         }
         /// <inheritdoc />
         public override bool IsNullable(object value)
         {
-            throw new System.NotImplementedException();
+            string? str = Convert.ToString(value, CultureInfo.InvariantCulture);
+            return string.Equals(str, "Y", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(str, "YES", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(str, "TRUE", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string GetPermissions(DatabasePermission value)
@@ -148,7 +150,7 @@ WHERE child.constraint_type = 'R' AND parent.table_name = UPPER('{tableName}')";
 
 
         /// <inheritdoc />
-        public override string GetUsersQuery(string databaseName)
+        public override string GetUsersQuery(string? databaseName)
         {
             if (string.IsNullOrEmpty(databaseName))
             {
@@ -200,22 +202,24 @@ WHERE USERNAME NOT IN (
 )
 ORDER BY USERNAME";
             }
-            return $@"SELECT GRANTEE
-FROM DBA_TAB_PRIVS
-WHERE PRIVILEGE = 'CREATE SESSION' AND OWNER = UPPER('{databaseName}')
-ORDER BY GRANTEE";
+            return $@"SELECT DISTINCT p.GRANTEE
+FROM DBA_TAB_PRIVS p JOIN DBA_USERS u ON u.USERNAME = p.GRANTEE
+WHERE p.OWNER = UPPER('{databaseName}')
+ORDER BY p.GRANTEE";
+            // return $@"SELECT GRANTEE FROM DBA_TAB_PRIVS WHERE OWNER = '{databaseName}' ORDER BY GRANTEE";
         }
 
         /// <inheritdoc />
-        public override string GetDatabasesQuery()
+        public override string GetDatabasesQuery(out int index)
         {
+            index = 0;
             //Oracle uses schemas instead of databases.
             //The following query returns all users, which can be considered as databases in Oracle.
             return "SELECT USERNAME FROM ALL_USERS ORDER BY USERNAME";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string databaseName, string userName)
+        public override string GetDatabaseUserPermissionQuery(string? databaseName, string userName)
         {
             if (string.IsNullOrEmpty(databaseName))
             {
@@ -263,7 +267,7 @@ WHERE grantee = UPPER('{userName}')";
         }
 
         /// <inheritdoc />
-        public override string RemoveUserQuery(string databaseName, string userName)
+        public override string RemoveUserQuery(string? databaseName, string userName)
         {
             if (!(userName.StartsWith("\"") && userName.EndsWith("\"")))
             {
@@ -362,13 +366,15 @@ END;");
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            return string.Format(
-        @"SELECT NULLABLE
+            string owner = string.IsNullOrEmpty(schema)
+                ? "SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"
+                : $"UPPER('{schema}')";
+
+            return $@"SELECT NULLABLE
           FROM ALL_TAB_COLUMNS
-          WHERE OWNER = UPPER('{0}')
-            AND TABLE_NAME = UPPER('{1}')
-            AND COLUMN_NAME = UPPER('{2}')",
-        schema, tableName, columnName);
+          WHERE OWNER = {owner}
+            AND TABLE_NAME = UPPER('{tableName}')
+            AND UPPER(COLUMN_NAME) = UPPER('{columnName}')";
         }
 
         /// <inheritdoc />
@@ -390,91 +396,65 @@ END;");
         }
 
         /// <inheritdoc />
-        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
+        public override bool IsUnique(object value)
         {
-            return string.Format(
-       "SELECT COUNT(*) FROM ALL_TAB_IDENTITY_COLS " +
-       "WHERE OWNER = UPPER('{0}') " +
-       "AND TABLE_NAME = UPPER('{1}') " +
-       "AND COLUMN_NAME = UPPER('{2}')",
-       schema, tableName, columnName);
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
-        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format(
-        @"SELECT pk.TABLE_NAME
-          FROM ALL_CONSTRAINTS fk
-          INNER JOIN ALL_CONS_COLUMNS fkc
-            ON fk.OWNER = fkc.OWNER
-           AND fk.CONSTRAINT_NAME = fkc.CONSTRAINT_NAME
-          INNER JOIN ALL_CONSTRAINTS pk
-            ON fk.R_OWNER = pk.OWNER
-           AND fk.R_CONSTRAINT_NAME = pk.CONSTRAINT_NAME
-          WHERE fk.CONSTRAINT_TYPE = 'R'
-            AND fk.OWNER = UPPER('{0}')
-            AND fk.TABLE_NAME = UPPER('{1}')
-            AND fkc.COLUMN_NAME = UPPER('{2}')",
-        schema, tableName, columnName);
+            string owner = string.IsNullOrEmpty(schema)
+                ? "SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"
+                : $"UPPER('{schema}')";
+            string trigger = GetTriggerName(tableName, columnName);
+
+            return $@"SELECT CASE WHEN EXISTS (
+    SELECT 1
+    FROM ALL_TAB_IDENTITY_COLS
+    WHERE OWNER = {owner}
+      AND TABLE_NAME = UPPER('{tableName}')
+      AND UPPER(COLUMN_NAME) = UPPER('{columnName}')
+) OR EXISTS (
+    SELECT 1
+    FROM ALL_TRIGGERS t
+    INNER JOIN ALL_SEQUENCES s
+      ON s.SEQUENCE_OWNER = t.OWNER
+     AND s.SEQUENCE_NAME = t.TRIGGER_NAME
+    WHERE t.OWNER = {owner}
+      AND t.TABLE_NAME = UPPER('{tableName}')
+      AND t.TRIGGER_NAME = '{trigger}'
+      AND t.TRIGGERING_EVENT LIKE '%INSERT%'
+      AND t.TRIGGER_TYPE LIKE 'BEFORE EACH ROW%'
+) THEN 1 ELSE 0 END
+FROM DUAL";
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            return string.Format(
-         @"SELECT COUNT(1)
-          FROM ALL_CONSTRAINTS c
-          INNER JOIN ALL_CONS_COLUMNS cc
-            ON c.OWNER = cc.OWNER
-           AND c.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
-           AND c.TABLE_NAME = cc.TABLE_NAME
-          WHERE c.CONSTRAINT_TYPE = 'P'
-            AND c.OWNER = UPPER('{0}')
-            AND c.TABLE_NAME = UPPER('{1}')
-            AND cc.COLUMN_NAME = UPPER('{2}')",
-         schema, tableName, columnName);
+            string owner = string.IsNullOrEmpty(schema)
+       ? "SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"
+       : $"UPPER('{schema}')";
+
+            return $@"SELECT COUNT(1)
+FROM ALL_CONSTRAINTS c JOIN ALL_CONS_COLUMNS cc ON c.OWNER = cc.OWNER
+ AND c.CONSTRAINT_NAME = cc.CONSTRAINT_NAME
+WHERE c.CONSTRAINT_TYPE = 'P'
+  AND c.OWNER = {owner}
+  AND c.TABLE_NAME = UPPER('{tableName}')
+  AND cc.COLUMN_NAME = UPPER('{columnName}')";
         }
 
         /// <inheritdoc />
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            tableName = tableName.Replace("'", "''").ToUpperInvariant();
-            columnName = columnName.Replace("'", "''").ToUpperInvariant();
-            if (string.IsNullOrEmpty(schema))
-            {
-                return string.Format(
-@"SELECT CASE
-    WHEN UPPER(c.DATA_TYPE) LIKE 'INTERVAL DAY%TO SECOND%' THEN 'CURRENT_TIMESTAMP'
-    ELSE (
-        SELECT CASE
-            WHEN UPPER(DATA_DEFAULT) LIKE '%SYS_EXTRACT_UTC%' THEN 'UTC_TIMESTAMP'
-            WHEN UPPER(DATA_DEFAULT) LIKE '%SYSTIMESTAMP%' OR UPPER(DATA_DEFAULT) LIKE '%SYSDATE%' THEN 'CURRENT_TIMESTAMP'
-            ELSE DATA_DEFAULT
-        END
-        FROM (
-            SELECT EXTRACTVALUE(XMLTYPE(DBMS_XMLGEN.GETXML('SELECT DATA_DEFAULT FROM USER_TAB_COLUMNS WHERE TABLE_NAME = ''{0}'' AND COLUMN_NAME = ''{1}''')), '/ROWSET/ROW/DATA_DEFAULT') DATA_DEFAULT FROM DUAL
-        )
-    )
-END FROM USER_TAB_COLUMNS c WHERE c.TABLE_NAME = '{0}' AND c.COLUMN_NAME = '{1}'",
-tableName, columnName);
-            }
-            schema = schema.Replace("'", "''").ToUpperInvariant();
-            return string.Format(
-       @"SELECT CASE
-    WHEN UPPER(c.DATA_TYPE) LIKE 'INTERVAL DAY%TO SECOND%' THEN 'CURRENT_TIMESTAMP'
-    ELSE (
-        SELECT CASE
-            WHEN UPPER(DATA_DEFAULT) LIKE '%SYS_EXTRACT_UTC%' THEN 'UTC_TIMESTAMP'
-            WHEN UPPER(DATA_DEFAULT) LIKE '%SYSTIMESTAMP%' OR UPPER(DATA_DEFAULT) LIKE '%SYSDATE%' THEN 'CURRENT_TIMESTAMP'
-            ELSE DATA_DEFAULT
-        END
-        FROM (
-            SELECT EXTRACTVALUE(XMLTYPE(DBMS_XMLGEN.GETXML('SELECT DATA_DEFAULT FROM ALL_TAB_COLUMNS WHERE OWNER = ''{0}'' AND TABLE_NAME = ''{1}'' AND COLUMN_NAME = ''{2}''')), '/ROWSET/ROW/DATA_DEFAULT') DATA_DEFAULT FROM DUAL
-        )
-    )
-END FROM ALL_TAB_COLUMNS c WHERE c.OWNER = '{0}' AND c.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'",
-       schema, tableName, columnName);
+            string owner = string.IsNullOrEmpty(schema)
+       ? "SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')"
+       : $"UPPER('{schema}')";
+
+            return $@"SELECT DATA_DEFAULT FROM ALL_TAB_COLUMNS
+WHERE OWNER = {owner} AND TABLE_NAME = UPPER('{tableName}') AND COLUMN_NAME = UPPER('{columnName}')";
         }
 
         /// <inheritdoc />
@@ -532,7 +512,7 @@ END FROM ALL_TAB_COLUMNS c WHERE c.OWNER = '{0}' AND c.TABLE_NAME = '{1}' AND c.
     DATA_PRECISION,
     DATA_SCALE
 FROM USER_TAB_COLUMNS
-WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnName.ToUpperInvariant()}'";
+WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND UPPER(COLUMN_NAME) = '{columnName.ToUpperInvariant()}'";
         }
 
         /// <inheritdoc />
@@ -582,15 +562,6 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
         }
 
         /// <inheritdoc/>
-        public override bool SelectUsingAs
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <inheritdoc/>
         public override bool UpperCase
         {
             get
@@ -610,24 +581,12 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
             }
         }
 
-        /// <inheritdoc/>
-        ///<remarks>
-        ///Oracle needs separator to where column names.
-        ///</remarks>
-        public override bool UseQuotationWhereColumns
-        {
-            get
-            {
-                return false;
-            }
-        }
-
         /// <inheritdoc />
         override public int MaximumRowUpdate
         {
             get
             {
-                return 1000;
+                return 100;
             }
         }
 
@@ -664,19 +623,13 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
         }
 
         /// <inheritdoc />
-        override public string AutoIncrementDefinition
+        override public string? AutoIncrementDefinition
         {
             get
             {
                 //IDENTITY don't work with multiple insert at the same query.
                 //Within a single SQL statement containing a reference to NEXTVAL, Oracle increments the sequence once:
                 //https://docs.oracle.com/cd/E11882_01/server.112/e41084/pseudocolumns002.htm#SQLRF50946
-                /*
-                if (GetVersion() > 11)
-                {
-                    return " GENERATED ALWAYS AS IDENTITY";
-                }
-                */
                 return null;
             }
         }
@@ -889,9 +842,9 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
         /// <summary>
         /// With Oracle DB sequency maximum length is 30 chars.
         /// </summary>
-        /// <param name="tableName"></param>
-        /// <param name="columnName"></param>
-        /// <returns></returns>
+        /// <param name="tableName">The database table name.</param>
+        /// <param name="columnName">The database column name.</param>
+        /// <returns>An uppercase sequence name of at most 30 characters.</returns>
         static internal string GetSequenceName(string tableName, string columnName)
         {
             string name = tableName + "_" + columnName;
@@ -916,6 +869,19 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
             }
             if (type == typeof(DateTime) && value is DateTime dt)
             {
+                if (dt == MaxValue)
+                {
+                    return DateTime.MaxValue;
+                }
+                return dt;
+            }
+            if (type == typeof(DateTimeOffset) && value is DateTimeOffset dto)
+            {
+                if (dto == MaxValue)
+                {
+                    return DateTimeOffset.MaxValue;
+                }
+                return dto;
             }
             if (type == typeof(TimeSpan) && value is string str2)
             {
@@ -924,13 +890,16 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
             return base.ChangeType(value, type);
         }
 
+        private readonly DateTime MaxValue = new DateTime(9999, 12, 31, 23, 59, 59, 000, DateTimeKind.Utc);
+
+
         /// <inheritdoc/>
         internal override string ConvertToString(object value, ConvertOption options)
         {
             if (value is DateTime dt)
             {
                 string format;
-                if ((options & ConvertOption.Seconds) != 0)
+                if (dt == DateTime.MaxValue || (options & ConvertOption.Seconds) != 0)
                 {
                     format = "yyyy-MM-dd HH:mm:ss";
                     return "TO_TIMESTAMP(" + GetQuetedValue(dt.ToString(format, CultureInfo.InvariantCulture)) + ", 'YYYY-MM-DD HH24:MI:SS')";
@@ -941,8 +910,9 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
             if (value is DateTimeOffset dto)
             {
                 string format;
-                if ((options & ConvertOption.Seconds) != 0)
+                if (dto == DateTimeOffset.MaxValue || (options & ConvertOption.Seconds) != 0)
                 {
+                    //MaxValue is saved without milliseconds because Oracle doesn't support milliseconds in TO_TIMESTAMP_TZ function.
                     format = "yyyy-MM-dd HH:mm:sszzz";
                     return "TO_TIMESTAMP_TZ(" + GetQuetedValue(dto.ToString(format, CultureInfo.InvariantCulture)) + ", 'YYYY-MM-DD HH24:MI:SS TZH:TZM')";
                 }
@@ -991,12 +961,11 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
         }
 
         /// <inheritdoc/>
-        public override string[] CreateAutoIncrement(string tableName, string columnName)
+        public override string[]? CreateAutoIncrement(string tableName, string columnName)
         {
             //IDENTITY don't work with multiple insert at the same query.
             //Within a single SQL statement containing a reference to NEXTVAL, Oracle increments the sequence once:
             //https://docs.oracle.com/cd/E11882_01/server.112/e41084/pseudocolumns002.htm#SQLRF50946
-
             string trigger = GetTriggerName(tableName, columnName);
             tableName = GXDbHelpers.ConvertToString(this, TargetType.Table, null, tableName, null);
             columnName = GXDbHelpers.ConvertToString(this, TargetType.Column, null, columnName, null);
@@ -1021,7 +990,7 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
             //IDENTITY don't work with multiple insert at the same query.
             //Within a single SQL statement containing a reference to NEXTVAL, Oracle increments the sequence once:
             //https://docs.oracle.com/cd/E11882_01/server.112/e41084/pseudocolumns002.htm#SQLRF50946
-            return new string[] { "DROP SEQUENCE " + GetSequenceName(tableName, columnName) };
+            return ["DROP SEQUENCE " + GetSequenceName(tableName, columnName)];
         }
 
         /// <inheritdoc />
@@ -1036,9 +1005,68 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND COLUMN_NAME = '{columnNa
         }
 
         /// <inheritdoc />
-        public override string GetTables(string schema)
+        public override string GetTablesQuery(string schema)
         {
             return "SELECT TABLE_NAME FROM USER_TABLES ORDER BY TABLE_NAME";
+        }
+
+        public override string UniqueQuery(string schema, string tableName, string columnName)
+        {
+            if (string.IsNullOrEmpty(schema))
+            {
+                return string.Format(
+                        @"SELECT COUNT(1)
+FROM ALL_INDEXES i
+INNER JOIN ALL_IND_COLUMNS ic
+ON i.OWNER = ic.INDEX_OWNER
+AND i.INDEX_NAME = ic.INDEX_NAME
+WHERE i.UNIQUENESS = 'UNIQUE'
+AND i.OWNER = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA')
+AND i.TABLE_NAME = UPPER('{1}')
+AND UPPER(ic.COLUMN_NAME) = UPPER('{2}')", schema, tableName, columnName);
+            }
+            return string.Format(
+         @"SELECT COUNT(1)
+          FROM ALL_INDEXES i
+          INNER JOIN ALL_IND_COLUMNS ic
+            ON i.OWNER = ic.INDEX_OWNER
+           AND i.INDEX_NAME = ic.INDEX_NAME
+          WHERE i.UNIQUENESS = 'UNIQUE'
+            AND i.OWNER = UPPER('{0}')
+            AND i.TABLE_NAME = UPPER('{1}')
+            AND UPPER(ic.COLUMN_NAME) = UPPER('{2}')", schema, tableName, columnName);
+        }
+
+
+        /// <inheritdoc />
+        public override bool IsIdentity(object value)
+        {
+            if (value is string str)
+            {
+                return str.Equals("YES", StringComparison.OrdinalIgnoreCase);
+            }
+            return Convert.ToBoolean(value);
+        }
+
+        /// <inheritdoc />
+        public override string IsIdentityQuery(string schema, string tableName, string columnName)
+        {
+            return GetAutoIncrementQuery(schema, tableName, columnName);
+        }
+
+        public override string TableIndexesQuery(string schema, string tableName)
+        {
+            return $@"SELECT i.INDEX_NAME, CASE WHEN i.UNIQUENESS = 'UNIQUE' THEN 1 ELSE 0 END, ic.COLUMN_NAME, ic.COLUMN_POSITION, ic.DESCEND
+FROM USER_INDEXES i
+INNER JOIN USER_IND_COLUMNS ic ON i.INDEX_NAME = ic.INDEX_NAME
+WHERE i.TABLE_NAME = UPPER('{tableName}')
+  AND i.GENERATED = 'N'
+ORDER BY i.INDEX_NAME, ic.COLUMN_POSITION";
+        }
+
+        public override void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value)
+        {
+            UpdateTableIndexesFromRows(schema, value);
         }
 
         /// <inheritdoc />

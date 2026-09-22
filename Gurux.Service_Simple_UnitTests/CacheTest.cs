@@ -122,17 +122,17 @@ namespace Gurux.Service_Simple_Unit_Test
             GuidTestClass t = new GuidTestClass();
             t.Id = Guid.NewGuid();
             GXDeleteArgs arg = GXDeleteArgs.Delete(t, _cache);
-            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
-            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             t.Id = Guid.NewGuid();
             GuidTestClass t2 = new GuidTestClass();
             t2.Id = t.Id;
             arg = GXDeleteArgs.DeleteRange([t, t2], _cache);
-            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id IN(UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1), UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1))", arg.ToString(false));
+            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id IN(X'" + Convert.ToHexString(t.Id.ToByteArray()) + "', X'" + Convert.ToHexString(t.Id.ToByteArray()) + "')", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
-            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id IN(UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1), UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1))", arg.ToString(false));
+            Assert.AreEqual("DELETE FROM GuidTestClass WHERE Id IN(X'" + Convert.ToHexString(t.Id.ToByteArray()) + "', X'" + Convert.ToHexString(t.Id.ToByteArray()) + "')", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
         }
 
@@ -147,20 +147,20 @@ namespace Gurux.Service_Simple_Unit_Test
             t.Time = DateTime.MinValue;
             t.Text2 = "First";
             GXUpdateArgs arg = GXUpdateArgs.Update(t, u => new { u.Time, u.Text2 }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000', SimpleText = 'First' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000', SimpleText = 'First' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             t.Time = DateTime.MaxValue;
             t.Text2 = "Second";
             arg = GXUpdateArgs.Update(t, u => new { u.Time, u.Text2 }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.999', SimpleText = 'Second' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499', SimpleText = 'Second' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             t.Time = DateTime.MinValue;
             arg = GXUpdateArgs.Update(t, u => u.Time, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             //Cached value.
             arg = GXUpdateArgs.Update(t, u => u.Time, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
 
             t.Id = Guid.NewGuid();
@@ -170,15 +170,15 @@ namespace Gurux.Service_Simple_Unit_Test
             t2.Time = DateTime.MaxValue;
             t2.Text2 = "Second";
             arg = GXUpdateArgs.UpdateRange([t, t2], u => new { u.Time, u.Text2 }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000', SimpleText = 'First' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1) UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.999', SimpleText = 'Second' WHERE Id = UUID_TO_BIN('" + t2.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000', SimpleText = 'First' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "' UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499', SimpleText = 'Second' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
 
             arg = GXUpdateArgs.UpdateRange([t, t2], u => new { u.Time }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1) UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.999' WHERE Id = UUID_TO_BIN('" + t2.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "' UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             //Cached value.
             arg = GXUpdateArgs.UpdateRange([t, t2], u => new { u.Time }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1) UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.999' WHERE Id = UUID_TO_BIN('" + t2.Id.ToString().ToUpper() + "', 1)", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "' UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
         }
 
@@ -195,13 +195,13 @@ namespace Gurux.Service_Simple_Unit_Test
             t.Text2 = "First";
             GXInsertArgs arg = GXInsertArgs.Insert(t, u => new { u.Id, u.Time, u.Text2 }, _cache);
             string actual = arg.ToString(false);
-            Assert.AreEqual("INSERT INTO GuidTestClass (Id, Time, SimpleText) VALUES(UUID_TO_BIN('" + t.Id.ToString().ToUpper() + "', 1), '0001-01-01 00:00:00.000', 'First')", actual);
+            Assert.AreEqual("INSERT INTO GuidTestClass (Id, Time, SimpleText) VALUES(X'" + Convert.ToHexString(t.Id.ToByteArray()) + "', '0001-01-01 00:00:00.000', 'First')", actual);
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             t.Id = Guid.Empty;
             t.Time = DateTime.MaxValue;
             t.Text2 = "Second";
             arg = GXInsertArgs.Insert(t, u => new { u.Time, u.Text2 }, _cache);
-            Assert.AreEqual("INSERT INTO GuidTestClass (Time, SimpleText) VALUES('9999-12-31 23:59:59.999', 'Second')", arg.ToString(false));
+            Assert.AreEqual("INSERT INTO GuidTestClass (Time, SimpleText) VALUES('9999-12-31 23:59:59.499', 'Second')", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             t.Id = Guid.Empty;
             t.Time = DateTime.MinValue;
@@ -221,19 +221,19 @@ namespace Gurux.Service_Simple_Unit_Test
             t2.Time = DateTime.MaxValue;
             t2.Text2 = "Second";
             arg = GXInsertArgs.InsertRange([t, t2], u => new { u.Time, u.Text2 }, _cache);
-            Assert.AreEqual("INSERT INTO GuidTestClass (Time, SimpleText) VALUES('0001-01-01 00:00:00.000', 'First'), ('9999-12-31 23:59:59.999', 'Second')", arg.ToString(false));
+            Assert.AreEqual("INSERT INTO GuidTestClass (Time, SimpleText) VALUES('0001-01-01 00:00:00.000', 'First'), ('9999-12-31 23:59:59.499', 'Second')", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
 
             t.Id = Guid.Empty;
             t2.Id = Guid.Empty;
             arg = GXInsertArgs.Insert([t, t2], u => new { u.Time }, _cache);
-            Assert.AreEqual("INSERT INTO GuidTestClass (Time) VALUES('0001-01-01 00:00:00.000'), ('9999-12-31 23:59:59.999')", arg.ToString(false));
+            Assert.AreEqual("INSERT INTO GuidTestClass (Time) VALUES('0001-01-01 00:00:00.000'), ('9999-12-31 23:59:59.499')", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             //Cached value.
             t.Id = Guid.Empty;
             t2.Id = Guid.Empty;
             arg = GXInsertArgs.Insert([t, t2], u => new { u.Time }, _cache);
-            Assert.AreEqual("INSERT INTO GuidTestClass (Time) VALUES('0001-01-01 00:00:00.000'), ('9999-12-31 23:59:59.999')", arg.ToString(false));
+            Assert.AreEqual("INSERT INTO GuidTestClass (Time) VALUES('0001-01-01 00:00:00.000'), ('9999-12-31 23:59:59.499')", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
         }
 

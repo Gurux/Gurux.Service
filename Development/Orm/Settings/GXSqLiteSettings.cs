@@ -31,12 +31,10 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
-using System.Globalization;
-using System.Linq;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -83,15 +81,11 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            throw new NotImplementedException();
-        }
-
-        /// <inheritdoc />
-        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
-        {
-            throw new NotImplementedException();
+            return $@"SELECT 'fk_{tableName}_' || id, '', ""table"", ""from"", ""to"", seq + 1, on_delete, on_update
+FROM pragma_foreign_key_list('{tableName}')
+ORDER BY id, seq";
         }
 
         /// <inheritdoc />
@@ -131,14 +125,15 @@ namespace Gurux.Service.Orm.Settings
 
 
         /// <inheritdoc />
-        public override string GetUsersQuery(string databaseName)
+        public override string GetUsersQuery(string? databaseName)
         {
             throw new NotSupportedException("SQLite does not support database users or permissions.");
         }
 
         /// <inheritdoc />
-        public override string GetDatabasesQuery()
+        public override string GetDatabasesQuery(out int index)
         {
+            index = 1;
             return @"PRAGMA database_list";
         }
 
@@ -155,7 +150,7 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string RemoveUserQuery(string databaseName, string userName)
+        public override string RemoveUserQuery(string? databaseName, string userName)
         {
             throw new NotSupportedException("SQLite does not support database users or permissions.");
         }
@@ -207,14 +202,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        public override bool IsAutoIncrement(object value)
         {
-            return $"SELECT DISTINCT \"table\" FROM pragma_foreign_key_list('{tableName}') " + $"WHERE \"from\" = '{columnName}'";        
+            return Convert.ToBoolean(value);
         }
 
-
         /// <inheritdoc />
-        public override bool IsAutoIncrement(object value)
+        public override bool IsUnique(object value)
         {
             return Convert.ToBoolean(value);
         }
@@ -222,20 +216,14 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format(
-        @"SELECT CASE
-              WHEN sql LIKE '%""{0}"" INTEGER PRIMARY KEY AUTOINCREMENT%'
-                OR sql LIKE '%{0} INTEGER PRIMARY KEY AUTOINCREMENT%'
-                OR sql LIKE '%""{0}"" INTEGER PRIMARY KEY%'
-                OR sql LIKE '%{0} INTEGER PRIMARY KEY%'
-              THEN 1
-              ELSE 0
-          END
-          FROM sqlite_master
-          WHERE type = 'table'
-            AND name = '{1}'",
-        columnName,
-        tableName);
+            return $@"SELECT CASE WHEN EXISTS (
+    SELECT 1
+    FROM pragma_table_info('{tableName}')
+    WHERE name = '{columnName}'
+      AND UPPER(type) = 'INTEGER'
+      AND pk > 0
+      AND NOT EXISTS (SELECT 1 FROM pragma_index_list('{tableName}') WHERE origin = 'pk')
+) THEN 1 ELSE 0 END;";
         }
 
         /// <inheritdoc />
@@ -268,13 +256,8 @@ namespace Gurux.Service.Orm.Settings
 
                     DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) =>
                         "time('now')",
-
-                    DefaultValueKind.UtcNow =>
-                        "CURRENT_TIMESTAMP",
-
-                    DefaultValueKind.NewGuid =>
-                        "randomblob(16)",
-
+                    DefaultValueKind.UtcNow => "CURRENT_TIMESTAMP",
+                    DefaultValueKind.NewGuid => "randomblob(16)",
                     _ => throw new ArgumentOutOfRangeException(nameof(value))
                 };
             }
@@ -377,7 +360,7 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        override public string AutoIncrementDefinition
+        override public string? AutoIncrementDefinition
         {
             get
             {
@@ -598,8 +581,17 @@ namespace Gurux.Service.Orm.Settings
             }
             if (type == typeof(DateTimeOffset) && value is string str)
             {
-                string format = "yyyy-MM-dd HH:mm:ss.fffzzz";
-                return DateTimeOffset.ParseExact(str, format, System.Globalization.CultureInfo.InvariantCulture);
+                try
+                {
+                    string format = "yyyy-MM-dd HH:mm:ss.fffzzz";
+                    return DateTimeOffset.ParseExact(str, format, System.Globalization.CultureInfo.InvariantCulture);
+                }
+                catch (Exception)
+                {
+                    //If datetime is in ISO 8601 format.
+                    string format = "yyyy-MM-ddTHH:mm:ss";
+                    return DateTimeOffset.ParseExact(str, format, System.Globalization.CultureInfo.InvariantCulture);
+                }
             }
             if (type == typeof(Guid) && value is byte[] bytes)
             {
@@ -632,9 +624,51 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetTables(string schema)
+        public override string GetTablesQuery(string schema)
         {
-            return "SELECT NAME FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name";
+            return "SELECT name FROM sqlite_schema WHERE type = 'table' AND name <> 'sqlite_sequence' ORDER BY name;";
+        }
+
+        /// <inheritdoc/>
+        public override string UniqueQuery(string schema, string tableName, string columnName)
+        {
+            return $@"SELECT COUNT(*)
+FROM pragma_index_list('{tableName}') il
+INNER JOIN pragma_index_info(il.name) ii ON 1 = 1
+WHERE il.""unique"" = 1
+  AND ii.name = '{columnName}'";
+        }
+
+
+        /// <inheritdoc />
+        public override bool IsIdentity(object value)
+        {
+            return Convert.ToBoolean(value);
+        }
+
+        /// <inheritdoc />
+        public override string IsIdentityQuery(string schema, string tableName, string columnName)
+        {
+            return GetAutoIncrementQuery(schema, tableName, columnName);
+        }
+
+        /// <inheritdoc/>
+        public override string TableIndexesQuery(string schema, string tableName)
+        {
+            return $@"SELECT il.name, il.[unique], ii.name, ii.seqno + 1,
+CASE WHEN ii.[desc] = 1 THEN 'DESC' ELSE 'ASC' END
+FROM pragma_index_list('{tableName}') il
+INNER JOIN pragma_index_xinfo(il.name) ii
+WHERE il.origin <> 'pk'
+  AND ii.[key] = 1
+  AND ii.name IS NOT NULL
+ORDER BY il.name, ii.seqno";
+        }
+
+        /// <inheritdoc/>
+        public override void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value)
+        {
+            UpdateTableIndexesFromRows(schema, value);
         }
 
         /// <inheritdoc />

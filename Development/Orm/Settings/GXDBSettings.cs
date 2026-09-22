@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -31,11 +31,15 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Internal;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
+using System.Text;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -50,8 +54,6 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="type">Database type.</param>
         protected GXDBSettings(DatabaseType type)
         {
-            //Update type so SQL queries are shown for correct database.
-            GXDbConnection.DefaultDatabaseType = type;
             Type = type;
         }
 
@@ -75,7 +77,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// Table prefix.
         /// </summary>
-        public string TablePrefix
+        public string? TablePrefix
         {
             get;
             internal set;
@@ -118,23 +120,6 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <summary>
-        /// Select table columns using form "AS ColumnName.TableName". 
-        /// This is needed when data is retreaved from multiple tables and column names are the same. 
-        /// If table name is available on the schema, then column name is used without table name.
-        /// </summary>
-        /// <remarks>
-        /// If table name is available on the schema, then column name is used without table name. 
-        /// This is true, for example with Oracle and PostgreSQL databases where table name is not available on the schema.
-        /// </remarks>
-        public virtual bool SelectUsingAs
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Are column names upper case.
         /// </summary>
         public virtual bool UpperCase
@@ -157,17 +142,6 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <summary>
-        /// Are column quotation marks used with Where column names.
-        /// </summary>
-        public virtual bool UseQuotationWhereColumns
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Is column quotation marks added to select columns.
         /// </summary>
         public virtual bool UseQuotationWithSelectColumns
@@ -185,23 +159,19 @@ namespace Gurux.Service.Orm.Settings
         /// <returns>A SQL query string that selects foreign key information.</returns>
         public abstract string GetForeignKeysQuery(string tableName);
 
-        /// <summary>
-        /// Get column constraints.
-        /// </summary>
-        /// <param name="values">Received values.</param>
-        /// <param name="onDelete">Foreign key delete action.</param>
-        /// <param name="onUpdate">Foreign key update action</param>
-        /// <returns>reference class</returns>
-        public abstract string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate);
+        /// <summary>Builds the query that retrieves index metadata for a table.</summary>
+        /// <param name="schema">Database schema containing the table.</param>
+        /// <param name="tableName">Table whose indexes are requested.</param>
+        /// <returns>The provider-specific index metadata query.</returns>
+        public abstract string TableIndexesQuery(string schema, string tableName);
 
         /// <summary>
         /// Get column constraints query.
         /// </summary>
         /// <param name="schema">Schema name.</param>
         /// <param name="tableName">Table name.</param>
-        /// <param name="columnName">Column name.</param>
         /// <returns>Column data type query.</returns>
-        public abstract string GetColumnConstraintsQuery(string schema, string tableName, string columnName);
+        public abstract string GetColumnConstraintsQuery(string schema, string tableName);
 
         /// <summary>
         /// Get description query for table and column.
@@ -209,7 +179,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="schema">Schema name.</param>
         /// <param name="tableName">Table name.</param>
         /// <param name="columnName">Column name.</param>
-        /// <returns></returns>
+        /// <returns>The SQL query that retrieves the table or column comment.</returns>
         public abstract string GetDescriptionQuery(string schema, string tableName, string columnName);
 
         /// <summary>
@@ -218,7 +188,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="schema">Schema name.</param>
         /// <param name="tableName">Table name.</param>
         /// <param name="columnName">Column name.</param>
-        /// <returns></returns>
+        /// <returns>The SQL query that retrieves the column ordinal.</returns>
         public abstract string GetOrdinalQuery(string schema, string tableName, string columnName);
 
         /// <summary>
@@ -244,7 +214,7 @@ namespace Gurux.Service.Orm.Settings
         /// </summary>
         /// <param name="schema">Schema name.</param>
         /// <returns>Tables query.</returns>
-        public abstract string GetTables(string schema);
+        public abstract string GetTablesQuery(string schema);
 
         /// <summary>
         /// Get table is empty query.
@@ -266,25 +236,25 @@ namespace Gurux.Service.Orm.Settings
         /// Retrieves the SQL query used to obtain a list of available users.
         /// </summary>
         /// <returns>A string containing the SQL query for fetching user names.</returns>
-        public abstract string GetUsersQuery(string databaseName);
+        public abstract string GetUsersQuery(string? databaseName);
 
         /// <summary>
         /// Retrieves the SQL query used to remove a list of users.
         /// </summary>
         /// <returns>A string containing the SQL query for removing user names.</returns>
-        public abstract string RemoveUserQuery(string databaseName, string userName);
+        public abstract string RemoveUserQuery(string? databaseName, string userName);
 
         /// <summary>
         /// Retrieves the SQL query used to obtain a list of available databases.
         /// </summary>
         /// <returns>A string containing the SQL query for fetching database names.</returns>
-        public abstract string GetDatabasesQuery();
+        public abstract string GetDatabasesQuery(out int index);
 
         /// <summary>
         /// Generates a SQL query string to retrieve database user permissions.
         /// </summary>
         /// <returns>A string representing the SQL query for database permissions.</returns>
-        public abstract string GetDatabaseUserPermissionQuery(string databaseName, string userName);
+        public abstract string GetDatabaseUserPermissionQuery(string? databaseName, string userName);
 
         /// <summary>
         /// Converts the specified string to its corresponding DatabasePermission object.
@@ -349,16 +319,6 @@ namespace Gurux.Service.Orm.Settings
         /// <returns>Column data type query.</returns>
         public abstract string GetColumnIndexQuery(string schema, string tableName, string columnName);
 
-
-        /// <summary>
-        /// Get reference tables query.
-        /// </summary>
-        /// <param name="schema">Schema name.</param>
-        /// <param name="tableName">Table name.</param>
-        /// <param name="columnName">Column name.</param>
-        /// <returns>Column data type query.</returns>
-        public abstract string GetReferenceTablesQuery(string schema, string tableName, string columnName);
-
         /// <summary>
         /// Get column query.
         /// </summary>
@@ -369,10 +329,10 @@ namespace Gurux.Service.Orm.Settings
         public abstract string GetColumnsQuery(string schema, string name, out int index);
 
         /// <summary>
-        /// Get key type.
+        /// Is column the primary key.
         /// </summary>
         /// <param name="value">Received string.</param>
-        /// <returns>Key type.</returns>
+        /// <returns>Is column the primary key.</returns>
         public abstract bool IsPrimaryKey(object value);
 
         /// <summary>
@@ -385,11 +345,133 @@ namespace Gurux.Service.Orm.Settings
         public abstract string GetPrimaryKeyQuery(string schema, string tableName, string columnName);
 
         /// <summary>
-        /// Is column autoincrement.
+        /// Is column auto increment.
         /// </summary>
-        /// <param name="value"></param>
-        /// <returns></returns>
+        /// <param name="value">DB value.</param>
+        /// <returns>True, if column is auto increment.</returns>
         public abstract bool IsAutoIncrement(object value);
+
+        /// <summary>
+        /// Is column unique.
+        /// </summary>
+        /// <param name="value">DB value.</param>
+        /// <returns>True, if column is unique.</returns>
+        public abstract bool IsUnique(object value);
+
+        /// <summary>
+        /// Update table indexes.
+        /// </summary>
+        /// <param name="schema">Table schema.</param>
+        /// <param name="value">DB value.</param>
+        public abstract void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value);
+
+        /// <summary>
+        /// Update table indexes from rows returned by <see cref="TableIndexesQuery"/>.
+        /// </summary>
+        /// <param name="schema">Table schema.</param>
+        /// <param name="values">Index rows.</param>
+        protected static void UpdateTableIndexesFromRows(
+            GXTableSchema schema,
+            IEnumerable<IEnumerable<object>> values)
+        {
+            schema.Indexes.Clear();
+            foreach (IEnumerable<object> row in values)
+            {
+                object[] items = row as object[] ?? row.ToArray();
+                if (items.Length < 5 ||
+                    items[0] == null ||
+                    items[0] is DBNull ||
+                    items[2] == null ||
+                    items[2] is DBNull)
+                {
+                    continue;
+                }
+                string indexName = Convert.ToString(items[0], CultureInfo.InvariantCulture)!;
+                string columnName = NormalizeIndexColumnName(
+                    schema,
+                    indexName,
+                    Convert.ToString(items[2], CultureInfo.InvariantCulture)!);
+                if (string.IsNullOrEmpty(indexName) ||
+                    string.IsNullOrEmpty(columnName))
+                {
+                    continue;
+                }
+                GXIndex? index = schema.Indexes
+                    .FirstOrDefault(it => string.Compare(
+                        it.Name,
+                        indexName,
+                        true,
+                        CultureInfo.InvariantCulture) == 0);
+                if (index == null)
+                {
+                    index = new GXIndex()
+                    {
+                        Name = indexName,
+                        Unique = Convert.ToBoolean(items[1], CultureInfo.InvariantCulture)
+                    };
+                    schema.Indexes.Add(index);
+                }
+                int position = Convert.ToInt32(items[3], CultureInfo.InvariantCulture);
+                string order = items[4] == null || items[4] is DBNull
+                    ? string.Empty
+                    : Convert.ToString(items[4], CultureInfo.InvariantCulture)!;
+                index.Columns.Add(new GXIndexColumn()
+                {
+                    Name = columnName,
+                    Position = Math.Max(0, position - 1),
+                    Order = IsDescendingIndexOrder(order)
+                        ? IndexOrder.Descending
+                        : IndexOrder.Ascending
+                });
+            }
+            foreach (GXIndex index in schema.Indexes)
+            {
+                index.Columns.Sort((a, b) => a.Position.CompareTo(b.Position));
+            }
+        }
+
+        private static bool IsDescendingIndexOrder(string value)
+        {
+            return string.Equals(value, "D", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "DESC", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "DESCENDING", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeIndexColumnName(
+            GXTableSchema schema,
+            string indexName,
+            string columnName)
+        {
+            columnName = columnName.Trim();
+            if ((columnName.StartsWith('"') && columnName.EndsWith('"')) ||
+                (columnName.StartsWith('`') && columnName.EndsWith('`')))
+            {
+                columnName = columnName[1..^1];
+            }
+            else if (columnName.StartsWith('[') && columnName.EndsWith(']'))
+            {
+                columnName = columnName[1..^1];
+            }
+            if (columnName.StartsWith("SYS_NC", StringComparison.OrdinalIgnoreCase))
+            {
+                GXColumnSchema? column = schema.Columns.FirstOrDefault(it =>
+                    indexName.EndsWith("_" + it.Name, StringComparison.OrdinalIgnoreCase));
+                if (column != null)
+                {
+                    columnName = column.Name;
+                }
+            }
+            return columnName;
+        }
+
+        /// <summary>
+        /// Is column identity.
+        /// </summary>
+        /// <param name="value">The identity metadata value returned by the provider.</param>
+        /// <returns>True when the provider metadata marks an identity column; otherwise, false.</returns>
+        public abstract bool IsIdentity(object value);
+
+
 
         /// <summary>
         /// Retrieves the identifier of the most recently inserted record based on the specified value.
@@ -408,6 +490,23 @@ namespace Gurux.Service.Orm.Settings
         /// <returns>Column data type query.</returns>
         public abstract string GetAutoIncrementQuery(string schema, string tableName, string columnName);
 
+        /// <summary>
+        /// Check is column unique.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column unique query.</returns>
+        public abstract string UniqueQuery(string schema, string tableName, string columnName);
+
+        /// <summary>
+        /// Check is column identity.
+        /// </summary>
+        /// <param name="schema">Schema name.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="columnName">Column name.</param>
+        /// <returns>Column identity query.</returns>
+        public abstract string IsIdentityQuery(string schema, string tableName, string columnName);
 
         /// <summary>
         /// Get default value for column query.
@@ -423,7 +522,8 @@ namespace Gurux.Service.Orm.Settings
         /// </summary>
         /// <param name="value">Default value.</param>
         /// <returns>String representation of the default value.</returns>
-        public abstract string GetColumnDefaultValue(object value, Type columnType);        
+        /// <param name="columnType">CLR type of the column receiving the default value.</param>
+        public abstract string GetColumnDefaultValue(object value, Type columnType);
 
         /// <summary>
         /// Get column query.
@@ -523,7 +623,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// Auto increment column definition.
         /// </summary>
-        abstract public string AutoIncrementDefinition
+        abstract public string? AutoIncrementDefinition
         {
             get;
         }
@@ -691,7 +791,7 @@ namespace Gurux.Service.Orm.Settings
         abstract public string ByteArrayColumnDefinition(int maxLength);
 
         /// <summary>
-        /// 
+        /// Gets the SQL column definition used for object values.
         /// </summary>
         abstract public string ObjectColumnDefinition
         {
@@ -704,7 +804,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="value">Value to be converted.</param>
         /// <param name="type">Target type.</param>
         /// <returns>Converted value.</returns>
-        internal virtual object ChangeType(object value, Type type)
+        internal virtual object? ChangeType(object? value, Type type)
         {
             if (value == null)
             {
@@ -743,8 +843,26 @@ namespace Gurux.Service.Orm.Settings
             {
                 return Decimal.Parse(str2, CultureInfo.InvariantCulture);
             }
+            if (type.IsEnum)
+            {
+                var enumType = Enum.GetUnderlyingType(type);
+                var enumValue = Convert.ChangeType(value, enumType);
+                return Enum.ToObject(type, enumValue!);
+            }
+            if (type == typeof(Type) && value is string typeName)
+            {
+                value = GXDbHelpers.GetType(typeName);
+                return value;
+            }
+            if (type == typeof(DateTimeOffset) && value is DateTime dt)
+            {
+                //If database is saved the datetime value without timezone information,
+                //then we need to add the timezone information.
+                return new DateTimeOffset(DateTime.SpecifyKind(dt, DateTimeKind.Utc)).ToLocalTime();
+            }
             return Convert.ChangeType(value, type);
         }
+
 
         /// <summary>
         /// Convert value to string. 
@@ -752,7 +870,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="value">Value to be converted.</param>
         /// <param name="options">Conversion options.</param>
         /// <returns>Converted string value.</returns>
-        internal virtual string ConvertToString(object value, ConvertOption options = ConvertOption.Quete)
+        internal virtual string? ConvertToString(object value, ConvertOption options = ConvertOption.Quete)
         {
             if (value is Guid id)
             {
@@ -824,13 +942,32 @@ namespace Gurux.Service.Orm.Settings
             {
                 return args.ToString(false);
             }
+            if (value is Type type)
+            {
+                return GetQuetedValue(type.FullName!);
+            }
+            if (value is IEnumerable<object> list)
+            {
+                StringBuilder sb = new();
+                foreach (var it in list)
+                {
+                    sb.Append(ConvertToString(it, options));
+                    sb.Append(", ");
+                }
+                if (sb.Length != 0)
+                {
+                    //Remove the last ", " from the string.
+                    sb.Length -= 2;
+                }
+                return sb.ToString();
+            }
             return Convert.ToString(value, CultureInfo.InvariantCulture);
         }
 
         /// <summary>
         /// All DB's do not support Auto Increment by default.
         /// </summary>
-        public virtual string[] CreateAutoIncrement(string tableName, string columnName)
+        public virtual string[]? CreateAutoIncrement(string tableName, string columnName)
         {
             return null;
         }
@@ -895,8 +1032,46 @@ namespace Gurux.Service.Orm.Settings
                 case DatabaseType.SapHana:
                     return GXSapHanaReservedWords.IsReservedWord(identifier);
                 default:
-                    throw new NotSupportedException("Database type not supported: " + Type);
+                    throw new NotSupportedException(string.Format("Database type {0} not supported: ", Type));
             }
         }
+
+        /// <summary>
+        /// Escape identifier if it is reserved word. If it is, then it needs to be quoted.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix to use.</param>
+        /// <param name="identifier">The identifier to escape.</param>
+        /// <returns>The escaped identifier if it is a reserved word; otherwise, the original identifier.</returns>
+        /// <exception cref="NotSupportedException">The database provider has no identifier-escaping implementation.</exception>
+        public virtual string EscapeIdentifier(string? tablePrefix, string identifier)
+        {
+            if ((identifier.StartsWith('`') && identifier.EndsWith('`')) ||
+                (identifier.StartsWith('"') && identifier.EndsWith('"')))
+            {
+                return tablePrefix + identifier;
+            }
+            switch (Type)
+            {
+                case DatabaseType.MySQL:
+                    return GXMySqlReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.MSSQL:
+                    return GXMSSqlReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.SqLite:
+                    return GXSqliteReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.Oracle:
+                    return GXOracleReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.PostgreSQL:
+                    return GXPostgreSqlReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.MariaDB:
+                    return GXMariaDBReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.DB2:
+                    return GXDB2ReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                case DatabaseType.SapHana:
+                    return GXSapHanaReservedWords.EscapeIdentifier(tablePrefix, identifier);
+                default:
+                    throw new NotSupportedException(string.Format("Database type {0} not supported: ", Type));
+            }
+        }
+
     }
 }

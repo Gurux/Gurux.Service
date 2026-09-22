@@ -34,6 +34,7 @@ using System.Runtime.Serialization;
 using System.ComponentModel;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Enums;
 
 namespace Gurux.Service_Simple_Unit_Test
 {
@@ -421,7 +422,7 @@ namespace Gurux.Service_Simple_Unit_Test
             set;
         }
 
-        [DataMember()]
+        [DataMember(Name = "Text")]
         public String Text
         {
             get;
@@ -502,7 +503,7 @@ namespace Gurux.Service_Simple_Unit_Test
         }
 
         [DataMember()]
-        //        [DefaultValue(State.OK)]
+        [DefaultValue(State.OK)]
         [Filter(FilterType.Exact, State.OK)]
         public State Status
         {
@@ -1044,7 +1045,7 @@ namespace Gurux.Service_Simple_Unit_Test
     class DeviceGroup3 : IUnique<int>
     {
         [DataMember]
-        //[AutoIncrement]
+        [AutoIncrement]
         public int Id
         {
             get;
@@ -1077,6 +1078,7 @@ namespace Gurux.Service_Simple_Unit_Test
     [DataContract]
     class GuidTestClass : IUnique<Guid>
     {
+        [DefaultValue(DefaultValueKind.NewGuid)]
         [DataMember()]
         public Guid Id
         {

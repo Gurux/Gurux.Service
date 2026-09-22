@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -30,18 +30,19 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Common.Internal;
+using Gurux.Service.DB;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Common.Model;
+using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Settings;
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Text;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
-using Gurux.Service.Orm.Settings;
-using System.Collections;
-using Gurux.Common.Internal;
-using System.Diagnostics;
-using Gurux.Service.Orm.Internal;
-using Gurux.Service.Orm.Common;
-using Gurux.Service.DB;
+using System.Text;
 
 namespace Gurux.Service.Orm
 {
@@ -51,15 +52,16 @@ namespace Gurux.Service.Orm
     public class GXDeleteArgs
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private Type Table;
+        private readonly Type Table;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private GXSettingsArgs Parent = new GXSettingsArgs();
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        private GXDeleteArgs()
+        private GXDeleteArgs(Type table)
         {
+            Table = table;
             Where = new GXWhereCollection(Parent, null);
         }
 
@@ -69,7 +71,6 @@ namespace Gurux.Service.Orm
         public void Clear()
         {
             Parent.Clear();
-            Table = null;
             Where.Clear();
         }
 
@@ -78,10 +79,13 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="queryCache">The query cache instance to use.</param>
         /// <returns>This <see cref="GXDeleteArgs"/> instance.</returns>
-        public GXDeleteArgs UseQueryCache(GXQueryCache queryCache)
+        public GXDeleteArgs UseQueryCache(GXQueryCache? queryCache)
         {
-            Parent.Settings = GXSqlBuilder.CreateSettings(queryCache.DatabaseType);
-            Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            if (queryCache != null)
+            {
+                Parent.Settings = GXSqlBuilder.CreateSettings(queryCache.DatabaseType);
+                Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            }
             return this;
         }
 
@@ -108,20 +112,20 @@ namespace Gurux.Service.Orm
         public string ToString(bool addGenerationTime)
         {
             string sql;
-            var sw = Stopwatch.StartNew();
             string cacheKey = Parent.QueryCache.BuildKey(
+                Parent.Settings.Type,
                 Table,
                 Where != null ? Where.GetItemHash() : 0,
                 Count);
-            if (Parent.QueryCache.TryGet(cacheKey, out string cachedSql))
+            if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
-                sw.Stop();
-                GenerationTime = (int)sw.ElapsedMilliseconds;
+                GenerationTime = generationTime;
                 Debug.WriteLine($"Cached SQL: {GenerationTime} ms {cachedSql}");
-                sql = cachedSql;
+                sql = cachedSql!;
             }
             else
             {
+                var sw = Stopwatch.StartNew();
                 GXGetMembersArgs args = new GXGetMembersArgs(Settings, TargetType.Table)
                 {
                     SingleTable = true,
@@ -143,10 +147,13 @@ namespace Gurux.Service.Orm
                     args.StringBuilder.Append(sql);
                 }
                 sql = args.StringBuilder.ToString();
-                Parent.QueryCache.Set(cacheKey, sql);
                 sw.Stop();
                 GenerationTime = (int)sw.ElapsedMilliseconds;
-                Debug.WriteLine($"New SQL: {GenerationTime} ms {sql}");
+                if (!string.IsNullOrEmpty(sql))
+                {
+                    Parent.QueryCache.Set(cacheKey, sql, GenerationTime);
+                    Debug.WriteLine($"New SQL: {GenerationTime} ms {sql}");
+                }
             }
             if (addGenerationTime)
             {
@@ -186,28 +193,18 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Delete items from selected table.
-        /// </summary>
-        /// <typeparam name="T">Table where items are deleted.</typeparam>
-        /// <returns></returns>
-        public static GXDeleteArgs DeleteAll<T>()
-        {
-            return Delete(typeof(T));
-        }
-
-        /// <summary>
         /// Delete all items from the table and use the specified query cache.
         /// </summary>
         /// <typeparam name="T">Table where items are deleted.</typeparam>
         /// <param name="queryCache">The query cache instance to use.</param>
-        public static GXDeleteArgs DeleteAll<T>(GXQueryCache queryCache)
+        public static GXDeleteArgs DeleteAll<T>(GXQueryCache? queryCache = null)
         {
-            return DeleteAll<T>().UseQueryCache(queryCache);
+            return new GXDeleteArgs(typeof(T)).UseQueryCache(queryCache);
         }
 
         internal static GXDeleteArgs Delete(Type type)
         {
-            return new GXDeleteArgs() { Table = type };
+            return new GXDeleteArgs(type);
         }
 
         /// <summary>
@@ -226,16 +223,16 @@ namespace Gurux.Service.Orm
                 tb.BeforeRemove();
             }
             GXDeleteArgs arg;
-            if (item is IEnumerable)
+            if (item is IEnumerable e)
             {
                 arg = Delete(GXInternal.GetPropertyType(typeof(T)));
-                foreach (var it in item as IEnumerable)
+                foreach (var it in e)
                 {
                     arg.Where.Or<T>(q => it);
                 }
                 return arg;
             }
-            GXSerializedItem si = GXSqlBuilder.FindUnique(typeof(T));
+            GXSerializedItem? si = GXSqlBuilder.FindUnique(typeof(T));
             if (si == null)
             {
                 throw new ArgumentException("Delete by ID failed. Target class must be derived from IUnique.");
@@ -267,7 +264,7 @@ namespace Gurux.Service.Orm
             GXDeleteArgs arg = DeleteAll<T>();
             if (where != null)
             {
-                arg.Where.Or<T>(where);
+                arg.Where.Or(where);
             }
             return arg;
         }
@@ -281,6 +278,46 @@ namespace Gurux.Service.Orm
         public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where, GXQueryCache queryCache)
         {
             return Delete(where).UseQueryCache(queryCache);
+        }
+
+        /// <summary>
+        /// Create new delete expression with schema.
+        /// </summary>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
+        /// <param name="value">The entity whose values are used by this operation.</param>
+        /// <param name="schema">Column metadata accepted for API compatibility; this implementation does not inspect it.</param>
+        /// <returns>The delete arguments built from the supplied entity or collection.</returns>
+        /// <exception cref="ArgumentNullException">The value is null.</exception>
+        /// <exception cref="ArgumentException">A non-collection entity has no mapped unique key.</exception>
+        public static GXDeleteArgs Delete<T>(T value, params IEnumerable<GXColumnSchema> schema)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException("Deleted item can't be null.");
+            }
+            if (value is GXTableBase tb)
+            {
+                tb.BeforeRemove();
+            }
+            GXDeleteArgs arg;
+            if (value is IEnumerable e)
+            {
+                arg = Delete(GXInternal.GetPropertyType(typeof(T)));
+                foreach (var it in e)
+                {
+                    arg.Where.Or<T>(q => it);
+                }
+                return arg;
+            }
+            GXSerializedItem? si = GXSqlBuilder.FindUnique(typeof(T));
+            if (si == null)
+            {
+                throw new ArgumentException("Delete by ID failed. Target class must be derived from IUnique.");
+            }
+            string name = GXDbHelpers.ConvertToString(null, TargetType.Column, null, si.Target as PropertyInfo, null);
+            arg = DeleteAll<T>();
+            arg.Where.Or<IUnique<T>>(_ => name.Equals(value));
+            return arg;
         }
 
         /// <summary>
@@ -322,7 +359,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentNullException("Invalid Id.");
             }
             GXDeleteArgs arg = DeleteAll<T>();
-            GXSerializedItem si = GXSqlBuilder.FindUnique(typeof(T));
+            GXSerializedItem? si = GXSqlBuilder.FindUnique(typeof(T));
             if (si == null)
             {
                 throw new Exception("DeleteById failed. Class is not derived from IUnique.");
@@ -409,12 +446,12 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Add given item to the n:n collection.
+        /// Creates arguments to remove a many-to-many association.
         /// </summary>
-        /// <typeparam name="TItem"></typeparam>
-        /// <typeparam name="TDestination"></typeparam>
-        /// <param name="item"></param>
-        /// <param name="collection"></param>
+        /// <typeparam name="TItem">The type of the entity being unlinked.</typeparam>
+        /// <typeparam name="TDestination">The type of the related entity.</typeparam>
+        /// <param name="item">The entity to unlink.</param>
+        /// <param name="collection">The related entity to unlink from the item.</param>
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem item, TDestination collection)
         {
             return Remove(new TItem[] { item }, new TDestination[] { collection });

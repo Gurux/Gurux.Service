@@ -35,7 +35,7 @@ namespace Gurux.Service.Orm.Enums
     /// <summary>
     /// Join types.
     /// </summary>
-    enum JoinType
+    public enum JoinType
     {
         /// <summary>
         /// Left join.

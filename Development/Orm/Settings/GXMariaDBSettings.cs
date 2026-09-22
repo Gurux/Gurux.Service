@@ -31,6 +31,7 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
@@ -84,17 +85,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            onDelete = (ForeignKeyDelete)Enum.Parse(typeof(ForeignKeyDelete), (string)values[2], true);
-            onUpdate = (ForeignKeyUpdate)Enum.Parse(typeof(ForeignKeyUpdate), (string)values[1], true);
-            return (string)values[0];
-        }
-
-        /// <inheritdoc />
-        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
-        {
-            return string.Format("SELECT tb1.REFERENCED_TABLE_NAME, tb2.UPDATE_RULE, tb2.DELETE_RULE FROM information_schema.KEY_COLUMN_USAGE AS tb1 INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS AS tb2 ON tb1.CONSTRAINT_NAME = tb2.CONSTRAINT_NAME WHERE table_schema = '{0}' AND tb1.table_name = '{1}' AND COLUMN_NAME = '{2}' AND referenced_column_name IS NOT NULL", schema, tableName, columnName);
+            return string.Format(@"SELECT k.CONSTRAINT_NAME, k.REFERENCED_TABLE_SCHEMA, k.REFERENCED_TABLE_NAME, k.COLUMN_NAME, k.REFERENCED_COLUMN_NAME, k.ORDINAL_POSITION, rc.DELETE_RULE, rc.UPDATE_RULE
+FROM information_schema.KEY_COLUMN_USAGE k
+INNER JOIN information_schema.REFERENTIAL_CONSTRAINTS rc ON k.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA AND k.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+WHERE k.TABLE_SCHEMA = '{0}' AND k.TABLE_NAME = '{1}' AND k.REFERENCED_COLUMN_NAME IS NOT NULL
+ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION", schema, tableName);
         }
 
         /// <inheritdoc />
@@ -130,32 +127,8 @@ namespace Gurux.Service.Orm.Settings
             {
                 return $"ALTER TABLE `{quotedTableName}` COMMENT = '{comment}'";
             }
-
-            schema = schema.Replace("'", "''");
-            tableName = tableName.Replace("'", "''");
-            string quotedColumnName = columnName.Replace("`", "``");
-            columnName = columnName.Replace("'", "''");
-            // MariaDB requires the complete column definition when a column
-            // comment is changed. Rebuild it from information_schema so that
-            // the type, nullability, default value and extra attributes remain
-            // unchanged.
-            comment = comment.Replace("'", "''");
-            return "BEGIN NOT ATOMIC " +
-                "DECLARE gx_comment_sql TEXT; " +
-                $"SELECT CONCAT(" +
-                $"'ALTER TABLE `{quotedTableName}` MODIFY COLUMN `{quotedColumnName}` ', " +
-                "COLUMN_TYPE, " +
-                "IF(CHARACTER_SET_NAME IS NULL, '', CONCAT(' CHARACTER SET ', CHARACTER_SET_NAME)), " +
-                "IF(COLLATION_NAME IS NULL, '', CONCAT(' COLLATE ', COLLATION_NAME)), " +
-                "IF(IS_NULLABLE = 'YES', ' NULL', ' NOT NULL'), " +
-                "IF(COLUMN_DEFAULT IS NULL, '', CONCAT(' DEFAULT ', COLUMN_DEFAULT)), " +
-                "IF(EXTRA = '', '', CONCAT(' ', EXTRA)), " +
-                $"' COMMENT ''{comment}''') INTO gx_comment_sql FROM information_schema.COLUMNS " +
-                $"WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'; " +
-                "EXECUTE IMMEDIATE gx_comment_sql; " +
-                "END";
+            return "";
         }
-
 
         /// <inheritdoc />
         public override string GetCurrentUserQuery()
@@ -164,13 +137,13 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetUsersQuery(string databaseName)
+        public override string GetUsersQuery(string? databaseName)
         {
             if (string.IsNullOrEmpty(databaseName))
             {
                 return @"SELECT DISTINCT USER FROM mysql.user ORDER BY USER";
             }
-            return @"SELECT DISTINCT GRANTEE
+            return $@"SELECT DISTINCT GRANTEE
 FROM information_schema.SCHEMA_PRIVILEGES
 WHERE TABLE_SCHEMA = '{databaseName}'
 ORDER BY GRANTEE";
@@ -178,15 +151,16 @@ ORDER BY GRANTEE";
 
 
         /// <inheritdoc />
-        public override string GetDatabasesQuery()
+        public override string GetDatabasesQuery(out int index)
         {
+            index = 0;
             return @"SELECT SCHEMA_NAME AS database_name FROM information_schema.SCHEMATA
 WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
 ORDER BY SCHEMA_NAME";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string databaseName, string userName)
+        public override string GetDatabaseUserPermissionQuery(string? databaseName, string userName)
         {
             if (userName.EndsWith("@%"))
             {
@@ -208,7 +182,7 @@ ORDER BY PRIVILEGE_TYPE";
         }
 
         /// <inheritdoc />
-        public override string RemoveUserQuery(string databaseName, string userName)
+        public override string RemoveUserQuery(string? databaseName, string userName)
         {
             if (userName.EndsWith("@%"))
             {
@@ -257,9 +231,13 @@ FLUSH PRIVILEGES;
             foreach (string user in users)
             {
                 string userName = user;
-                if (userName.EndsWith("@%"))
+                if (userName.EndsWith("@'%'"))
                 {
-                    userName = userName.Substring(0, userName.Length - 2);
+                    userName = userName.Substring(0, userName.Length - 4);
+                }
+                if (userName.StartsWith('\'') && userName.EndsWith('\''))
+                {
+                    userName = userName.Substring(1, userName.Length - 2);
                 }
                 userName = userName.Replace("'", "''");
                 queries.Add($@"REVOKE ALL PRIVILEGES ON `{databaseName}`.* FROM '{userName}'@'%';");
@@ -294,15 +272,15 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc />
-        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
+        public override bool IsUnique(object value)
         {
-            return string.Format("SELECT EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'", tableName, columnName, schema);
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
-        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT REFERENCED_TABLE_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'", tableName, columnName, schema);
+            return string.Format("SELECT EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'", tableName, columnName, schema);
         }
 
         /// <inheritdoc />
@@ -343,7 +321,13 @@ FLUSH PRIVILEGES;
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT CASE WHEN COLUMN_TYPE LIKE '% unsigned' THEN CONCAT(DATA_TYPE, ' unsigned') WHEN DATA_TYPE IN ('decimal', 'numeric') THEN COLUMN_TYPE ELSE DATA_TYPE END, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'", tableName, columnName, schema);
+            return string.Format("SELECT CASE WHEN COLUMN_TYPE LIKE '% unsigned' THEN CONCAT(DATA_TYPE, ' unsigned') " +
+                              "WHEN DATA_TYPE IN ('decimal', 'numeric', 'datetime', 'timestamp', 'time') THEN COLUMN_TYPE " +
+                              "ELSE DATA_TYPE END, " +
+                              "CHARACTER_MAXIMUM_LENGTH " +
+                              "FROM INFORMATION_SCHEMA.COLUMNS " +
+                              "WHERE TABLE_NAME = '{0}' AND COLUMN_NAME = '{1}' AND TABLE_SCHEMA = '{2}'",
+                              tableName, columnName, schema);
         }
 
         /// <inheritdoc />
@@ -420,7 +404,7 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc />
-        override public string AutoIncrementDefinition
+        override public string? AutoIncrementDefinition
         {
             get
             {
@@ -634,23 +618,6 @@ FLUSH PRIVILEGES;
                 return "BLOB";
             }
         }
-        public static Guid MariaDBUuidToGuid(byte[] bytes)
-        {
-            byte[] guid =
-            [
-                bytes[3], bytes[2],
-                bytes[1], bytes[0],
-                //++++
-                bytes[5],bytes[4],
-                bytes[7],
-                bytes[6],
-                //++++
-                bytes[8], bytes[9], bytes[10], bytes[11],
-                bytes[12], bytes[13], bytes[14], bytes[15]
-            ];
-
-            return new Guid(guid);
-        }
 
         /// <inheritdoc/>
         internal override object ChangeType(object value, Type type)
@@ -688,7 +655,7 @@ FLUSH PRIVILEGES;
             }
             if (type == typeof(Guid) && value is byte[] bytes)
             {
-                return MariaDBUuidToGuid(bytes);
+                return new Guid(bytes, bigEndian: false);
             }
             if (type == typeof(DateTime) && value is DateTime dt)
             {
@@ -729,7 +696,7 @@ FLUSH PRIVILEGES;
             const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
             if (value is Guid id)
             {
-                return "UNHEX('" + id.ToString().ToUpper().Replace("-", "") + "')";
+                return "X'" + Convert.ToHexString(id.ToByteArray()) + "'";
             }
             if (value is DateTimeOffset dto)
             {
@@ -778,9 +745,43 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc />
-        public override string GetTables(string schema)
+        public override string GetTablesQuery(string schema)
         {
             return string.Format("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '{0}'", schema);
+        }
+
+        public override string UniqueQuery(string schema, string tableName, string columnName)
+        {
+            return string.Format("SELECT COUNT(1) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc INNER JOIN INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu ON tc.CONSTRAINT_SCHEMA = kcu.CONSTRAINT_SCHEMA AND tc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME AND tc.TABLE_NAME = kcu.TABLE_NAME WHERE tc.CONSTRAINT_TYPE = 'UNIQUE' AND tc.TABLE_SCHEMA = '{0}' AND tc.TABLE_NAME = '{1}' AND kcu.COLUMN_NAME = '{2}'", schema, tableName, columnName);
+        }
+
+
+        /// <inheritdoc />
+        public override bool IsIdentity(object value)
+        {
+            return Convert.ToBoolean(value);
+        }
+
+        /// <inheritdoc />
+        public override string IsIdentityQuery(string schema, string tableName, string columnName)
+        {
+            return $@"SELECT CASE WHEN EXTRA LIKE '%auto_increment%' THEN 1 ELSE 0 END
+FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}';";
+        }
+
+        public override string TableIndexesQuery(string schema, string tableName)
+        {
+            return $@"SELECT INDEX_NAME, CASE WHEN NON_UNIQUE = 0 THEN 1 ELSE 0 END, COLUMN_NAME, SEQ_IN_INDEX, COLLATION
+FROM INFORMATION_SCHEMA.STATISTICS
+WHERE TABLE_SCHEMA = '{schema}'
+  AND TABLE_NAME = '{tableName}'
+  AND INDEX_NAME <> 'PRIMARY'
+ORDER BY INDEX_NAME, SEQ_IN_INDEX";
+        }
+
+        public override void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value)
+        {
+            UpdateTableIndexesFromRows(schema, value);
         }
 
         /// <inheritdoc />

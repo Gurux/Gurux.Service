@@ -238,5 +238,20 @@ namespace Gurux.Service.Orm.Settings
             return !string.IsNullOrWhiteSpace(identifier) &&
                    ReservedWords.Contains(identifier);
         }
+
+        /// <summary>
+        /// Escapes the given identifier if it is a reserved word in MSSQL.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix to use.</param>
+        /// <param name="value">The identifier to escape.</param>
+        /// <returns>The escaped identifier if it is a reserved word; otherwise, the original identifier.</returns>
+        public static string EscapeIdentifier(string? tablePrefix, string value)
+        {
+            if (IsReservedWord(value))
+            {
+                return $"[{tablePrefix}{value}]";
+            }
+            return $"{tablePrefix}{value}";
+        }
     }
 }

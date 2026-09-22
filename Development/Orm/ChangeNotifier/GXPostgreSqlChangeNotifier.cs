@@ -1,4 +1,4 @@
-﻿//
+//
 //
 // --------------------------------------------------------------------------
 //  Gurux Ltd
@@ -31,47 +31,37 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using System;
+using System.Collections.Generic;
+
 namespace Gurux.Service.Orm.Enums
 {
+
     /// <summary>
-    /// Available database types.
+    /// Polling based PostgreSql database change notifier.
     /// </summary>
-    public enum DatabaseType
+    internal sealed class GXPostgreSqlChangeNotifier :
+        GXPollingDatabaseChangeNotifier
     {
         /// <summary>
-        /// Target database is MySQL or Maria DB.
+        /// Constructor.
         /// </summary>
-        MySQL,
-        /// <summary>
-        /// Target database is Microsoft SQL.
-        /// </summary>
-        MSSQL,
-        /// <summary>
-        /// Target database is SQLite.
-        /// </summary>
-        /// <remarks>
-        /// http://www.sqlite.org
-        /// </remarks>
-        SqLite,
-        /// <summary>
-        /// Target database is Oracle.
-        /// </summary>        
-        Oracle,
-        /// <summary>
-        /// Target database is PostgreSQL.
-        /// </summary>
-        PostgreSQL,
-        /// <summary>
-        /// Target database is MariaDB.
-        /// </summary>
-        MariaDB,
-        /// <summary>
-        /// Target database is IBM DB2.
-        /// </summary>
-        DB2,
-        /// <summary>
-        /// Target database is SAP HANA.
-        /// </summary>
-        SapHana
+        /// <param name="connection">DB connection.</param>
+        /// <param name="createdColumns">Tables and columns to monitor for insert.</param>
+        /// <param name="updatedColumns">Tables and columns to monitor for update.</param>
+        /// <param name="deletedColumns">Tables and columns to monitor for delete.</param>
+        /// <param name="interval">
+        /// Polling interval.
+        /// </param>
+        public GXPostgreSqlChangeNotifier(
+            GXDbConnection connection,
+            IEnumerable<DatabaseMonitor>? createdColumns,
+            IEnumerable<DatabaseMonitor>? updatedColumns,
+            IEnumerable<DatabaseMonitor>? deletedColumns,
+            TimeSpan interval)
+            : base(connection, createdColumns, updatedColumns, deletedColumns, interval)
+        {
+        }
+
     }
 }

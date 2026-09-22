@@ -50,7 +50,7 @@ namespace Gurux.Service.Orm
         /// Constructor.
         /// </summary>
         /// <param name="queryCache">Query cache instance.</param>
-        public GXSettingsArgs(GXQueryCache queryCache = null)
+        public GXSettingsArgs(GXQueryCache? queryCache = null)
         {
             settings = GXSqlBuilder.CreateSettings(queryCache != null ? queryCache.DatabaseType : GXDbConnection.DefaultDatabaseType);
             QueryCache = queryCache ?? new GXQueryCache(TimeSpan.FromMinutes(10), GXDbConnection.DefaultDatabaseType);

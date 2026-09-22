@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -55,10 +55,18 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// Add inner join.
+        /// Add join.
         /// </summary>
-        private void AddJoin<TSourceTable, TDestinationTable>(JoinType type, Expression<Func<TSourceTable, object>> sourceColumn,
+        internal void AddJoin<TSourceTable, TDestinationTable>(JoinType type, Expression<Func<TSourceTable, object>> sourceColumn,
             Expression<Func<TDestinationTable, object>> destinationColumn)
+        {
+            AddJoin(type, (LambdaExpression)sourceColumn, (LambdaExpression)destinationColumn);
+        }
+
+        /// <summary>
+        /// Add join.
+        /// </summary>
+        internal void AddJoin(JoinType type, LambdaExpression sourceColumn, LambdaExpression destinationColumn)
         {
             if (sourceColumn == null)
             {
@@ -127,7 +135,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Append joins.
         /// </summary>
-        /// <param name="joins"></param>
+        /// <param name="joins">The joins to append to this collection.</param>
         public void Append(GXJoinCollection joins)
         {
             List.AddRange(joins.List);

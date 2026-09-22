@@ -62,11 +62,13 @@ namespace Gurux.Service.Orm
         /// <inheritdoc/>
         public override string ToString()
         {
-            string cacheKey = Parent.QueryCache.BuildKey(List);
-            if (Parent.QueryCache.TryGet(cacheKey, out string cached))
+            string cacheKey = Parent.QueryCache.BuildKey(
+                Parent.Settings.Type,
+                List);
+            if (Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
                 Debug.WriteLine("Cached SQL: " + cached);
-                return cached;
+                return cached!;
             }
             string sql = HavingToString(Parent.Settings, List, !_joins.List.Any());
             if (!string.IsNullOrEmpty(sql))
@@ -75,8 +77,11 @@ namespace Gurux.Service.Orm
                 sb.Append(" HAVING ");
                 sb.Append(sql);
                 sql = sb.ToString();
-                Parent.QueryCache.Set(cacheKey, sql);
-                Debug.WriteLine("New SQL: " + sql);
+                if (!string.IsNullOrEmpty(sql))
+                {
+                    Parent.QueryCache.Set(cacheKey, sql, 0);
+                    Debug.WriteLine("New SQL: " + sql);
+                }
             }
             return sql;
         }

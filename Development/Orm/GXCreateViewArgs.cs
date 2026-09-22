@@ -30,6 +30,7 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Service.DB;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Settings;
 using System;
@@ -130,7 +131,23 @@ namespace Gurux.Service.Orm
             GXCreateViewArgs view = new GXCreateViewArgs();
             view.Select = arg;
             view.type = typeof(T);
+            if (arg.Parent.QueryCache != null)
+            {
+                view.UseQueryCache(arg.Parent.QueryCache);
+            }
             return view;
+        }
+
+        /// <summary>
+        /// Set query cache.
+        /// </summary>
+        /// <param name="queryCache">Query cache to use.</param>
+        /// <returns>Update arguments.</returns>
+        public GXCreateViewArgs UseQueryCache(GXQueryCache queryCache)
+        {
+            Parent.Settings = GXSqlBuilder.CreateSettings(queryCache.DatabaseType);
+            Parent.QueryCache = queryCache ?? Parent.QueryCache ?? new GXQueryCache();
+            return this;
         }
 
         /// <summary>

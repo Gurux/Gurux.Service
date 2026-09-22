@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -30,9 +30,9 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Orm.Internal.Enums;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Common.Enums;
-using Gurux.Service.Orm.Settings;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -58,7 +58,7 @@ namespace Gurux.Common.Internal
     delegate void SetHandler(object instance, object? value);
 
     [Flags]
-    enum Attributes : int
+    enum Attributes : UInt32
     {
         None = 0,
         /// <summary>
@@ -81,7 +81,9 @@ namespace Gurux.Common.Internal
         /// Is foreign key used.
         /// </summary>
         ForeignKey = 0x10,
-        //Value is required.
+        /// <summary>
+        /// Value is required.
+        /// </summary>
         Required = 0x20,
         /// <summary>
         /// Property is ignored. DB uses this.
@@ -115,26 +117,24 @@ namespace Gurux.Common.Internal
         /// Millisecond is ignored.
         /// </summary>
         MsIgnored = 0x2000,
-    }
-
-    enum RelationType
-    {
         /// <summary>
-        /// Relation between two tables.
+        /// Database generates new Guid when data is inserted to the database.
         /// </summary>
-        Relation,
+        NewGuid = 0x4000,
         /// <summary>
-        /// Primary key 1:1.
+        /// Database generates current timestamp when data is inserted to the database.
         /// </summary>
-        OneToOne,
+        CurrentTimestamp = 0x8000,
         /// <summary>
-        /// Primary key 1:n
+        /// Concurrency check is used and 
+        /// a new concurrency stamp is generated when object is inserted.
         /// </summary>
-        OneToMany,
+        ConcurrencyCheck = 0x10000,
         /// <summary>
-        /// Primary key n:n.
+        /// Database don't generate value when data is inserted to the database. 
+        /// Value is set by application.
         /// </summary>
-        ManyToMany
+        NotGenerated = 0x20000
     }
 
     [DataContract]
@@ -182,13 +182,13 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Property type.
         /// </summary>
-        public Type Type;
+        public Type Type = default!;
 
-        public object Target;
+        public object Target = default!;
         /// <summary>
         /// Default value if given.
         /// </summary>
-        public object DefaultValue;
+        public object? DefaultValue;
         /// <summary>
         /// Filter type.
         /// </summary>
@@ -196,20 +196,20 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Filter value if given.
         /// </summary>
-        public object FilterValue;
+        public object FilterValue = default!;
 
         /// <summary>
         /// Set method.
         /// </summary>
-        public SetHandler Set;
+        public SetHandler Set = default!;
         /// <summary>
         /// Get Method.
         /// </summary>
-        public GetHandler Get;
+        public GetHandler Get = default!;
 
         public Attributes Attributes;
 
-        public GXRelationTable Relation;
+        public GXRelationTable? Relation;
     }
 
     /// <summary>
@@ -233,7 +233,7 @@ namespace Gurux.Common.Internal
 
         private static Func<object> CreateFactory(Type type)
         {
-            var ctor = type.GetConstructor(Type.EmptyTypes)
+            var ctor = type.GetConstructor(Type.EmptyTypes) ?? GetConstructor(type)
                 ?? throw new InvalidOperationException($"No default constructor: {type}");
 
             var dm = new DynamicMethod(
@@ -245,6 +245,11 @@ namespace Gurux.Common.Internal
 
             var il = dm.GetILGenerator();
 
+            foreach (ParameterInfo it in ctor.GetParameters())
+            {
+                EmitDefaultValue(il, it.ParameterType);
+            }
+
             il.Emit(OpCodes.Newobj, ctor);
 
             if (type.IsValueType)
@@ -253,6 +258,67 @@ namespace Gurux.Common.Internal
             il.Emit(OpCodes.Ret);
 
             return (Func<object>)dm.CreateDelegate(typeof(Func<object>));
+        }
+
+        private static ConstructorInfo? GetConstructor(Type type)
+        {
+            ConstructorInfo? ctor = null;
+            foreach (ConstructorInfo it in type.GetConstructors(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                ParameterInfo[] parameters = it.GetParameters();
+                if (parameters.Length == 1 &&
+                    parameters[0].ParameterType.IsAssignableFrom(type))
+                {
+                    continue;
+                }
+                if (ctor == null ||
+                    parameters.Length < ctor.GetParameters().Length)
+                {
+                    ctor = it;
+                }
+            }
+            return ctor;
+        }
+
+        private static void EmitDefaultValue(ILGenerator il, Type type)
+        {
+            if (!type.IsValueType)
+            {
+                il.Emit(OpCodes.Ldnull);
+                return;
+            }
+
+            TypeCode code = Type.GetTypeCode(type);
+            switch (code)
+            {
+                case TypeCode.Boolean:
+                case TypeCode.Char:
+                case TypeCode.SByte:
+                case TypeCode.Byte:
+                case TypeCode.Int16:
+                case TypeCode.UInt16:
+                case TypeCode.Int32:
+                case TypeCode.UInt32:
+                    il.Emit(OpCodes.Ldc_I4_0);
+                    break;
+                case TypeCode.Int64:
+                case TypeCode.UInt64:
+                    il.Emit(OpCodes.Ldc_I8, 0L);
+                    break;
+                case TypeCode.Single:
+                    il.Emit(OpCodes.Ldc_R4, 0F);
+                    break;
+                case TypeCode.Double:
+                    il.Emit(OpCodes.Ldc_R8, 0D);
+                    break;
+                default:
+                    LocalBuilder local = il.DeclareLocal(type);
+                    il.Emit(OpCodes.Ldloca_S, local);
+                    il.Emit(OpCodes.Initobj, type);
+                    il.Emit(OpCodes.Ldloc, local);
+                    break;
+            }
         }
 
         private static DynamicMethod CreateGetDynamicMethod(Type type)
@@ -341,9 +407,9 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Get custom attribute.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="target"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">The attribute type to retrieve.</typeparam>
+        /// <param name="target">The reflected property or field to inspect for attributes.</param>
+        /// <returns>The first matching attribute, or the default value when none is present.</returns>
         static public T GetAttribute<T>(object target)
         {
             T[] atts;
@@ -380,33 +446,6 @@ namespace Gurux.Common.Internal
             return atts[0];
         }
 
-        /// <summary>
-        /// Get property value.
-        /// </summary>
-        /// <param name="instance">Class instance where value is get.</param>
-        /// <param name="target">Property what is get from the instance.</param>
-        public static object GetValue(object instance, object target)
-        {
-            PropertyInfo pi = target as PropertyInfo;
-            if (pi != null)
-            {
-#if !NETSTANDARD2_0 && !NETSTANDARD2_1
-                Tuple<GetHandler, SetHandler> propertyHandlers = GetHandlers(pi.DeclaringType, pi);
-                GetHandler handler = propertyHandlers.Item1;
-                return handler(instance);
-#else
-                return pi.GetValue(instance, null);
-#endif
-            }
-            FieldInfo fi = target as FieldInfo;
-#if !NETSTANDARD2_0 && !NETSTANDARD2_1
-            Tuple<GetHandler, SetHandler> fieldHandlers = GetHandlers(fi.DeclaringType, fi);
-            GetHandler fieldHandler = fieldHandlers.Item1;
-            return fieldHandler(instance);
-#else
-            return fi.GetValue(instance);
-#endif
-        }
 
         /// <summary>
         /// Get property value.
@@ -447,10 +486,11 @@ namespace Gurux.Common.Internal
         /// <param name="sorted">Are values returned as sorted dictionary.</param>
         /// <param name="attributeUpdater">Updater that is called to get wanted value. Can be null.</param>
         /// <returns>Dictionary of values.</returns>
-        internal static IDictionary<string, GXSerializedItem> GetValues(Type type, bool sorted, UpdateAttributes attributeUpdater)
+        internal static IDictionary<string, GXSerializedItem>? GetValues(Type type, bool sorted, UpdateAttributes attributeUpdater)
         {
             GXSerializedItem s;
-            if (type.IsPrimitive || type == typeof(string) || type == typeof(Guid))
+
+            if (IsGenericDataType(type))
             {
                 return null;
             }
@@ -553,17 +593,30 @@ namespace Gurux.Common.Internal
             }
             return list;
         }
-       
+
         internal static bool IsGenericDataType(Type type)
         {
             //If nullable.
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            type = Nullable.GetUnderlyingType(type) ?? type;
+            if (type.IsArray)
             {
-                type = Nullable.GetUnderlyingType(type);
+                type = type.GetElementType() ?? type;
             }
-            return type.IsPrimitive || type.IsEnum || type == typeof(Guid) || type == typeof(DateTime) ||
-                   type == typeof(string) || type == typeof(Type) || type == typeof(object) ||
-                   type == typeof(decimal) || type == typeof(TimeSpan) || type == typeof(DateTimeOffset);
+            return type switch
+            {
+                Type _ when type.IsPrimitive => true,
+                Type _ when type.IsEnum => true,
+                Type _ when type == typeof(byte[]) => true,
+                Type _ when type == typeof(Guid) => true,
+                Type _ when type == typeof(DateTime) => true,
+                Type _ when type == typeof(string) => true,
+                Type _ when type == typeof(Type) => true,
+                Type _ when type == typeof(object) => true,
+                Type _ when type == typeof(decimal) => true,
+                Type _ when type == typeof(TimeSpan) => true,
+                Type _ when type == typeof(DateTimeOffset) => true,
+                _ => false
+            };
         }
 
         public static object ConvertListIfNeeded(object value, Type targetType)
@@ -581,11 +634,17 @@ namespace Gurux.Common.Internal
             }
 
             if (targetType.IsGenericType &&
-                targetType.GetGenericTypeDefinition() == typeof(List<>))
+                (targetType.GetGenericTypeDefinition() == typeof(List<>) ||
+                 targetType.GetGenericTypeDefinition() == typeof(IEnumerable<>) ||
+                 targetType.GetGenericTypeDefinition() == typeof(ICollection<>) ||
+                 targetType.GetGenericTypeDefinition() == typeof(IList<>) ||
+                 targetType.GetGenericTypeDefinition() == typeof(IReadOnlyCollection<>) ||
+                 targetType.GetGenericTypeDefinition() == typeof(IReadOnlyList<>)))
             {
                 Type targetItemType = targetType.GetGenericArguments()[0];
 
-                var result = (IList)Activator.CreateInstance(targetType)!;
+                Type listType = typeof(List<>).MakeGenericType(targetItemType);
+                var result = (IList)Activator.CreateInstance(listType)!;
 
                 foreach (object item in (IEnumerable)value)
                 {
@@ -628,65 +687,6 @@ namespace Gurux.Common.Internal
                 return types[1];
             }
             throw new ArgumentException("Unsupported number of generic arguments.");
-        }
-
-        /// <summary>
-        /// Convert date time to epoch string.
-        /// </summary>
-        /// <param name="dt">Date time to convert.</param>
-        /// <param name="get">Is this http get request.</param>
-        /// <returns>Date time as epoch string.</returns>
-        public static string ToString(DateTime dt, bool get)
-        {
-            double offset = 0;
-            if (get && dt.Kind == DateTimeKind.Local)
-            {
-                dt = dt.ToUniversalTime();
-            }
-            else
-            {
-                if (dt != DateTime.MinValue && dt != DateTime.MaxValue)
-                {
-                    offset = TimeZoneInfo.Local.GetUtcOffset(dt).TotalMinutes;
-                }
-            }
-            long value = (long)(dt - new DateTime(1970, 1, 1, 0, 0, 0, dt.Kind)).TotalSeconds;
-            if (offset != 0)
-            {
-                string str;
-                if (get)
-                {
-                    str = "/Date(" + value.ToString();
-                }
-                else
-                {
-                    str = "\"\\/Date(" + value.ToString();
-                }
-                if (offset > 0)
-                {
-                    str += "+";
-                }
-                else
-                {
-                    str += "-";
-                }
-                str += TimeZoneInfo.Local.GetUtcOffset(dt).Hours.ToString("00") +
-                       TimeZoneInfo.Local.GetUtcOffset(dt).Minutes.ToString("00");
-                if (get)
-                {
-                    str += ")/";
-                }
-                else
-                {
-                    str += ")\\/\"";
-                }
-                return str;
-            }
-            if (get)
-            {
-                return "/Date(" + value.ToString() + ")/";
-            }
-            return "\"\\/Date(" + value.ToString() + ")\\/\"";
         }
     }
 }

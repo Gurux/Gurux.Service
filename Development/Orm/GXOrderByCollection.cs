@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -64,14 +64,15 @@ namespace Gurux.Service.Orm
         public override string ToString()
         {
             string cacheKey = Parent.Parent.QueryCache.BuildKey(
+                Parent.Settings.Type,
                 List,
                 Parent.Joins != null ? Parent.Joins.GetItemHash() : 0,
                 Parent.Count,
                 Parent.Descending);
-            if (Parent.Parent.QueryCache.TryGet(cacheKey, out string cached))
+            if (Parent.Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
                 Debug.WriteLine("Cached SQL: " + cached);
-                return cached;
+                return cached!;
             }
             List<GXJoin> joinList = new List<GXJoin>();
             List<GXOrder> orderList = new List<GXOrder>();
@@ -85,7 +86,7 @@ namespace Gurux.Service.Orm
             string sql = sb.ToString();
             if (sql != string.Empty)
             {
-                Parent.Parent.QueryCache.Set(cacheKey, sql);
+                Parent.Parent.QueryCache.Set(cacheKey, sql, 0);
                 Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
@@ -170,12 +171,12 @@ namespace Gurux.Service.Orm
                 me = GetMemberExpression(it.Value.Left, out allowNull);
                 MemberInfo m = me.Member;
                 Expression e = me.Expression;
-                join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column, null, m, null);
+                join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
                 join.AllowNull1 = allowNull;
                 m = GetMemberExpression(it.Value.Right, out allowNull).Member;
-                join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column, null, m, null);
+                join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
                 join.AllowNull2 = allowNull;
-                join.UpdateTables(e.Type, m.DeclaringType);
+                join.UpdateTables(settings, e.Type, m.DeclaringType);
                 joins.Add(join);
             }
         }
@@ -222,7 +223,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add new order by expression.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="expression">LINQ expression.</param>
         public void Add<T>(Expression<Func<T, object>> expression)
         {
@@ -263,7 +264,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add new order by expression.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="name">Column name.</param>
         public void Add<T>(string name)
         {

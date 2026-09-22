@@ -1,4 +1,4 @@
-using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Common.Enums;
 using System.Linq;
 
 namespace Gurux.Service_Simple_Unit_Test
@@ -157,6 +157,17 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             base.SelectSubItemsTest2(expected);
         }
+
+        /// <summary>
+        /// Select sub items test.
+        /// </summary>
+        [TestMethod]
+        [DataRow("SELECT Product2.Product2ID, Supplier.SupplierID FROM Product2 INNER JOIN Supplier ON Product2.Target2ID = Supplier.SupplierID")]
+        public override void SelectSubItemsTest3(string expected)
+        {
+            base.SelectSubItemsTest3(expected);
+        }
+
 
         /// <summary>
         /// Limit test.
@@ -848,10 +859,20 @@ namespace Gurux.Service_Simple_Unit_Test
         /// Insert test.
         /// </summary>
         [TestMethod]
-        [DataRow("INSERT INTO Supplier (Text) VALUES('Gurux') INSERT INTO Product2 (Text, Target2ID) VALUES('Virtual-serial', 0)")]
-        public override void InsertTest2(string expected)
+        [DataRow("INSERT INTO Supplier (Text) VALUES('Gurux')")]
+        public override void InsertOneToOneTest(string expected)
         {
-            base.InsertTest2(expected);
+            base.InsertOneToOneTest(expected);
+        }
+
+        /// <summary>
+        /// Insert test.
+        /// </summary>
+        [TestMethod]
+        [DataRow("INSERT INTO Product2 (Text, Target2ID) VALUES('Product1', 1)")]
+        public override void InsertOneToOneTest2(string expected)
+        {
+            base.InsertOneToOneTest2(expected);
         }
 
         /// <summary>
@@ -1482,7 +1503,7 @@ namespace Gurux.Service_Simple_Unit_Test
         /// and CountryID is not twice.
         /// </summary>
         [TestMethod]
-        [DataRow("INSERT INTO Company2 (Name, CountryID, ExtraField) SELECT 'Gurux', ID, 'Extra' FROM Country")]
+        [DataRow("INSERT INTO Company2 (Name, ExtraField, CountryID) SELECT 'Gurux', 'Extra', ID FROM Country")]
         public override void UpdateInsertParameterTest(string expected)
         {
             base.UpdateInsertParameterTest(expected);
@@ -1502,10 +1523,10 @@ namespace Gurux.Service_Simple_Unit_Test
         /// Where is used in update syntax.
         /// </summary>
         [TestMethod]
-        [DataRow("INSERT INTO UserToUserGroup (UserId, GroupId) VALUES(2, 1)", "INSERT INTO UserToUserGroup (UserId, GroupId) VALUES(2, 1)")]
-        public override void UpdateParameterCollectionTest(string expected, string expected2)
+        [DataRow("INSERT INTO UserToUserGroup (UserId, GroupId) VALUES(2, 1)")]
+        public override void UpdateParameterCollectionTest(string expected)
         {
-            base.UpdateParameterCollectionTest(expected, expected2);
+            base.UpdateParameterCollectionTest(expected);
         }
 
         /// <summary>
@@ -1649,7 +1670,26 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             base.NotExistOnJoinTableTest(expected);
         }
+        [TestMethod]
+        [DataRow("SELECT ID, `ALL` FROM ReservedClass")]
+        public override void ReservedWordSelectTest(string expected)
+        {
+            base.ReservedWordSelectTest(expected);
+        }
 
+        [TestMethod]
+        [DataRow("INSERT INTO ReservedClass (ID, `ALL`) VALUES(2, 'Gurux')")]
+        public override void ReservedWordInsertTest(string expected)
+        {
+            base.ReservedWordInsertTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("UPDATE ReservedClass SET `ALL` = 'Gurux' WHERE ID = 2")]
+        public override void ReservedWordUpdateTest(string expected)
+        {
+            base.ReservedWordUpdateTest(expected);
+        }
     }
 }
 

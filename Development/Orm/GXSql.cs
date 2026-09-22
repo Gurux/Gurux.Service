@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -31,6 +31,7 @@
 //---------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 
 namespace Gurux.Service.Orm
@@ -38,6 +39,11 @@ namespace Gurux.Service.Orm
     /// <summary>
     /// SQL helper methods.
     /// </summary>
+    /// <remarks>
+    /// These members are markers for the ORM expression translator. Their method bodies return
+    /// placeholder values and do not execute SQL or calculate aggregates in memory. Use them
+    /// inside query expressions passed to the ORM.
+    /// </remarks>
     public static class GXSql
     {
         /// <summary>
@@ -53,8 +59,8 @@ namespace Gurux.Service.Orm
         /// parser.Select&lt;TestClass&gt;(arg);
         /// </code>
         /// </example>
-        /// <param name="expression"></param>
-        /// <returns></returns>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
+        /// <returns>A placeholder value. The expression is translated to SQL COUNT rather than evaluated by this method.</returns>
         public static int Count(object expression)
         {
             return 0;
@@ -72,7 +78,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Are there any rows.
         /// </summary>
-        /// <param name="expression"></param>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
         /// <returns>True, if there are no rows.</returns>
         public static bool IsEmpty(object expression)
         {
@@ -82,8 +88,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Count sum of selected objects.
         /// </summary>
-        /// <param name="expression"></param>
-        /// <returns></returns>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
+        /// <returns>A placeholder value used to represent SQL SUM in an expression tree.</returns>
         public static bool Sum(object expression)
         {
             return true;
@@ -92,8 +98,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get minimum value from selected objects.
         /// </summary>
-        /// <param name="expression"></param>
-        /// <returns></returns>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
+        /// <returns>A placeholder value used to represent SQL MIN in an expression tree.</returns>
         public static bool Min(object expression)
         {
             return true;
@@ -102,8 +108,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get maximum value from selected objects.
         /// </summary>
-        /// <param name="expression"></param>
-        /// <returns></returns>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
+        /// <returns>A placeholder value used to represent SQL MAX in an expression tree.</returns>
         public static bool Max(object expression)
         {
             return true;
@@ -112,8 +118,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get average value from selected objects.
         /// </summary>
-        /// <param name="expression"></param>
-        /// <returns></returns>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
+        /// <returns>A placeholder value used to represent SQL AVG in an expression tree.</returns>
         public static bool Avg(object expression)
         {
             return true;
@@ -122,7 +128,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select 1 FROM table.
         /// </summary>
-        /// <returns></returns>
+        /// <value>A placeholder representing the constant 1 in a SQL projection.</value>
         public static bool One
         {
             get
@@ -139,7 +145,7 @@ namespace Gurux.Service.Orm
         /// <param name="value">Value to search.</param>
         /// <param name="collection">Collection of values.</param>
         /// <returns>True, if value exists.</returns>
-        public static bool In<T>(T value, params T[] collection)
+        public static bool In<T>(T value, params IEnumerable<T> collection)
         {
             return true;
         }
@@ -183,10 +189,10 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Is value containing the expression.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="value"></param>
-        /// <param name="expression"></param>
-        /// <returns></returns>
+        /// <typeparam name="T">The type of the value being searched.</typeparam>
+        /// <param name="value">The value being searched.</param>
+        /// <param name="expression">The SQL operand represented by the expression.</param>
+        /// <returns>A placeholder value used to represent a SQL containment predicate in an expression tree.</returns>
         public static bool Contains<T>(T value, object expression)
         {
             return true;

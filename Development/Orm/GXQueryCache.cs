@@ -1,3 +1,5 @@
+using Gurux.Service.Orm;
+using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections;
@@ -72,13 +74,13 @@ namespace Gurux.Service.DB
             /// <summary>
             /// The cached query string value.
             /// </summary>
-            public string Value;
+            public string Value = default!;
 
             /// <summary>
             /// The UTC time when this cache entry expires.
             /// </summary>
             public DateTime Expires;
-
+            public int GenerationTime;
         }
 
         /// <summary>
@@ -142,6 +144,16 @@ namespace Gurux.Service.DB
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="GXQueryCache"/> class with a cache time.
+        /// </summary>
+        /// <param name="databaseType">The type of the database.</param>
+        public GXQueryCache(DatabaseType databaseType)
+        {
+            CacheTime = TimeSpan.FromMinutes(10);
+            DatabaseType = databaseType;
+        }
+
+        /// <summary>
         /// Removes all entries from the cache.
         /// </summary>
         /// <remarks>
@@ -193,7 +205,6 @@ namespace Gurux.Service.DB
         /// </summary>
         public DatabaseType DatabaseType { get; init; }
 
-
         /// <summary>
         /// Attempts to retrieve a cached value for the specified key.
         /// </summary>
@@ -202,6 +213,7 @@ namespace Gurux.Service.DB
         /// When this method returns, contains the cached value if found and not expired; 
         /// otherwise, null. This parameter is passed uninitialized.
         /// </param>
+        /// <param name="generationTime">The generation time of the cached value in milliseconds.</param>
         /// <returns>
         /// true if the key was found in the cache and has not expired; otherwise, false.
         /// </returns>
@@ -209,8 +221,9 @@ namespace Gurux.Service.DB
         /// If caching is disabled (<see cref="CacheTime"/> is <see cref="TimeSpan.Zero"/>), this method always returns false.
         /// Expired entries are automatically removed from the cache.
         /// </remarks>
-        internal bool TryGet(string key, out string value)
+        internal bool TryGet(string key, out string? value, out int generationTime)
         {
+            generationTime = 0;
             if (CacheTime == TimeSpan.Zero)
             {
                 value = null;
@@ -219,11 +232,12 @@ namespace Gurux.Service.DB
             CleanupIfNeeded();
             if (key != null)
             {
-                if (Items.TryGetValue(key, out GXCacheItem it))
+                if (Items.TryGetValue(key, out GXCacheItem? it))
                 {
                     if (it.Expires > DateTime.UtcNow)
                     {
                         value = it.Value;
+                        generationTime = it.GenerationTime;
                         return true;
                     }
                     Items.TryRemove(key, out _);
@@ -243,7 +257,8 @@ namespace Gurux.Service.DB
         /// If the key is null, the value is not cached.
         /// If the key already exists, its value and expiration time are updated.
         /// </remarks>
-        internal void Set(string key, string value)
+        /// <param name="generationTime">Time spent generating the SQL, in milliseconds.</param>
+        internal void Set(string key, string value, int generationTime)
         {
             if (CacheTime == TimeSpan.Zero)
             {

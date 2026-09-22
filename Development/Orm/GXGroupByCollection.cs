@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -63,13 +63,14 @@ namespace Gurux.Service.Orm
         public override string ToString()
         {
             string cacheKey = Parent.Parent.QueryCache.BuildKey(
+                Parent.Settings.Type,
                 List,
                 Parent.Joins != null ? Parent.Joins.GetItemHash() : 0,
                 Parent.Count);
-            if (Parent.Parent.QueryCache.TryGet(cacheKey, out string cached))
+            if (Parent.Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
                 Debug.WriteLine("Cached SQL: " + cached);
-                return cached;
+                return cached!;
             }
             List<GXJoin> joinList = new List<GXJoin>();
             List<GXOrder> orderList = new List<GXOrder>();
@@ -83,7 +84,7 @@ namespace Gurux.Service.Orm
             string sql = sb.ToString();
             if (sql != string.Empty)
             {
-                Parent.Parent.QueryCache.Set(cacheKey, sql);
+                Parent.Parent.QueryCache.Set(cacheKey, sql, 0);
                 Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
@@ -168,7 +169,7 @@ namespace Gurux.Service.Orm
                 m = GetMemberExpression(it.Value.Right, out allowNull).Member;
                 join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column, null, m, null);
                 join.AllowNull2 = allowNull;
-                join.UpdateTables(e.Type, m.DeclaringType);
+                join.UpdateTables(settings, e.Type, m.DeclaringType);
                 joins.Add(join);
             }
         }
@@ -211,8 +212,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add new group by expression.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="expression"></param>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
+        /// <param name="expression">The expression identifying the selected members.</param>
         public void Add<T>(Expression<Func<T, object>> expression)
         {
             if (expression == null)

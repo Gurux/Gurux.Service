@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -36,8 +36,8 @@ using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Settings;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 
@@ -56,12 +56,12 @@ namespace Gurux.Service.Orm
     {
         internal List<KeyValuePair<WhereType, LambdaExpression>> List = new List<KeyValuePair<WhereType, LambdaExpression>>();
         internal GXSettingsArgs Parent;
-        internal GXJoinCollection Joins;
+        internal GXJoinCollection? Joins;
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        internal GXWhereCollection(GXSettingsArgs parent, GXJoinCollection joins)
+        internal GXWhereCollection(GXSettingsArgs parent, GXJoinCollection? joins)
         {
             Parent = parent;
             Joins = joins;
@@ -70,27 +70,28 @@ namespace Gurux.Service.Orm
         /// <inheritdoc/>
         public override string ToString()
         {
-            string cacheKey = Parent.QueryCache.BuildKey(List,
+            string cacheKey = Parent.QueryCache.BuildKey(Parent.Settings.Type, 
+                List,
                 Joins != null ? Joins.GetItemHash() : 0);
-            if (Parent.QueryCache.TryGet(cacheKey, out string cached))
+            if (Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
                 Debug.WriteLine("Cache SQL: " + cached);
-                return cached;
+                return cached!;
             }
             string sql = string.Empty;
             GXGetMembersArgs args = new GXGetMembersArgs(Parent.Settings, TargetType.Where)
             {
                 StringBuilder = new StringBuilder(),
-                SingleTable = Joins == null || Joins.List.Count == 0,
+                SingleTable = Joins?.List.Any() != true,
             };
-            WhereToString(args, List, Joins == null || Joins.List.Count == 0);
+            WhereToString(args, List, args.SingleTable);
             if (args.StringBuilder.Length > 0)
             {
                 sql = "WHERE " + args.StringBuilder.ToString();
             }
             if (sql != string.Empty)
             {
-                Parent.QueryCache.Set(cacheKey, sql);
+                Parent.QueryCache.Set(cacheKey, sql, 0);
                 Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
@@ -142,8 +143,13 @@ namespace Gurux.Service.Orm
             List<KeyValuePair<WhereType, LambdaExpression>> list,
             bool singleTable)
         {
+            if (args.StringBuilder == null)
+            {
+                throw new ArgumentNullException("args.StringBuilder");
+            }
             if (list.Count != 0)
             {
+                bool emptyId = false;
                 bool first = true;
                 if (list.Count != 1)
                 {
@@ -171,8 +177,12 @@ namespace Gurux.Service.Orm
                     }
                     args.Expression = it.Value;
                     GXDbHelpers.GetMembers(args);
+                    if (args.StringBuilder.Length == 0)
+                    {
+                        first = emptyId = true;
+                    }
                 }
-                if (list.Count != 1)
+                if (list.Count != 1 && !emptyId)
                 {
                     args.StringBuilder.Append(')');
                 }
@@ -227,8 +237,8 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Update where condition.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="target"></param>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
+        /// <param name="target">The object whose mapped values provide the filter.</param>
         public void FilterBy<T>(T target)
         {
             if (target != null)
@@ -289,7 +299,7 @@ namespace Gurux.Service.Orm
                                 }
                                 if (actual is bool b)
                                 {
-                                    if (this.Parent.Settings.Type == Enums.DatabaseType.PostgreSQL)
+                                    if (this.Parent.Settings.Type == DatabaseType.PostgreSQL)
                                     {
                                         And<T>(q => it.Value.Target.Equals(b));
                                     }
@@ -358,6 +368,6 @@ namespace Gurux.Service.Orm
                     }
                 }
             }
-        }
+        }       
     }
 }

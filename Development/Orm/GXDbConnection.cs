@@ -32,11 +32,10 @@
 
 using Gurux.Common.Internal;
 using Gurux.Service.DB;
-using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Model;
-using Gurux.Service.Orm.Settings;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -44,20 +43,11 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Gurux.Service.Orm
 {
-    /// <summary>
-    /// Event handler for executed SQL.
-    /// </summary>
-    /// <param name="instance">Sender.</param>
-    /// <param name="sql">Executed SQL.</param>
-    /// <param name="executionTime">Execution time.</param>
-    public delegate void SqlExecutedEventHandler(object instance, string sql, int executionTime);
-
     /// <summary>
     /// Event handler for column or table rename.
     /// </summary>
@@ -79,8 +69,11 @@ namespace Gurux.Service.Orm
         /// MySql settings are default settings because of MariaDB (https://mariadb.org/).
         /// </remarks>
         public static DatabaseType DefaultDatabaseType = DatabaseType.MySQL;
-        readonly GXQueryCache queryCache;
+        readonly GXQueryCache _queryCache;
         internal GXSqlBuilder Builder;
+
+        /// <summary>Gets the table-description cache shared with schema managers on this connection.</summary>
+        public GXSchemaCache SchemaCache => GXSchemaCache.ForConnection(Connection);
 
         /// <summary>
         /// Query cache instance.
@@ -89,7 +82,7 @@ namespace Gurux.Service.Orm
         {
             get
             {
-                return queryCache;
+                return _queryCache;
             }
         }
 
@@ -103,11 +96,11 @@ namespace Gurux.Service.Orm
         {
             get
             {
-                return queryCache.CacheTime;
+                return _queryCache.CacheTime;
             }
             set
             {
-                queryCache.CacheTime = value;
+                _queryCache.CacheTime = value;
             }
         }
 
@@ -116,10 +109,9 @@ namespace Gurux.Service.Orm
         /// </summary>
         public void ClearQueryCache()
         {
-            queryCache.Clear();
+            _queryCache.Clear();
         }
 
-        private SqlExecutedEventHandler sql;
         private RenameEventHandler rename;
 
         /// <summary>
@@ -157,33 +149,7 @@ namespace Gurux.Service.Orm
         /// <param name="databaseName">Name of the database to switch to.</param>
         public void ChangeDatabase(string databaseName)
         {
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
-            if (Builder.Settings.Type == DatabaseType.SqLite)
-            {
-                if (Connection.ConnectionString == "Data Source=:memory:")
-                {
-                    return;
-                }
-                var type = Connection.GetType();
-                Connection = (DbConnection)Activator.CreateInstance(
-                    type,
-                    Connection.ConnectionString)!;
-                Connection.Open();
-                return;
-            }
-            if (Builder.Settings.Type == DatabaseType.DB2 ||
-                Builder.Settings.Type == DatabaseType.SapHana)
-            {
-                ExecuteNonQuery("SET SCHEMA " + databaseName);
-                return;
-            }
-            if (Builder.Settings.Type == DatabaseType.Oracle ||
-                Builder.Settings.Type == DatabaseType.SapHana)
-            {
-                ExecuteNonQuery("ALTER SESSION SET CURRENT_SCHEMA = " + databaseName);
-                return;
-            }
-            Connection.ChangeDatabase(databaseName);
+            Connection = Builder.ChangeDatabaseAsync(Connection, databaseName).Result;
         }
 
         /// <summary>
@@ -192,23 +158,7 @@ namespace Gurux.Service.Orm
         /// <param name="databaseName">Name of the database to switch to.</param>
         public async Task ChangeDatabaseAsync(string databaseName)
         {
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
-            if (Builder.Settings.Type == DatabaseType.SqLite)
-            {
-                if (Connection.ConnectionString == "Data Source=:memory:")
-                {
-                    return;
-                }
-                var type = Connection.GetType();
-                Connection = (DbConnection)Activator.CreateInstance(
-                    type,
-                    Connection.ConnectionString)!;
-                await Connection.OpenAsync();
-            }
-            else
-            {
-                await Connection.ChangeDatabaseAsync(databaseName);
-            }
+            Connection = await Builder.ChangeDatabaseAsync(Connection, databaseName);
         }
 
         /// <summary>
@@ -224,26 +174,17 @@ namespace Gurux.Service.Orm
             set;
         }
 
+
         /// <summary>
-        /// Event handler for executed SQL.
+        /// Event hanler for executed SQL.
         /// </summary>
         /// <remarks>
         /// This can be used for debugging executed SQLs.
         /// </remarks>
-        public event SqlExecutedEventHandler OnSqlExecuted
-        {
-            add
-            {
-                sql += value;
-            }
-            remove
-            {
-                sql -= value;
-            }
-        }
+        public event EventHandler<GXSqlExecutedEventArgs>? OnSqlExecuted;
 
         /// <summary>
-        /// Event handler for column ora table update.
+        /// Event handler for column or table update.
         /// </summary>
         /// <remarks>
         /// </remarks>
@@ -280,6 +221,7 @@ namespace Gurux.Service.Orm
                 return Connection.State;
             }
         }
+
         /// <inheritdoc />
         public IDbTransaction BeginTransaction()
         {
@@ -288,18 +230,26 @@ namespace Gurux.Service.Orm
         }
 
         /// <inheritdoc />
-        public IDbTransaction BeginTransaction(IsolationLevel isolationLevel)
+        public IDbTransaction BeginTransaction(System.Data.IsolationLevel isolationLevel)
         {
             IDbTransaction transaction = Connection.BeginTransaction(isolationLevel);
             return transaction;
         }
+
+        /// <inheritdoc />
+        public ValueTask<DbTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+          => Connection.BeginTransactionAsync(System.Data.IsolationLevel.Unspecified, cancellationToken);
+
+        /// <inheritdoc />
+        public ValueTask<DbTransaction> BeginTransactionAsync(System.Data.IsolationLevel isolationLevel, CancellationToken cancellationToken = default)
+            => Connection.BeginTransactionAsync(isolationLevel, cancellationToken);
 
         /// <summary>
         /// Constructor.
         /// </summary>
         /// <param name="connection">DB connection.</param>
         /// <param name="tablePrefix">Table prefix.</param>
-        public GXDbConnection(DbConnection connection, string tablePrefix)
+        public GXDbConnection(DbConnection connection, string? tablePrefix = null)
             : this(connection, tablePrefix, null)
         {
         }
@@ -310,7 +260,9 @@ namespace Gurux.Service.Orm
         /// <param name="connection">DB connection.</param>
         /// <param name="tablePrefix">Table prefix.</param>
         /// <param name="queryCache">Query cache instance.</param>
-        public GXDbConnection(DbConnection connection, string tablePrefix, GXQueryCache queryCache)
+        public GXDbConnection(DbConnection connection,
+            string? tablePrefix,
+            GXQueryCache? queryCache)
         {
             AutoTransaction = true;
             Connection = connection ?? throw new ArgumentException(null, nameof(connection));
@@ -319,7 +271,12 @@ namespace Gurux.Service.Orm
                 Connection.Open();
             }
             Builder = new GXSqlBuilder(connection, tablePrefix);
-            this.queryCache = queryCache ?? new GXQueryCache(TimeSpan.FromMinutes(10), Builder.Settings.Type);
+            _queryCache = queryCache ?? new GXQueryCache(TimeSpan.FromMinutes(10), Builder.Settings.Type);
+            if (Builder.Settings.Type == DatabaseType.DB2 &&
+                !string.IsNullOrEmpty(connection.Database))
+            {
+                ChangeDatabase(connection.Database);
+            }
         }
 
         /// <summary>
@@ -327,9 +284,21 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="query">The scalar query.</param>
         /// <returns>Returns the result of the scalar query.</returns>
-        public T ExecuteScalar<T>(string query)
+        public T? ExecuteScalar<T>(string query)
         {
-            return (T)GXSchemaManager.ExecuteScalarInternal(Connection, null, query, typeof(T));
+            return (T?)GXSchemaManager.ExecuteScalarInternal(Connection, null, query, typeof(T));
+        }
+
+        /// <summary>
+        /// Execute scalar.
+        /// </summary>
+        /// <param name="query">The scalar query.</param>
+        /// <returns>Returns the result of the scalar query.</returns>
+        /// <typeparam name="T">CLR type used to convert the scalar result.</typeparam>
+        /// <param name="cancellationToken">Token used to cancel query execution.</param>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(string query, CancellationToken cancellationToken = default)
+        {
+            return (T?)await GXSchemaManager.ExecuteScalarInternalAsync(Connection, query, typeof(T), cancellationToken);
         }
 
         /// <summary>
@@ -346,39 +315,24 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Used transaction.</param>
         /// <param name="query">Query to execute.</param>
-        public void ExecuteNonQuery(IDbTransaction transaction, string query)
+        public void ExecuteNonQuery(IDbTransaction? transaction, string query)
         {
-            IDbConnection connection;
-            if (transaction == null)
-            {
-                connection = Connection;
-            }
-            else
-            {
-                connection = transaction.Connection;
-            }
-            GXSchemaManager.ExecuteNonQuery(connection, transaction, sql, query);
+            IDbConnection connection = transaction?.Connection ?? Connection;
+            GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
         }
 
         /// <summary>
         /// Returns last inserted ID.
         /// </summary>
         /// <returns>Last inserted row ID.</returns>
-        private object GetLastInsertId(IDbConnection connection, IDbTransaction transaction, Type valueType, string columnName, Type tableType)
+        private object? GetLastInsertId(IDbConnection connection,
+            IDbTransaction? transaction,
+            Type valueType,
+            string columnName,
+            Type tableType)
         {
-            string table = null;
-            if (tableType != null)
-            {
-                if (Builder.Settings.Type == DatabaseType.Oracle ||
-                Builder.Settings.Type == DatabaseType.SapHana)
-                {
-                    table = Builder.GetTableName(tableType, false);
-                }
-                else
-                {
-                    table = Builder.GetTableName(tableType, true);
-                }
-            }
+            string table = Builder.GetTableName(tableType, true);
+            columnName = Builder.Settings.EscapeIdentifier(null, columnName);
             string sql = Builder.Settings.GetLastInsertId(table, columnName);
             return GXSchemaManager.ExecuteScalarInternal(connection, transaction, sql, valueType);
         }
@@ -388,7 +342,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <returns>Name of the current user.</returns>
-        public string GetCurrentUser(IDbTransaction transaction = null)
+        public string GetCurrentUser(IDbTransaction? transaction = null)
         {
             string query = Builder.Settings.GetCurrentUserQuery();
             return GXSchemaManager.ExecuteQuery(Connection, transaction, query)[0];
@@ -399,7 +353,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="databaseName">Database name.</param>   
         /// <returns>Array of user names.</returns>
-        public string[] GetUsers(string databaseName = null)
+        public string[] GetUsers(string? databaseName = null)
         {
             return GetUsers(null, databaseName);
         }
@@ -410,9 +364,12 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="databaseName">Database name.</param>   
         /// <returns>Array of user names.</returns>
-        public string[] GetUsers(IDbTransaction transaction, string databaseName = null)
+        public string[] GetUsers(IDbTransaction? transaction, string? databaseName = null)
         {
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
+            if (!string.IsNullOrEmpty(databaseName))
+            {
+                databaseName = Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, databaseName);
+            }
             string query = Builder.Settings.GetUsersQuery(databaseName);
             if (Builder.Settings.Type == DatabaseType.DB2)
             {
@@ -424,7 +381,8 @@ namespace Gurux.Service.Orm
                 }
                 try
                 {
-                    return ((List<string>)Builder.SelectInternal<string>(Connection, transaction, query)).ToArray();
+                    return ((List<string>)Builder.SelectInternal<string>(this,
+                        Connection, transaction, OnSqlExecuted, query, 0, CommandTimeout)).ToArray();
                 }
                 finally
                 {
@@ -434,26 +392,18 @@ namespace Gurux.Service.Orm
                     }
                 }
             }
-            return ((List<string>)Builder.SelectInternal<string>(Connection, transaction, query)).ToArray();
-        }
-
-        /// <summary>
-        /// Remove users.
-        /// </summary>
-        /// <param name="users">Array of users to remove.</param>   
-        public void RemoveUsers(IEnumerable<string> users)
-        {
-            RemoveUsers(null, null, users);
+            var values = Builder.SelectInternal<string>(this, Connection,
+                transaction, OnSqlExecuted, query, 0, CommandTimeout);
+            return values.ToArray();
         }
 
         /// <summary>
         /// Remove users from the database.
         /// </summary>
-        /// <param name="databaseName">Database name.</param>
         /// <param name="users">Array of users to remove.</param>   
-        public void RemoveUsers(string databaseName, IEnumerable<string> users)
+        public void RemoveDatabaseUsers(params IEnumerable<string> users)
         {
-            RemoveUsers(null, databaseName, users);
+            RemoveDatabaseUsers(null, users);
         }
 
         /// <summary>
@@ -461,8 +411,8 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="users">Array of users to remove.</param>   
-        /// <param name="databaseName">Database name.</param>   
-        public void RemoveUsers(IDbTransaction transaction, string databaseName, IEnumerable<string> users)
+        public void RemoveDatabaseUsers(IDbTransaction? transaction,
+            params IEnumerable<string> users)
         {
             if (Builder.Settings.Type == DatabaseType.SqLite)
             {
@@ -480,13 +430,13 @@ namespace Gurux.Service.Orm
                 {
                     throw new ArgumentException("User name cannot be empty.");
                 }
-                string query = Builder.Settings.RemoveUserQuery(databaseName, it);
+                string query = Builder.Settings.RemoveUserQuery(null, it);
                 queries.Add(query);
             }
 
             foreach (var query in queries)
             {
-                GXSchemaManager.ExecuteNonQuery(Connection, transaction, sql, query);
+                GXSchemaManager.ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted, query);
             }
         }
 
@@ -495,9 +445,9 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <returns>Array of database names.</returns>
-        public string[] GetDatabases(IDbTransaction transaction = null)
+        public string[] GetDatabases(IDbTransaction? transaction = null)
         {
-            return Builder.GetDatabases(Connection, transaction);
+            return Builder.GetDatabases(this, Connection, transaction, OnSqlExecuted);
         }
 
         /// <summary>
@@ -516,9 +466,9 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <returns>True if the database exists, otherwise false.</returns>
-        public bool DatabaseExists(IDbTransaction transaction, string databaseName)
+        public bool DatabaseExists(IDbTransaction? transaction, string databaseName)
         {
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
+            databaseName = Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, databaseName);
             string[] databases = GetDatabases(transaction);
             return databases.Contains(databaseName);
         }
@@ -526,9 +476,9 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Returns the permissions of the given user for the given database.
         /// </summary>
-        /// <param name="userName">User name to get permissions for.</param>
-        /// <param name="databaseName">Database name.</param>
-        public DatabasePermission GetUserPermission(string userName = null, string databaseName = null)
+        /// <param name="userName">User name to get permissions for. If null, the current user is used.</param>
+        /// <param name="databaseName">Database name. If null, the current database is used.</param>
+        public DatabasePermission GetUserPermission(string? userName = null, string? databaseName = null)
         {
             return GetUserPermission(null, userName, databaseName);
         }
@@ -539,14 +489,18 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <param name="userName">User name to get permissions for.</param>
-        public DatabasePermission GetUserPermission(IDbTransaction transaction, string userName = null, string databaseName = null)
+        public DatabasePermission GetUserPermission(IDbTransaction? transaction,
+            string? userName = null, string? databaseName = null)
         {
             if (Builder.Settings.Type == DatabaseType.SqLite)
             {
                 //SQL lite does not have users and permissions, so we return Admin permission.
                 return DatabasePermission.Admin;
             }
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
+            if (!string.IsNullOrEmpty(databaseName))
+            {
+                databaseName = Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, databaseName);
+            }
             string query;
             if (string.IsNullOrEmpty(userName))
             {
@@ -624,7 +578,7 @@ namespace Gurux.Service.Orm
         /// <param name="databaseName">Database name.</param>
         /// <param name="permissions">Database permissions.</param>
         /// <param name="users">Array of user names to add.</param>
-        public void AddUsersToDatabase(IDbTransaction transaction,
+        public void AddUsersToDatabase(IDbTransaction? transaction,
             string databaseName,
             DatabasePermission permissions,
             params IEnumerable<string> users)
@@ -636,7 +590,7 @@ namespace Gurux.Service.Orm
                 //SQL lite does not have users and permissions.
                 return;
             }
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
+            databaseName = Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, databaseName);
             string old = Connection.Database;
             List<string> queries = [];
             Builder.Settings.AddUsersToDatabaseQuery(queries, databaseName, permissions, users);
@@ -677,10 +631,14 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <param name="users">Array of user names to remove.</param>
-        public void RemoveUsersFromDatabase(IDbTransaction transaction,
+        public void RemoveUsersFromDatabase(IDbTransaction? transaction,
             string databaseName,
             params IEnumerable<string> users)
         {
+            if (string.IsNullOrEmpty(databaseName))
+            {
+                throw new ArgumentException("Database name cannot be empty.");
+            }
             if (Builder.Settings.Type == DatabaseType.SqLite ||
                 Builder.Settings.Type == DatabaseType.DB2 ||
                 Builder.Settings.Type == DatabaseType.Oracle)
@@ -688,7 +646,7 @@ namespace Gurux.Service.Orm
                 //SQL lite does not have users and permissions.
                 return;
             }
-            databaseName = GXDbHelpers.GetDatabaseName(Builder.Settings.Type, databaseName);
+            databaseName = Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, databaseName);
             string old = Connection.Database;
             List<string> queries = [];
             Builder.Settings.RemoveUsersFromDatabaseQuery(queries, databaseName, users);
@@ -718,12 +676,6 @@ namespace Gurux.Service.Orm
         /// <param name="users">Array of user names to add.</param>
         public void AddUsers(params DatabaseUser[] users)
         {
-            if (Builder.Settings.Type == DatabaseType.SqLite ||
-                Builder.Settings.Type == DatabaseType.DB2)
-            {
-                //SQL lite does not have users and permissions.
-                return;
-            }
             List<string> queries = [];
             Builder.Settings.AddUsersQuery(queries, users);
             foreach (var it in queries)
@@ -735,22 +687,85 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Check is table empty.
         /// </summary>
-        /// <returns>True, if thable is empty.</returns>
-        public bool IsEmpty<T>(IDbTransaction transaction = null)
+        /// <returns>True, if table is empty.</returns>
+        public bool IsEmpty<T>(IDbTransaction? transaction = null)
         {
             string tableName = Builder.GetTableName(typeof(T), false);
+            return IsEmpty(transaction, tableName);
+        }
+
+        /// <summary>
+        /// Check is table empty.
+        /// </summary>
+        /// <returns>True, if table is empty.</returns>
+        public bool IsEmpty(string tableName)
+        {
+            return IsEmpty(null, tableName);
+        }
+
+        /// <summary>
+        /// Check is table empty.
+        /// </summary>
+        /// <returns>True, if table is empty.</returns>
+        public bool IsEmpty(IDbTransaction? transaction, string tableName)
+        {
             string query = Builder.Settings.IsEmpty(tableName);
-            object ret = GXSchemaManager.ExecuteScalarInternal(Connection, transaction, query, null);
+            object? ret = GXSchemaManager.ExecuteScalarInternal(Connection, transaction, query, null);
             return ret == null || Convert.ToInt32(ret) == 0;
+        }
+
+        /// <summary>
+        /// Get table row count.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Number of rows in the table.</returns>
+        public T GetTableRowCount<T>(IDbTransaction? transaction, string tableName)
+        {
+            ArgumentNullException.ThrowIfNull(tableName);
+            string query = Builder.Settings.IsEmpty(tableName);
+            object? ret = GXSchemaManager.ExecuteScalarInternal(Connection, transaction, query, null);
+            return ret == null ? (T)Convert.ChangeType(0, typeof(T)) : (T)Convert.ChangeType(ret, typeof(T));
+        }
+
+        /// <summary>
+        /// Get table row count.
+        /// </summary>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Number of rows in the table.</returns>
+        public T GetTableRowCount<T>(string tableName)
+        {
+            return GetTableRowCount<T>(null, tableName);
+        }
+
+        /// <summary>
+        /// Get table row count.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Number of rows in the table.</returns>
+        public async Task<T> GetTableRowCountAsync<T>(IDbTransaction? transaction, string tableName)
+        {
+            return await Task.Run(() => GetTableRowCount<T>(transaction, tableName));
+        }
+
+        /// <summary>
+        /// Get table row count.
+        /// </summary>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Number of rows in the table.</returns>
+        public Task<T> GetTableRowCountAsync<T>(string tableName)
+        {
+            return GetTableRowCountAsync<T>(null, tableName);
         }
 
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
         /// <param name="arg">Delete arguments.</param>
-        public async Task DeleteAsync(GXDeleteArgs arg)
+        public Task<int> DeleteAsync(GXDeleteArgs arg)
         {
-            await DeleteAsync(arg, CancellationToken.None);
+            return DeleteAsync(arg, CancellationToken.None);
         }
 
         /// <summary>
@@ -758,13 +773,9 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="arg">Delete arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task DeleteAsync(GXDeleteArgs arg, CancellationToken cancellationToken = default)
+        public Task<int> DeleteAsync(GXDeleteArgs arg, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            await Task.Run(() =>
-            {
-                Delete(arg);
-            }, cancellationToken);
+            return DeleteAsync(null, arg, cancellationToken);
         }
 
         /// <summary>
@@ -773,13 +784,14 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Delete arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task DeleteAsync(IDbTransaction transaction, GXDeleteArgs arg,
+        public async Task<int> DeleteAsync(IDbTransaction? transaction,
+            GXDeleteArgs arg,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await Task.Run(() =>
+            return await Task.Run(() =>
             {
-                Delete(transaction, arg);
+                return Delete(transaction, arg);
             }, cancellationToken);
         }
 
@@ -787,9 +799,9 @@ namespace Gurux.Service.Orm
         /// Delete items from the DB.
         /// </summary>
         /// <param name="arg">Delete arguments.</param>
-        public void Delete(GXDeleteArgs arg)
+        public int Delete(GXDeleteArgs arg)
         {
-            Delete(null, arg);
+            return Delete(null, arg);
         }
 
         /// <summary>
@@ -797,13 +809,13 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>  
         /// <param name="arg">Delete arguments.</param>
-        public void Delete(IDbTransaction transaction, GXDeleteArgs arg)
+        public int Delete(IDbTransaction? transaction, GXDeleteArgs arg)
         {
-            IDbConnection connection;
+            IDbConnection? connection;
             bool tranactionOnProgress = transaction != null;
             if (tranactionOnProgress)
             {
-                connection = transaction.Connection;
+                connection = transaction?.Connection;
             }
             else
             {
@@ -817,17 +829,85 @@ namespace Gurux.Service.Orm
             {
                 arg.UseQueryCache(QueryCache);
                 arg.Settings = Builder.Settings;
-                GXSchemaManager.ExecuteNonQuery(connection, transaction, sql, arg.ToString(false));
+                int count = GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, arg.ToString(false));
                 if (!tranactionOnProgress && AutoTransaction)
                 {
-                    transaction.Commit();
+                    transaction?.Commit();
                 }
+                return count;
             }
             catch (Exception)
             {
                 if (!tranactionOnProgress && AutoTransaction)
                 {
-                    transaction.Rollback();
+                    transaction?.Rollback();
+                }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="tableName">Name of the table to delete items from.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public async Task<int> DeleteAsync(IDbTransaction? transaction, string tableName, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await Task.Run(() =>
+            {
+                return Delete(transaction, tableName);
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="tableName">Name of the table to delete items from.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public Task<int> DeleteAsync(string tableName, CancellationToken cancellationToken = default)
+        {
+            return DeleteAsync(null, tableName, cancellationToken);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="tableName">Name of the table to delete items from.</param>
+        public int Delete(string tableName)
+        {
+            return Delete(null, tableName);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="tableName">Name of the table to delete items from.</param>
+        public int Delete(IDbTransaction? transaction, string tableName)
+        {
+            IDbConnection connection = transaction?.Connection ?? Connection;
+            bool tranactionOnProgress = transaction != null;
+            if (AutoTransaction && !tranactionOnProgress)
+            {
+                transaction = connection.BeginTransaction();
+            }
+            try
+            {
+                string query = "DELETE FROM " + tableName;
+                int count = GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                if (!tranactionOnProgress && AutoTransaction)
+                {
+                    transaction?.Commit();
+                }
+                return count;
+            }
+            catch (Exception)
+            {
+                if (!tranactionOnProgress && AutoTransaction)
+                {
+                    transaction?.Rollback();
                 }
                 throw;
             }
@@ -845,17 +925,17 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public T SelectById<T>(string id, Expression<Func<T, object>> columns)
+        public T SelectById<T>(string id, Expression<Func<T, object>>? columns)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
             List<T> list = Select<T>(args);
             if (list.Count == 0)
             {
-                return default(T);
+                throw new Exception($"Item with ID '{id}' does not exist.");
             }
             if (list.Count == 1)
             {
@@ -867,7 +947,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<T> SelectByIdAsync<T>(string id, CancellationToken cancellationToken = default)
@@ -878,11 +958,11 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(string id, Expression<Func<T, object>> columns, CancellationToken cancellationToken = default)
+        public async Task<T> SelectByIdAsync<T>(string id, Expression<Func<T, object>>? columns, CancellationToken cancellationToken = default)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
@@ -906,7 +986,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         public T SelectById<T>(Guid id, Expression<Func<T, object>> columns)
@@ -928,7 +1008,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<T> SelectByIdAsync<T>(Guid id, CancellationToken cancellationToken = default)
@@ -939,7 +1019,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
@@ -965,7 +1045,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         public T SelectById<T>(long id, Expression<Func<T, object>> columns)
@@ -987,7 +1067,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public Task<T> SelectByIdAsync<T>(long id, CancellationToken cancellationToken = default)
@@ -998,7 +1078,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
@@ -1023,7 +1103,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         public T SelectById<T>(UInt64 id, Expression<Func<T, object>> columns)
@@ -1045,7 +1125,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<T> SelectByIdAsync<T>(UInt64 id, CancellationToken cancellationToken = default)
@@ -1056,7 +1136,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select item's columns by ID.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
@@ -1099,9 +1179,9 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">Type of the database object.</typeparam>
         /// <param name="transaction">Transaction.</param>
         /// <returns>List of all items.</returns>
-        public List<T> SelectAll<T>(IDbTransaction transaction = default)
+        public List<T> SelectAll<T>(IDbTransaction? transaction = default)
         {
-            return Select<T>(transaction, (GXSelectArgs)null);
+            return Select<T>(transaction, null);
         }
 
         /// <summary>
@@ -1112,11 +1192,11 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of all items.</returns>
-        public async Task<List<T>> SelectAllAsync<T>(IDbTransaction transaction = default,
+        public async Task<List<T>> SelectAllAsync<T>(IDbTransaction? transaction = default,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return await SelectAsync<T>(transaction, (GXSelectArgs)null, cancellationToken);
+            return await SelectAsync<T>(transaction, (GXSelectArgs?)null, cancellationToken);
         }
 
         /// <summary>
@@ -1150,43 +1230,41 @@ namespace Gurux.Service.Orm
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of selected entities.</returns>
-        public List<T> Select<T>(IDbTransaction transaction, GXSelectArgs arg,
+        public List<T> Select<T>(IDbTransaction? transaction, GXSelectArgs? arg,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return SelectInternal<T>(transaction?.Connection, transaction, arg, cancellationToken);
+            return SelectInternal<T>(transaction?.Connection ?? Connection,
+                transaction, arg, cancellationToken);
         }
 
         private List<T> SelectInternal<T>(
-            IDbConnection connection,
-            IDbTransaction transaction,
-            GXSelectArgs arg,
+            IDbConnection? connection,
+            IDbTransaction? transaction,
+            GXSelectArgs? arg,
             CancellationToken cancellationToken)
         {
             if (arg == null)
             {
                 arg = GXSelectArgs.SelectAll<T>(QueryCache);
             }
-            arg.UseQueryCache(QueryCache);
+            if (QueryCache != null)
+            {
+                arg.UseQueryCache(QueryCache);
+            }
             arg.Verify();
-            arg.Parent.Settings = Builder.Settings;
             arg.GenerationTime = 0;
             DateTime tm = DateTime.Now;
-            bool release = connection == null && transaction == null;
-            if (release)
-            {
-                connection = Connection;
-            }
-            if (transaction != null)
-            {
-                connection = transaction.Connection;
-            }
-            List<T> value = (List<T>)SelectInternal2<T>(connection, transaction,
-                    arg, cancellationToken);
+            List<T> value = (List<T>)Builder.SelectInternal<T>(connection!, transaction,
+                    arg, CommandTimeout, cancellationToken);
             arg.GenerationTime = (int)(DateTime.Now - tm).TotalMilliseconds;
-            if (sql != null)
+            if (OnSqlExecuted != null)
             {
-                sql(this, arg.query, arg.GenerationTime);
+                OnSqlExecuted(this, new GXSqlExecutedEventArgs()
+                {
+                    Sql = arg.query!,
+                    Elapsed = TimeSpan.FromMilliseconds(arg.GenerationTime)
+                });
             }
             return value;
         }
@@ -1212,21 +1290,12 @@ namespace Gurux.Service.Orm
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of selected entities.</returns>
         public async Task<List<T>> SelectAsync<T>(
-            IDbTransaction transaction,
+            IDbTransaction? transaction,
             GXSelectArgs arg,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            bool useTransaction = transaction != null;
-            IDbConnection connection;
-            if (useTransaction)
-            {
-                connection = transaction.Connection;
-            }
-            else
-            {
-                connection = Connection;
-            }
+            IDbConnection connection = transaction?.Connection ?? Connection;
             return await Task.Run(() =>
             {
                 return SelectInternal<T>(connection, transaction, arg, cancellationToken);
@@ -1256,562 +1325,8 @@ namespace Gurux.Service.Orm
             cancellationToken.ThrowIfCancellationRequested();
             return await Task.Run(() =>
         {
-            return SelectInternal<T>(null, null, arg, cancellationToken);
+            return SelectInternal<T>(Connection, null, arg, cancellationToken);
         }, cancellationToken);
-        }
-
-        private object SelectInternal2<T>(
-            IDbConnection connection,
-            IDbTransaction transaction,
-            GXSelectArgs arg,
-            CancellationToken cancellationToken)
-        {
-            DateTime now = DateTime.Now;
-            object value = null, item, id = null;
-            List<object[]> objectList = null;
-            List<T> baseList = null;
-            List<T> list = null;
-            Dictionary<string, GXSerializedItem> properties = null;
-            object[] values = null;
-            Dictionary<Type, GXSerializedItem> tables = null;
-            Type type = typeof(T);
-            //Dictionary of read tables by name.
-            string maintable = Builder.GetTableName(type, false);
-            Dictionary<int, GXColumnHelper> columns = null;
-            //Collection of table indexes. 
-            Dictionary<Type, int> TableIndexes = null;
-            string targetTable;
-            Dictionary<Type, Dictionary<Type, GXSerializedItem>> relationDataSetters = null;
-            //If n:n relation is used make lists where relation tables are added by relation type.
-            Dictionary<Type, List<object>> mapTables = null;
-
-            //Columns that are updated when row is read. This is needed when relation data is try to update and it's not read yet.
-            List<KeyValuePair<int, object>> rowReferences = null;
-
-            //References are updated when data is read from multiple tables and if there are references for other tables.
-            //Parent object is an example for this.
-            List<KeyValuePair<object, object>> updatedReferences = null;
-            //All created objects. Objects are set to the dictionary by type. This makes it faster to find correct object.
-            //In the second dictionary is object ID and object.
-            Dictionary<Type, Dictionary<object, object>> allObjects = null;
-            //List of 1:N objects.
-            Dictionary<Type, Dictionary<object, List<object>>> oneToManyObjects = null;
-            //List of N:N objects.
-            Dictionary<Type, Dictionary<object, List<object>>> manyToManyObjects = null;
-
-            //Generate SQL again.
-            string query = arg.ToString(false);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (typeof(T) == typeof(object[]))
-            {
-                objectList = new List<object[]>();
-            }
-            else if (GXInternal.IsGenericDataType(typeof(T)))
-            {
-                baseList = new List<T>();
-            }
-            else
-            {
-                tables = new Dictionary<Type, GXSerializedItem>();
-                Dictionary<Type, GXSerializedItem> tmp = new Dictionary<Type, GXSerializedItem>();
-                //If there are no relations to other tables.
-                if (arg.Joins.List.Count == 0)
-                {
-                    tmp.Add(type, null);
-                }
-                else
-                {
-                    List<GXJoin> joinList = new List<GXJoin>();
-                    GXOrderByCollection.UpdateJoins(arg.Parent.Settings, arg.Joins, joinList);
-                    foreach (var it in joinList)
-                    {
-                        if (!tmp.ContainsKey(it.Table1Type))
-                        {
-                            tmp.Add(it.Table1Type, GXSqlBuilder.FindUnique(it.Table1Type));
-                        }
-                        if (!tmp.ContainsKey(it.Table2Type))
-                        {
-                            tmp.Add(it.Table2Type, GXSqlBuilder.FindUnique(it.Table2Type));
-                        }
-                    }
-                }
-                //Loop throw all tables and add only selected tables.
-                foreach (var it in tmp)
-                {
-                    if (arg.Columns.ColumnList.ContainsKey(it.Key))
-                    {
-                        tables.Add(it.Key, it.Value);
-                    }
-                }
-                list = new List<T>();
-                columns = new Dictionary<int, GXColumnHelper>();
-                //If we are using 1:n or n:n references.
-                if (tables.Count != 1)
-                {
-                    relationDataSetters = new Dictionary<Type, Dictionary<Type, GXSerializedItem>>();
-                    TableIndexes = new Dictionary<Type, int>();
-                    mapTables = new Dictionary<Type, List<object>>();
-                    rowReferences = new List<KeyValuePair<int, object>>();
-                    updatedReferences = new List<KeyValuePair<object, object>>();
-                    allObjects = new Dictionary<Type, Dictionary<object, object>>();
-                    oneToManyObjects = new Dictionary<Type, Dictionary<object, List<object>>>();
-                    manyToManyObjects = new Dictionary<Type, Dictionary<object, List<object>>>();
-                }
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            Dictionary<Type, List<string>> excluded = null;
-            if (arg.Columns.Excluded.Any())
-            {
-                GXGetMembersArgs args = new GXGetMembersArgs(Builder.Settings, TargetType.Column)
-                {
-                };
-                //Add excluded columns.
-                excluded = new Dictionary<Type, List<string>>();
-                foreach (KeyValuePair<Type, LambdaExpression> e in arg.Columns.Excluded)
-                {
-                    if (!excluded.ContainsKey(e.Key))
-                    {
-                        excluded[e.Key] = new List<string>();
-                    }
-                    args.Expression = e.Value;
-                    var tmp = GXDbHelpers.GetMemberList(args);
-                    excluded[e.Key].AddRange(tmp);
-                }
-            }
-            using (IDbCommand com = connection.CreateCommand())
-            {
-                if (CommandTimeout > 0)
-                {
-                    com.CommandTimeout = CommandTimeout;
-                }
-                com.Transaction = transaction;
-                com.CommandType = CommandType.Text;
-                com.CommandText = query;
-                try
-                {
-                    using (IDataReader reader = com.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            if (rowReferences != null)
-                            {
-                                rowReferences.Clear();
-                            }
-                            if (updatedReferences != null)
-                            {
-                                updatedReferences.Clear();
-                            }
-                            if (values == null)
-                            {
-                                values = new object[reader.FieldCount];
-                            }
-                            reader.GetValues(values);
-                            if (columns != null && columns.Count == 0)
-                            {
-                                Builder.InitializeSelect<T>(reader, Builder.Settings, tables, TableIndexes, columns, mapTables, relationDataSetters);
-                            }
-                            targetTable = null;
-                            if (list != null)
-                            {
-                                //If we want to read only basic data types example count(*)
-                                if (GXInternal.IsGenericDataType(type))
-                                {
-                                    list.Add((T)Builder.Settings.ChangeType(reader.GetValue(0), type));
-                                    return list;
-                                }
-                                properties = GXSqlBuilder.GetProperties<T>();
-                            }
-                            if (objectList != null)
-                            {
-                                objectList.Add(values);
-                            }
-                            else if (baseList != null)
-                            {
-                                //If value is nullable.
-                                if (values[0] is DBNull &&
-                                        type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-                                {
-                                    baseList.Add(default(T));
-                                }
-                                else
-                                {
-                                    if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
-                                    {
-                                        baseList.Add((T)values[0]);
-                                    }
-                                    else if (type == typeof(Guid) && values[0] is byte[] ba)
-                                    {
-                                        baseList.Add((T)(object)new Guid(ba));
-                                    }
-                                    else
-                                    {
-                                        baseList.Add((T)Convert.ChangeType(values[0], type));
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                item = null;
-                                //If we are reading values from multiple tables each component is created only once.
-                                bool isCreated = false;
-                                //For Oracle reader.FieldCount is too high. For this reason columns.Count is used.
-                                int colCount = Math.Min(reader.FieldCount, columns.Count);
-                                for (int pos = 0; pos != colCount; ++pos)
-                                {
-                                    cancellationToken.ThrowIfCancellationRequested();
-                                    value = null;
-                                    //If we are asking some data from the DB that is not exist on class.
-                                    //This is removed from the interface etc...
-                                    if (!columns.TryGetValue(pos, out GXColumnHelper col))
-                                    {
-                                        continue;
-                                    }
-                                    //If we are reading multiple objects and object has changed.
-                                    if (!string.Equals(col.Table, targetTable, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        isCreated = false;
-                                        if (TableIndexes != null && TableIndexes.TryGetValue(col.TableType, out int tableIdx))
-                                        {
-                                            id = values[tableIdx];
-                                            //Id is not save directly because class might change it's type example from uint to int.
-                                            id = Builder.Settings.ChangeType(id, col.Setter.Type);
-                                            if (id == null || id is DBNull)
-                                            {
-                                                UpdateReferences(item, relationDataSetters, mapTables, updatedReferences, manyToManyObjects);
-                                                isCreated = true;
-                                                item = null;
-                                            }
-                                            else
-                                            {
-                                                //Check is item created already and return item if it exists.
-                                                if (allObjects.TryGetValue(col.TableType, out var typeObjs) &&
-                                                    typeObjs.TryGetValue(id, out var existingItem))
-                                                {
-                                                    item = existingItem;
-                                                    isCreated = true;
-                                                    UpdateReferences(item, relationDataSetters, mapTables, updatedReferences, manyToManyObjects);
-                                                }
-                                            }
-                                        }
-                                        else //If only one table.
-                                        {
-                                            id = null;
-                                        }
-                                        if (!isCreated)
-                                        {
-                                            if (!GXInternal.IsGenericDataType(col.TableType) && item == null || item.GetType() != col.TableType)
-                                            {
-                                                item = GXInternal.CreateClass(col.TableType);
-                                                if (allObjects != null)
-                                                {
-                                                    if (!allObjects.TryGetValue(col.TableType, out var typeMap))
-                                                    {
-                                                        typeMap = new Dictionary<object, object>();
-                                                        allObjects.Add(col.TableType, typeMap);
-                                                    }
-                                                    //If only one table is read.
-                                                    if (id != null)
-                                                    {
-                                                        typeMap[id] = item;
-                                                        if (col.Setter.Set != null)
-                                                        {
-                                                            col.Setter.Set(item, id);
-                                                        }
-                                                    }
-                                                }
-                                                if (item != null && item.GetType() == typeof(T))
-                                                {
-                                                    list.Add((T)item);
-                                                }
-                                                UpdateReferences(item, relationDataSetters, mapTables, updatedReferences, manyToManyObjects);
-                                            }
-                                        }
-                                        targetTable = col.Table;
-                                    }
-                                    if (!isCreated)
-                                    {
-                                        //If 1:1 relation.
-                                        if (rowReferences != null && !GXInternal.IsGenericDataType(col.Setter.Type) &&
-                                            !GXInternal.IsGenericDataType(GXInternal.GetPropertyType(col.Setter.Type)) &&
-                                            col.Setter.Type.IsClass && col.Setter.Type != typeof(byte[]))
-                                        {
-                                            Type pt = GXInternal.GetPropertyType(col.Setter.Type);
-                                            if (GXInternal.IsGenericDataType(pt))
-                                            {
-                                                string posStr = values[pos]?.ToString();
-                                                if (!string.IsNullOrEmpty(posStr))
-                                                {
-                                                    string[] tmp = posStr.Split(new char[] { ';' });
-                                                    Array items = Array.CreateInstance(pt, tmp.Length);
-                                                    int pos2 = -1;
-                                                    foreach (string it in tmp)
-                                                    {
-                                                        items.SetValue(Builder.Settings.ChangeType(it, pt), ++pos2);
-                                                    }
-                                                    value = items;
-                                                }
-                                                else
-                                                {
-                                                    value = Array.CreateInstance(pt, 0);
-                                                }
-                                            }
-                                            else
-                                            {
-                                                //Columns relations are updated when all data from the row is read.
-                                                rowReferences.Add(new KeyValuePair<int, object>(pos, item));
-                                            }
-                                        }
-                                        else if (col.Setter != null)
-                                        {
-                                            //Get value if not class.
-                                            if (col.Setter.Type.IsArray || GXInternal.IsGenericDataType(col.Setter.Type))
-                                            {
-                                                var tmp = col.Setter.Type;
-                                                bool isNullable = tmp.IsGenericType && tmp.GetGenericTypeDefinition() == typeof(Nullable<>);
-                                                if (isNullable)
-                                                {
-                                                    tmp = Nullable.GetUnderlyingType(tmp);
-                                                }
-                                                value = values[pos];
-                                                if (value is DBNull)
-                                                {
-                                                    value = null;
-                                                }
-                                                value = Builder.Settings.ChangeType(value, tmp);
-                                                if (value == null && col.Setter.Type == typeof(string) && UseEmptyString)
-                                                {
-                                                    value = "";
-                                                }
-                                            }
-                                            else //Parameter type is class. Set to null.
-                                            {
-                                                value = null;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            value = values[pos];
-                                        }
-                                        if (value != null)
-                                        {
-                                            if (col.Setter.Set != null)
-                                            {
-                                                col.Setter.Set(item, value);
-                                            }
-                                            else
-                                            {
-                                                PropertyInfo pi = col.Setter.Target as PropertyInfo;
-                                                if (pi != null)
-                                                {
-                                                    pi.SetValue(item, value, null);
-                                                }
-                                                else
-                                                {
-                                                    FieldInfo fi = col.Setter.Target as FieldInfo;
-                                                    fi.SetValue(item, value);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            //Update columns that was not read yet.
-                            //Update One to one (1:1) and One to Many (1:N) releations.
-                            if (rowReferences != null)
-                            {
-                                foreach (var it in rowReferences)
-                                {
-                                    cancellationToken.ThrowIfCancellationRequested();
-                                    GXColumnHelper col = columns[it.Key];
-                                    object relationId = Builder.Settings.ChangeType(values[it.Key], col.Setter.Relation.ForeignId.Type);
-                                    Type itValueType = it.Value.GetType();
-                                    if (allObjects.TryGetValue(col.Setter.Type, out var relObjects))
-                                    {
-                                        foreach (var it2 in relObjects)
-                                        {
-                                            if (it2.Key.Equals(relationId))
-                                            {
-                                                bool exclude = false;
-                                                //If column is excluded.
-                                                if (excluded != null && excluded.TryGetValue(itValueType, out var excludedCols)
-                                                    && excludedCols.Contains(columns[it.Key].Name))
-                                                {
-                                                    exclude = true;
-                                                }
-                                                if (!exclude)
-                                                {
-                                                    col.Setter.Set(it.Value, it2.Value);
-                                                }
-                                                if (relationDataSetters.TryGetValue(itValueType, out var relSetters) &&
-                                                    relSetters.ContainsKey(it2.Value.GetType()))
-                                                {
-                                                    if (!oneToManyObjects.TryGetValue(itValueType, out var oneToMany))
-                                                    {
-                                                        oneToMany = new Dictionary<object, List<object>>();
-                                                        oneToManyObjects.Add(itValueType, oneToMany);
-                                                    }
-                                                    if (!oneToMany.TryGetValue(it2.Value, out var oneToManyList))
-                                                    {
-                                                        oneToManyList = new List<object>();
-                                                        oneToMany.Add(it2.Value, oneToManyList);
-                                                    }
-                                                    oneToManyList.Add(it.Value);
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                rowReferences.Clear();
-                            }
-                        }
-                        reader.Close();
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    throw GXDatabaseException.Create(ex, com.CommandText);
-                }
-            }
-            //Update relation data.
-            if (relationDataSetters != null)
-            {
-                //Update ManyToMany (N:N)
-                foreach (var it in manyToManyObjects)
-                {
-                    if (relationDataSetters.ContainsKey(it.Key))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var p = relationDataSetters[it.Key];
-                        foreach (var it2 in p)
-                        {
-                            //Check is column excluded.
-                            if (excluded != null && excluded.ContainsKey(it2.Key) && it2.Value.Target is PropertyInfo pi)
-                            {
-                                if (excluded[it2.Key].Contains(pi.Name))
-                                {
-                                    continue;
-                                }
-                            }
-                            foreach (var it3 in it.Value)
-                            {
-                                it2.Value.Set(it3.Key, GXInternal.ConvertListIfNeeded(it3.Value, it2.Value.Type));
-                            }
-                        }
-                    }
-                }
-                //Update OneToMany (1:N) relations.
-                foreach (var it in oneToManyObjects)
-                {
-                    if (relationDataSetters.ContainsKey(it.Key))
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var p = relationDataSetters[it.Key];
-                        foreach (var it2 in p)
-                        {
-                            //Check is column excluded.
-                            if (excluded != null && excluded.ContainsKey(it2.Key) && it2.Value.Target is PropertyInfo pi)
-                            {
-                                if (excluded[it2.Key].Contains(pi.Name))
-                                {
-                                    continue;
-                                }
-                            }
-                            foreach (var it3 in it.Value)
-                            {
-                                it2.Value.Set(it3.Key, GXInternal.ConvertListIfNeeded(it3.Value, it2.Value.Type));
-                            }
-                        }
-                    }
-                }
-            }
-            if (baseList != null)
-            {
-                return baseList;
-            }
-            if (objectList != null)
-            {
-                return objectList;
-            }
-            return list;
-        }
-
-        /// <summary>
-        /// Update Multiple reference values (N:N).
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="relationDataSetters"></param>
-        /// <param name="mapTables"></param>
-        /// <param name="UpdatedReferences"></param>
-        /// <param name="manyToManyObjects"></param>
-        private static void UpdateReferences(object item,
-            Dictionary<Type, Dictionary<Type, GXSerializedItem>> relationDataSetters,
-            Dictionary<Type, List<object>> mapTables,
-            List<KeyValuePair<object, object>> UpdatedReferences,
-            Dictionary<Type, Dictionary<object, List<object>>> manyToManyObjects)
-        {
-            if (item != null && mapTables != null)
-            {
-                foreach (var map in mapTables)
-                {
-                    if (map.Value.Contains(item.GetType()))
-                    {
-                        if (relationDataSetters.ContainsKey(map.Key))
-                        {
-                            foreach (var si in relationDataSetters[map.Key])
-                            {
-                                bool found = false;
-                                if (si.Key != item.GetType())
-                                {
-                                    foreach (var it5 in UpdatedReferences)
-                                    {
-                                        if (item.GetType().Equals(it5.Key))
-                                        {
-                                            found = true;
-                                            if (!manyToManyObjects.ContainsKey(it5.Value.GetType()))
-                                            {
-                                                manyToManyObjects.Add(it5.Value.GetType(), new Dictionary<object, List<object>>());
-                                            }
-                                            if (!manyToManyObjects[it5.Value.GetType()].ContainsKey(item))
-                                            {
-                                                manyToManyObjects[it5.Value.GetType()].Add(item, new List<object>());
-                                            }
-                                            //Check that item is not added yet.
-                                            if (!manyToManyObjects[it5.Value.GetType()][item].Contains(it5.Value))
-                                            {
-                                                manyToManyObjects[it5.Value.GetType()][item].Add(it5.Value);
-                                            }
-
-                                            if (!manyToManyObjects.ContainsKey(item.GetType()))
-                                            {
-                                                manyToManyObjects.Add(item.GetType(), new Dictionary<object, List<object>>());
-                                            }
-                                            if (!manyToManyObjects[item.GetType()].ContainsKey(it5.Value))
-                                            {
-                                                manyToManyObjects[item.GetType()].Add(it5.Value, new List<object>());
-                                            }
-                                            //Check that item is not added yet.
-                                            if (!manyToManyObjects[item.GetType()][it5.Value].Contains(item))
-                                            {
-                                                manyToManyObjects[item.GetType()][it5.Value].Add(item);
-                                            }
-                                            break;
-                                        }
-                                    }
-                                    if (!found)
-                                    {
-                                        UpdatedReferences.Add(new KeyValuePair<object, object>(si.Key, item));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         /// <summary>
@@ -1820,7 +1335,7 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
-        public T SingleOrDefault<T>(IDbTransaction transaction, GXSelectArgs arg)
+        public T? SingleOrDefault<T>(IDbTransaction transaction, GXSelectArgs arg)
         {
             List<T> list = Select<T>(transaction, arg);
             if (list.Count == 0)
@@ -1835,12 +1350,16 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
-        public T SingleOrDefault<T>(GXSelectArgs arg)
+        public T? SingleOrDefault<T>(GXSelectArgs arg)
         {
             List<T> list = Select<T>(arg);
             if (list.Count == 0)
             {
                 return default(T);
+            }
+            if (list.Count != 1)
+            {
+                throw new Exception("There are multiple items with same ID when id should be unique.");
             }
             return list[0];
         }
@@ -1850,7 +1369,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
-        public async Task<T> SingleOrDefaultAsync<T>(GXSelectArgs arg)
+        public async Task<T?> SingleOrDefaultAsync<T>(GXSelectArgs arg)
         {
             return await SingleOrDefaultAsync<T>(arg, CancellationToken.None);
         }
@@ -1861,7 +1380,7 @@ namespace Gurux.Service.Orm
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Database object.</returns>
-        public async Task<T> SingleOrDefaultAsync<T>(
+        public async Task<T?> SingleOrDefaultAsync<T>(
             GXSelectArgs arg,
             CancellationToken cancellationToken = default)
         {
@@ -1875,7 +1394,7 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
-        public async Task<T> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
+        public async Task<T?> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
         {
             return await SingleOrDefaultAsync<T>(transaction, arg, CancellationToken.None);
         }
@@ -1887,8 +1406,8 @@ namespace Gurux.Service.Orm
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Database object.</returns>
-        public async Task<T> SingleOrDefaultAsync<T>(
-            IDbTransaction transaction,
+        public async Task<T?> SingleOrDefaultAsync<T>(
+            IDbTransaction? transaction,
             GXSelectArgs arg,
             CancellationToken cancellationToken = default)
         {
@@ -1900,6 +1419,11 @@ namespace Gurux.Service.Orm
             {
                 return default(T);
             }
+            if (typeof(T) == typeof(string) && list[0] is string str)
+            {
+                str = str.Replace(@"\\", @"\");
+                return (T)(object)str;
+            }
             return list[0];
         }
 
@@ -1907,7 +1431,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object.
         /// </summary>
-        /// <param name="arg"></param>
+        /// <param name="arg">The insert arguments describing the entities to insert.</param>
         public void Insert(GXInsertArgs arg)
         {
             Insert(null, arg);
@@ -1918,39 +1442,71 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Insert arguments.</param>
-        public void Insert(IDbTransaction transaction, GXInsertArgs arg)
+        public void Insert(IDbTransaction? transaction,
+            GXInsertArgs arg)
         {
             if (arg == null)
             {
                 throw new ArgumentException("Insert arguments cannot be null.");
             }
-            if (arg.ToString(false) == "")
+            if (arg == null)
             {
-                //Nothing to insert.
+                throw new ArgumentException(Properties.Resources.InsertFailedBecauseThereIsNoDataToInsert);
+            }
+            if (QueryCache != null)
+            {
+                arg.UseQueryCache(QueryCache);
+            }
+            arg.Settings = Builder.Settings;
+            string query = arg.ToString(false);
+            if (string.IsNullOrEmpty(query))
+            {
+                //If there is no data to insert, we just return.
                 return;
             }
-            arg.UseQueryCache(QueryCache);
-            arg.Settings = Builder.Settings;
-            GXGetMembersArgs args = new GXGetMembersArgs(Builder.Settings, TargetType.Table)
+            bool autoTransaction = transaction == null && AutoTransaction;
+            IDbConnection connection = transaction?.Connection ?? Connection;
+            try
             {
-            };
-            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            foreach (var it in arg.Values)
-            {
-                GXDbHelpers.GetValues(args, it.Key, null, it.Value, list, arg.Excluded,
-                true, false, Builder.Settings.ColumnNameQuoteCharacter, false, null, null, arg.insertedObjects);
+                if (autoTransaction)
+                {
+                    transaction = connection.BeginTransaction();
+                }
+                GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                if (arg.Id != null)
+                {
+                    //Get last ID.
+                    GXSerializedItem? s = arg.Id?.ValuePair?.Value;
+                    var id = GetLastInsertId(connection, transaction, s.Type, arg.Id?.ValuePair?.Key, arg.Id?.Type);
+                    if (arg.Values.Count > 1)
+                    {
+                        if (Builder.Settings.Type != DatabaseType.MySQL &&
+                            Builder.Settings.Type != DatabaseType.MariaDB)
+                        {
+                            //If SQL database returns the last inserted ID,
+                            //so we need to subtract the number of inserted items - 1.
+                            id = GXDbHelpers.Add(id, -(arg.Values.Count - 1));
+                        }
+                    }
+                    foreach (var it in arg.Values)
+                    {
+                        s.Set?.Invoke(it.Key!, id);
+                        id = GXDbHelpers.Add(id, 1);
+                    }
+                }
+                if (autoTransaction)
+                {
+                    transaction?.Commit();
+                }
             }
-            IDbConnection connection;
-            bool tranactionOnProgress = transaction != null;
-            if (tranactionOnProgress)
+            catch (Exception)
             {
-                connection = transaction.Connection;
+                if (autoTransaction)
+                {
+                    transaction?.Rollback();
+                }
+                throw;
             }
-            else
-            {
-                connection = Connection;
-            }
-            UpdateOrInsert(connection, transaction, null, list);
         }
 
         /// <summary>
@@ -1967,7 +1523,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Insert argument.</param>
-        public async Task InsertAsync(IDbTransaction transaction, GXInsertArgs arg)
+        public async Task InsertAsync(IDbTransaction? transaction, GXInsertArgs arg)
         {
             await InsertAsync(transaction, arg, CancellationToken.None);
         }
@@ -1989,44 +1545,20 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Insert argument.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task InsertAsync(IDbTransaction transaction, GXInsertArgs arg,
+        public async Task InsertAsync(IDbTransaction? transaction,
+            GXInsertArgs arg,
             CancellationToken cancellationToken = default)
         {
-            if (arg == null)
-            {
-                throw new ArgumentException("Insert failed. There is nothing to insert.");
-            }
-            arg.UseQueryCache(QueryCache);
-            arg.Settings = Builder.Settings;
-            GXGetMembersArgs args = new GXGetMembersArgs(Builder.Settings, TargetType.Table)
-            {
-            };
-            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            foreach (var it in arg.Values)
-            {
-                GXDbHelpers.GetValues(args, it.Key, null, it.Value, list, arg.Excluded, true, false,
-                    Builder.Settings.ColumnNameQuoteCharacter, false, null, null, arg.insertedObjects);
-            }
-            IDbConnection connection;
-            bool tranactionOnProgress = transaction != null;
-            if (tranactionOnProgress)
-            {
-                connection = transaction.Connection;
-            }
-            else
-            {
-                connection = Connection;
-            }
-            await UpdateOrInsert(connection, transaction, null, list);
+            await Task.Run(() => Insert(transaction, arg), cancellationToken);
         }
 
         /// <summary>
         /// Update object.
         /// </summary>
         /// <param name="arg">Update arguments.</param>
-        public void Update(GXUpdateArgs arg)
+        public int Update(GXUpdateArgs arg)
         {
-            Update(null, arg);
+            return Update(null, arg);
         }
 
         /// <summary>
@@ -2034,54 +1566,50 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Update arguments.</param>
-        public void Update(IDbTransaction transaction, GXUpdateArgs arg)
+        public int Update(IDbTransaction? transaction, GXUpdateArgs arg)
         {
             if (arg == null)
             {
-                throw new ArgumentException("Update failed. There is nothing to update.");
+                throw new ArgumentException(Properties.Resources.NoDataToUpdate);
             }
             arg.UseQueryCache(QueryCache);
             arg.Settings = Builder.Settings;
-            GXGetMembersArgs args = new GXGetMembersArgs(Builder.Settings, TargetType.Table)
+            string query = arg.ToString(false);
+            if (string.IsNullOrEmpty(query))
             {
-            };
-            //Get values to insert first.
-            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            List<object> handledObjects = new List<object>();
-            if (arg.Where == null || arg.Where.List.Count == 0)
+                //If there is no data to update, we just return.
+                return 0;
+            }
+            bool autoTransaction = transaction == null && AutoTransaction;
+            IDbConnection connection = transaction?.Connection ?? Connection;
+            try
             {
-                foreach (var it in arg.Values)
+                if (autoTransaction)
                 {
-                    GXDbHelpers.GetValues(args, it.Key, null, it.Value, list, arg.Excluded, true, false,
-                        Builder.Settings.ColumnNameQuoteCharacter, false, arg.Where, handledObjects, null);
+                    transaction = connection.BeginTransaction();
                 }
+                int count = GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                if (autoTransaction)
+                {
+                    transaction?.Commit();
+                }
+                return count;
             }
-            IDbConnection connection;
-            bool tranactionOnProgress = transaction != null;
-            if (tranactionOnProgress)
+            catch (Exception)
             {
-                connection = transaction.Connection;
+                if (autoTransaction)
+                {
+                    transaction?.Rollback();
+                }
+                throw;
             }
-            else
-            {
-                connection = Connection;
-            }
-            UpdateOrInsert(connection, transaction, null, list);
-            list.Clear();
-            //Get updated values.
-            foreach (var it in arg.Values)
-            {
-                GXDbHelpers.GetValues(args, it.Key, null, it.Value, list, arg.Excluded,
-                    false, false, Builder.Settings.ColumnNameQuoteCharacter, true, arg.Where, handledObjects, null);
-            }
-            UpdateOrInsert(connection, transaction, arg, list);
         }
 
         /// <summary>
         /// Update object as async.
         /// </summary>
-        /// <param name="arg"></param>
-        public Task UpdateAsync(GXUpdateArgs arg)
+        /// <param name="arg">The update arguments describing the values and row filter.</param>
+        public Task<int> UpdateAsync(GXUpdateArgs arg)
         {
             return UpdateAsync(null, arg, CancellationToken.None);
         }
@@ -2091,7 +1619,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction</param>
         /// <param name="arg">Update arguments.</param>
-        public Task UpdateAsync(IDbTransaction transaction, GXUpdateArgs arg)
+        public Task<int> UpdateAsync(IDbTransaction transaction, GXUpdateArgs arg)
         {
             return UpdateAsync(transaction, arg, CancellationToken.None);
         }
@@ -2101,7 +1629,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="arg">Update arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public Task UpdateAsync(GXUpdateArgs arg, CancellationToken cancellationToken = default)
+        public Task<int> UpdateAsync(GXUpdateArgs arg, CancellationToken cancellationToken = default)
         {
             return UpdateAsync(null, arg, cancellationToken);
         }
@@ -2112,181 +1640,10 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction</param>
         /// <param name="arg">Update arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task UpdateAsync(IDbTransaction transaction, GXUpdateArgs arg,
+        public async Task<int> UpdateAsync(IDbTransaction? transaction, GXUpdateArgs arg,
             CancellationToken cancellationToken = default)
         {
-            if (arg == null)
-            {
-                throw new ArgumentException("Update failed. There is nothing to update.");
-            }
-            arg.UseQueryCache(QueryCache);
-            arg.Settings = Builder.Settings;
-            GXGetMembersArgs args = new GXGetMembersArgs(Builder.Settings, TargetType.Table)
-            {
-            };
-
-            //Get values to insert first.
-            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            List<object> handledObjects = new List<object>();
-            if (arg.Where == null || arg.Where.List.Count == 0)
-            {
-                foreach (var it in arg.Values)
-                {
-                    GXDbHelpers.GetValues(args, it.Key, null, it.Value, list, arg.Excluded,
-                        true, false, Builder.Settings.ColumnNameQuoteCharacter, false, arg.Where, handledObjects, null);
-                }
-            }
-            cancellationToken.ThrowIfCancellationRequested();
-            IDbConnection connection;
-            bool tranactionOnProgress = transaction != null;
-            if (tranactionOnProgress)
-            {
-                connection = transaction.Connection;
-            }
-            else
-            {
-                connection = Connection;
-            }
-            await UpdateOrInsert(connection, transaction, null, list);
-            list.Clear();
-            //Get updated values.
-            foreach (var it in arg.Values)
-            {
-                GXDbHelpers.GetValues(args, it.Key, null, it.Value, list, arg.Excluded,
-                    false, false, Builder.Settings.ColumnNameQuoteCharacter, true, arg.Where, handledObjects, null);
-            }
-            await UpdateOrInsertAsync(connection, transaction, arg, list, cancellationToken);
-        }
-
-        private Task UpdateOrInsertAsync(IDbConnection connection,
-            IDbTransaction transaction,
-            object caller,
-            List<KeyValuePair<Type, GXUpdateItem>> list,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return Task.Run(() => UpdateOrInsert(connection, transaction, caller, list), cancellationToken);
-        }
-
-        /// <summary>
-        /// Update or insert new value to the DB.
-        /// </summary>
-        /// <param name="connection">Database connection.</param>
-        /// <param name="transaction">Transaction.</param>
-        /// <param name="caller">Insert or update.</param>
-        /// <param name="list">List of tables to update.</param>
-        private Task UpdateOrInsert(IDbConnection connection,
-            IDbTransaction transaction,
-            object caller,
-            List<KeyValuePair<Type, GXUpdateItem>> list)
-        {
-            if (list.Count == 0)
-            {
-                return Task.CompletedTask;
-            }
-            int pos;
-            string columnName;
-            ulong id;
-            int total = 0;
-            Type type;
-            bool transactionUninitialized = transaction == null;
-            List<string> queries = new List<string>();
-            List<int> queryRowCounts = new List<int>();
-            bool update = caller is GXUpdateArgs;
-            try
-            {
-                if (AutoTransaction && transactionUninitialized)
-                {
-                    transaction = connection.BeginTransaction();
-                }
-                GXGetMembersArgs args = new GXGetMembersArgs(Builder.Settings, TargetType.Table)
-                {
-                    SingleTable = true
-                };
-                foreach (var q in list)
-                {
-                    queries.Clear();
-                    queryRowCounts.Clear();
-                    if (update)
-                    {
-                        GXDbHelpers.GetUpdateQuery((GXUpdateArgs)caller, q, Builder.Settings, queries);
-                    }
-                    else
-                    {
-                        total += GXDbHelpers.GetInsertQuery(args, q, queries, queryRowCounts);
-                        q.Value.Inserted = true;
-                    }
-                    type = q.Key;
-                    pos = -1;
-                    foreach (var it in q.Value.Rows[0])
-                    {
-                        if (it.Key.GetType() == type)
-                        {
-                            ++pos;
-                            break;
-                        }
-                        ++pos;
-                    }
-                    if (Builder.Settings.MaximumRowUpdate != 1 && total > Builder.Settings.MaximumRowUpdate)
-                    {
-                        if (transaction != null && transactionUninitialized)
-                        {
-                            transaction.Commit();
-                            transaction = connection.BeginTransaction();
-                        }
-                        total = 0;
-                    }
-                    GXSerializedItem si = GXSqlBuilder.FindAutoIncrement(type);
-                    int index = 0;
-                    int queryIndex = 0;
-                    foreach (string query in queries)
-                    {
-                        GXSchemaManager.ExecuteNonQuery(connection, transaction, sql, query);
-                        //Update auto increment value immediately after the insert statement.
-                        if (!update && si != null && pos != -1)
-                        {
-                            columnName = GXDbHelpers.ConvertToString(Builder.Settings, TargetType.Column | TargetType.Plain, null, si.Target as PropertyInfo, null);
-                            id = (ulong)GetLastInsertId(connection, transaction, typeof(ulong), columnName, type);
-                            int rowCount = queryRowCounts.Count > queryIndex ? queryRowCounts[queryIndex] : q.Value.Rows.Count;
-                            if (!Builder.Settings.AutoIncrementFirst)
-                            {
-                                id -= (ulong)(rowCount - 1);
-                            }
-                            for (int pos2 = 0; pos2 < rowCount && index < q.Value.Rows.Count; ++pos2)
-                            {
-                                var it = q.Value.Rows[index];
-                                if (Convert.ChangeType(si.Get(it[pos].Key), si.Type).Equals(Convert.ChangeType(0, si.Type)))
-                                {
-                                    si.Set(it[pos].Key, Convert.ChangeType(id, si.Type));
-                                }
-                                ++id;
-                                ++index;
-                            }
-                        }
-                        ++queryIndex;
-                    }
-                }
-                if (transaction != null && transactionUninitialized)
-                {
-                    transaction.Commit();
-                }
-            }
-            catch (Exception)
-            {
-                if (transaction != null && transactionUninitialized)
-                {
-                    transaction.Rollback();
-                }
-                throw;
-            }
-            finally
-            {
-                if (transaction != null && transactionUninitialized)
-                {
-                    transaction.Dispose();
-                }
-            }
-            return Task.CompletedTask;
+            return await Task.Run(() => Update(transaction, arg), cancellationToken);
         }
 
         /// <summary>
@@ -2320,7 +1677,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T">Table type.</typeparam>
         /// <param name="transaction">Transaction to use.</param>
-        public void Truncate<T>(IDbTransaction transaction = default)
+        public void Truncate<T>(IDbTransaction? transaction = null)
         {
             //SQLite don't support truncate.
             if (Builder.Settings.Type == DatabaseType.SqLite)
@@ -2330,7 +1687,7 @@ namespace Gurux.Service.Orm
             else
             {
                 string query = "TRUNCATE TABLE " + Builder.GetTableName(typeof(T), true);
-                GXSchemaManager.ExecuteNonQuery(Connection, transaction, sql, query);
+                GXSchemaManager.ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted, query);
             }
         }
 
@@ -2339,7 +1696,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction to use.</param>
         /// <param name="cancellationToken">Cancellation token</param>
-        public async Task TruncateAsync<T>(IDbTransaction transaction = default, CancellationToken cancellationToken = default)
+        public async Task TruncateAsync<T>(IDbTransaction? transaction = default, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await Task.Run(() =>
@@ -2349,9 +1706,92 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
-        /// 
+        /// Delete ALL items from the table.
         /// </summary>
-        /// <returns></returns>
+        /// <param name="tableName">Database table name.</param>
+        /// <param name="transaction">Transaction to use.</param>
+        public void Truncate(IDbTransaction? transaction, string tableName)
+        {
+            //SQLite don't support truncate.
+            if (Builder.Settings.Type == DatabaseType.SqLite)
+            {
+                Delete(transaction, tableName);
+            }
+            else
+            {
+                string query = "TRUNCATE TABLE " + GXDbHelpers.ConvertToString(Builder.Settings, TargetType.Table, null, tableName, null);
+                GXSchemaManager.ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted, query);
+            }
+        }
+
+        /// <summary>
+        /// Delete ALL items from the table.
+        /// </summary>
+        /// <param name="tableName">Database table name.</param>
+        public void Truncate(string tableName)
+        {
+            Truncate(null, tableName);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="transaction">Transaction to use.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        public async Task TruncateAsync(IDbTransaction? transaction, string tableName, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await Task.Run(() =>
+            {
+                Truncate(transaction, tableName);
+            }, cancellationToken);
+        }
+
+        /// <summary>
+        /// Delete items from the DB.
+        /// </summary>
+        /// <param name="tableName">Table name.</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        public Task TruncateAsync(string tableName, CancellationToken cancellationToken = default)
+        {
+            return TruncateAsync(null, tableName, cancellationToken);
+        }
+
+
+        /// <summary>
+        /// Check if table exists.
+        /// </summary>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Returns true if table exists.</returns>
+        public bool TableExist(string tableName)
+        {
+            return TableExist(null, tableName);
+        }
+
+        private string GetTableName(string table)
+        {
+            return Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, table);
+        }
+
+        /// <summary>
+        /// Check if table exists.
+        /// </summary>
+        /// <param name="transaction">Transaction.</param>
+        /// <param name="tableName">Table name.</param>
+        /// <returns>Returns true if table exists.</returns>
+        public bool TableExist(IDbTransaction? transaction, string tableName)
+        {
+            IDbConnection connection = transaction?.Connection ?? Connection;
+            tableName = GetTableName(tableName);
+            string query = Builder.Settings.TableExist(Builder.Database, tableName);
+            return ExecuteScalar<int>(query) != 0;
+        }
+
+        /// <summary>
+        /// Initiates disposal of the underlying database connection.
+        /// </summary>
+        /// <returns>A completed value task; the underlying asynchronous disposal is initiated but is not awaited by this implementation.</returns>
         public ValueTask DisposeAsync()
         {
             Connection.DisposeAsync();

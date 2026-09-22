@@ -11,6 +11,7 @@
     <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <TargetFrameworks>net10.0;net90;</TargetFrameworks>
+    <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
     <PackageTags>Gurux Service framework.</PackageTags>
@@ -26,8 +27,8 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Service.Common" Version="3.0.2605.602" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.10" />
+    <PackageReference Include="Gurux.Service.Common" Version="3.0.2609.1801" />
+    <PackageReference Include="System.Data.Odbc" Version="10.0.12" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
  </ItemGroup>
 
@@ -40,9 +41,6 @@
     <Reference Include="System.Data.Linq" />
   </ItemGroup>
  
-  <ItemGroup>
-    <Folder Include="Properties\" />
-  </ItemGroup>
  <ItemGroup>
     <None Include="..\gurux_service.png" Pack="true" PackagePath="\" />
   </ItemGroup>
@@ -55,5 +53,18 @@
    <PackageReference Include="System.Data.Odbc">
      <Version>5.0.0</Version>
    </PackageReference>
+ </ItemGroup>
+ <ItemGroup>
+   <Compile Update="Properties\Resources.Designer.cs">
+     <DesignTime>True</DesignTime>
+     <AutoGen>True</AutoGen>
+     <DependentUpon>Resources.resx</DependentUpon>
+   </Compile>
+ </ItemGroup>
+ <ItemGroup>
+   <EmbeddedResource Update="Properties\Resources.resx">
+     <Generator>ResXFileCodeGenerator</Generator>
+     <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+   </EmbeddedResource>
  </ItemGroup>
 </Project>

@@ -37,7 +37,7 @@ namespace Gurux.Service.Orm.Settings
     /// <summary>
     /// Utility class to handle reserved words in DB2.
     /// </summary>
-    public static class GXDB2ReservedWords
+    static class GXDB2ReservedWords
     {
         /// <summary>
         /// A set of reserved words in DB2. 
@@ -115,6 +115,21 @@ namespace Gurux.Service.Orm.Settings
         {
             return !string.IsNullOrWhiteSpace(identifier) &&
                    ReservedWords.Contains(identifier);
+        }
+
+        /// <summary>
+        /// Escapes the given identifier if it is a reserved word in DB2.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix to use.</param>
+        /// <param name="value">The identifier to escape.</param>
+        /// <returns>The escaped identifier if it is a reserved word; otherwise, the original identifier.</returns>
+        public static string EscapeIdentifier(string? tablePrefix, string value)
+        {
+            if (IsReservedWord(value))
+            {
+                return $"\"{tablePrefix}{value}\"";
+            }
+            return $"{tablePrefix}{value.ToUpperInvariant()}";
         }
     }
 }

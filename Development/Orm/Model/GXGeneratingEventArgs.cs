@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -33,15 +33,20 @@
 using System;
 namespace Gurux.Service.Orm.Model
 {
+    /// <summary>Contains the table and update choice for a generation operation.</summary>
     public sealed class GXGeneratingEventArgs : EventArgs
     {
+        /// <summary>Initializes generation options for a table.</summary>
+        /// <param name="tableName">Name of the table being processed.</param>
         public GXGeneratingEventArgs(string tableName)
         {
             TableName = tableName;
         }
 
+        /// <summary>Gets the name of the table being processed.</summary>
         public string TableName { get; }
 
+        /// <summary>Gets or sets whether to update the table. Defaults to true.</summary>
         public bool Update { get; set; } = true;
     }
 }

@@ -1,4 +1,4 @@
-//
+﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -29,23 +29,32 @@
 // This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
+
 using Gurux.Service.Orm.Common;
-using Gurux.Service.Orm.Common.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Runtime.Serialization;
 
-namespace Gurux.Service.DB.Tests
+namespace Gurux.Service_Simple_Unit_Test
 {
-    class DateTimeTestData
+    [DataContract]
+    class ReservedClass : IUnique<int>
     {
-        [TimeStorageUnit(TimeStorageUnit.Milliseconds)]
-        public DateTime Milliseconds { get; set; }
+        [DatabaseGeneratedAttribute(DatabaseGeneratedOption.None)]
+        [DataMember(Name = "ID"), Index]
+        public int Id
+        {
+            get;
+            set;
+        }
 
-        [TimeStorageUnit(TimeStorageUnit.Seconds)]
-        public DateTime Seconds { get; set; }
-        [TimeStorageUnit(TimeStorageUnit.Milliseconds)]
-        public DateTimeOffset MillisecondsWithTimeZone { get; set; }
-
-        [TimeStorageUnit(TimeStorageUnit.Seconds)]
-        public DateTimeOffset SecondsWithTimeZone { get; set; }
+        /// <summary>
+        /// MySql , PostgreSQL, DB2, Oracle, MariaDB, SqLite and SapHana reserved word.
+        /// </summary>
+        [DataMember(Name = "ALL")]
+        public string All
+        {
+            get;
+            set;
+        } = default!;
     }
-
 }

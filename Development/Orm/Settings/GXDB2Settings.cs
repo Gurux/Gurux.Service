@@ -31,6 +31,7 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
@@ -76,65 +77,18 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetForeignKeysQuery(string tableName)
         {
-            throw new NotImplementedException();
+            return $@"SELECT CONSTNAME AS constraint_name, TABNAME AS table_name FROM SYSCAT.REFERENCES WHERE REFTABNAME = '{tableName.ToUpperInvariant()}'";
         }
 
         /// <inheritdoc />
-        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            onDelete = ParseOnDelete(Convert.ToString(values[1], CultureInfo.InvariantCulture));
-            onUpdate = ParseOnUpdate(Convert.ToString(values[2], CultureInfo.InvariantCulture));
-            return (string)values[0];
-        }
-
-        private static ForeignKeyDelete ParseOnDelete(string value)
-        {
-            value = value ?? string.Empty;
-            switch (value.ToUpperInvariant())
-            {
-                case "A":
-                case "NO ACTION":
-                case "NO_ACTION":
-                    return ForeignKeyDelete.None;
-                case "C":
-                case "CASCADE":
-                    return ForeignKeyDelete.Cascade;
-                case "R":
-                case "RESTRICT":
-                    return ForeignKeyDelete.Restrict;
-                default:
-                    return ForeignKeyDelete.None;
-            }
-        }
-
-        private static ForeignKeyUpdate ParseOnUpdate(string value)
-        {
-            value = value ?? string.Empty;
-            switch (value.ToUpperInvariant())
-            {
-                case "A":
-                case "NO ACTION":
-                case "NO_ACTION":
-                    return ForeignKeyUpdate.None;
-                case "C":
-                case "CASCADE":
-                    return ForeignKeyUpdate.Cascade;
-                case "N":
-                case "SET NULL":
-                case "SET_NULL":
-                    return ForeignKeyUpdate.Null;
-                case "R":
-                case "RESTRICT":
-                    return ForeignKeyUpdate.Restrict;
-                default:
-                    return ForeignKeyUpdate.None;
-            }
-        }
-
-        /// <inheritdoc />
-        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
-        {
-            return string.Format("SELECT r.REFTABNAME, r.DELETERULE, r.UPDATERULE FROM SYSCAT.REFERENCES r INNER JOIN SYSCAT.KEYCOLUSE k ON r.TABSCHEMA = k.TABSCHEMA AND r.TABNAME = k.TABNAME AND r.CONSTNAME = k.CONSTNAME WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format(@"SELECT r.CONSTNAME, r.REFTABSCHEMA, r.REFTABNAME, child.COLNAME, parent.COLNAME, child.COLSEQ, r.DELETERULE, r.UPDATERULE
+FROM SYSCAT.REFERENCES r
+INNER JOIN SYSCAT.KEYCOLUSE child ON r.TABSCHEMA = child.TABSCHEMA AND r.TABNAME = child.TABNAME AND r.CONSTNAME = child.CONSTNAME
+INNER JOIN SYSCAT.KEYCOLUSE parent ON r.REFTABSCHEMA = parent.TABSCHEMA AND r.REFTABNAME = parent.TABNAME AND r.REFKEYNAME = parent.CONSTNAME AND child.COLSEQ = parent.COLSEQ
+WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}'
+ORDER BY r.CONSTNAME, child.COLSEQ", schema, tableName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
@@ -144,26 +98,24 @@ namespace Gurux.Service.Orm.Settings
             {
                 return string.Format("SELECT REMARKS FROM SYSCAT.TABLES WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}'", schema, tableName.ToUpperInvariant());
             }
-            return string.Format("SELECT REMARKS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT REMARKS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND UPPER(COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetOrdinalQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT COLNO + 1 FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT COLNO + 1 FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND UPPER(COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
         {
-            tableName = tableName.Replace("\"", "\"\"");
             comment = comment.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
             {
-                return $"COMMENT ON TABLE \"{tableName}\" IS '{comment}'";
+                return $"COMMENT ON TABLE {tableName} IS '{comment}'";
             }
-            columnName = columnName.Replace("\"", "\"\"");
-            return $"COMMENT ON COLUMN \"{tableName}\".\"{columnName}\" IS '{comment}'";
+            return $"COMMENT ON COLUMN {tableName}.{columnName} IS '{comment}'";
         }
 
 
@@ -198,7 +150,7 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetUsersQuery(string databaseName)
+        public override string GetUsersQuery(string? databaseName)
         {
             if (string.IsNullOrEmpty(databaseName))
             {
@@ -211,9 +163,10 @@ ORDER BY GRANTEE";
         }
 
         /// <inheritdoc />
-        public override string GetDatabasesQuery()
+        public override string GetDatabasesQuery(out int index)
         {
-            return @"SELECT SCHEMANAME FROM SYSCAT.SCHEMATA WHERE SCHEMANAME NOT IN (
+            index = 0;
+            return @"SELECT RTRIM(SCHEMANAME) FROM SYSCAT.SCHEMATA WHERE SCHEMANAME NOT IN (
 'SYSIBM', 'SYSIBMADM', 'SYSIBMINTERNAL', 'SYSIBMTS',
 'SYSCAT', 'SYSFUN', 'SYSPROC', 'SYSPUBLIC',
 'SYSSTAT', 'SYSTOOLS','NULLID','SQLJ'
@@ -221,7 +174,7 @@ ORDER BY GRANTEE";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string databaseName, string userName)
+        public override string GetDatabaseUserPermissionQuery(string? databaseName, string userName)
         {
             if (string.IsNullOrWhiteSpace(databaseName))
             {
@@ -306,6 +259,8 @@ ORDER BY PERMISSION;";
                 // Database authorities
                 "DBADM" =>
                     DatabasePermission.Admin,
+                "SYSIBM" =>
+                    DatabasePermission.Admin,
                 "CONNECT" =>
                     DatabasePermission.None,
                 "CREATE" or
@@ -334,7 +289,7 @@ ORDER BY PERMISSION;";
         }
 
         /// <inheritdoc />
-        public override string RemoveUserQuery(string databaseName, string userName)
+        public override string RemoveUserQuery(string? databaseName, string userName)
         {
             throw new NotSupportedException("DB2 does not allow user management.");
         }
@@ -372,7 +327,7 @@ ORDER BY PERMISSION;";
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT NULLS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT NULLS FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND UPPER(COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
@@ -401,46 +356,86 @@ ORDER BY PERMISSION;";
         }
 
         /// <inheritdoc />
-        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
+        public override bool IsUnique(object value)
         {
-            return string.Format("SELECT IDENTITY FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            if (value is bool b)
+            {
+                return b;
+            }
+            return string.Compare(Convert.ToString(value, CultureInfo.InvariantCulture), "Y", true) == 0;
         }
 
         /// <inheritdoc />
-        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT r.REFTABNAME FROM SYSCAT.REFERENCES r INNER JOIN SYSCAT.KEYCOLUSE k ON r.TABSCHEMA = k.TABSCHEMA AND r.TABNAME = k.TABNAME AND r.CONSTNAME = k.CONSTNAME WHERE r.TABSCHEMA = CURRENT SCHEMA AND r.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT IDENTITY FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND UPPER(COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT COUNT(1) FROM SYSCAT.TABCONST tc INNER JOIN SYSCAT.KEYCOLUSE k ON tc.TABSCHEMA = k.TABSCHEMA AND tc.TABNAME = k.TABNAME AND tc.CONSTNAME = k.CONSTNAME WHERE tc.TYPE = 'P' AND tc.TABSCHEMA = CURRENT SCHEMA AND tc.TABNAME = '{1}' AND k.COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT COUNT(1) FROM SYSCAT.TABCONST tc INNER JOIN SYSCAT.KEYCOLUSE k ON tc.TABSCHEMA = k.TABSCHEMA AND tc.TABNAME = k.TABNAME AND tc.CONSTNAME = k.CONSTNAME WHERE tc.TYPE = 'P' AND tc.TABSCHEMA = CURRENT SCHEMA AND tc.TABNAME = '{1}' AND UPPER(k.COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT \"DEFAULT\" FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT \"DEFAULT\" FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND UPPER(COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetColumnDefaultValue(object value, Type columnType)
         {
-            throw new NotImplementedException();
+            if (value is DefaultValueKind v)
+            {
+                return v switch
+                {
+                    DefaultValueKind.Now when columnType == typeof(DateOnly) =>
+                        "CURRENT DATE",
+
+                    DefaultValueKind.Now when columnType == typeof(TimeOnly) =>
+                        "CURRENT TIME",
+
+                    DefaultValueKind.Now when columnType == typeof(DateTimeOffset) =>
+                        "CURRENT TIMESTAMP",
+
+                    DefaultValueKind.Now =>
+                        "CURRENT TIMESTAMP",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(DateOnly) =>
+                        "DATE CURRENT TIMESTAMP",
+
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) =>
+                        "TIME CURRENT TIMESTAMP",
+
+                    DefaultValueKind.UtcNow =>
+                        "CURRENT TIMESTAMP",
+                    //DB2 does not support default value for guid when data type is
+                    //BINARY(16).
+                    DefaultValueKind.NewGuid => "",
+                    _ => throw new ArgumentOutOfRangeException(nameof(value))
+                };
+            }
+            if (columnType == typeof(bool))
+            {
+                return ConvertToString(value, ConvertOption.None);
+            }
+            return ConvertToString(value, ConvertOption.Quete);
         }
 
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT TYPENAME, LENGTH, SCALE FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            tableName = tableName.Replace("\"", "");
+            columnName = columnName.Replace("\"", "");
+            return string.Format("SELECT TYPENAME, LENGTH, SCALE FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{1}' AND COLNAME = '{2}'", schema, tableName, columnName);
         }
 
         /// <inheritdoc />
         public override string GetColumnsQuery(string schema, string name, out int index)
         {
             index = 0;
-            return string.Format("SELECT COLNAME FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{0}' ORDER BY COLNO", name.ToUpperInvariant());
+            return string.Format("SELECT COLNAME FROM SYSCAT.COLUMNS WHERE TABSCHEMA = CURRENT SCHEMA AND TABNAME = '{0}' ORDER BY COLNO", name);
         }
 
         /// <inheritdoc />
@@ -470,15 +465,6 @@ ORDER BY PERMISSION;";
             get
             {
                 return 128;
-            }
-        }
-
-        /// <inheritdoc/>
-        public override bool SelectUsingAs
-        {
-            get
-            {
-                return false;
             }
         }
 
@@ -537,7 +523,7 @@ ORDER BY PERMISSION;";
         }
 
         /// <inheritdoc />
-        override public string AutoIncrementDefinition
+        override public string? AutoIncrementDefinition
         {
             get
             {
@@ -569,7 +555,7 @@ ORDER BY PERMISSION;";
         {
             get
             {
-                return "SMALLINT";
+                return "BOOLEAN";
             }
         }
 
@@ -578,7 +564,7 @@ ORDER BY PERMISSION;";
         {
             get
             {
-                return "CHAR(36)";
+                return "BINARY(16)";
             }
         }
 
@@ -754,6 +740,10 @@ ORDER BY PERMISSION;";
         /// <inheritdoc/>
         internal override string ConvertToString(object value, ConvertOption options)
         {
+            if (value is Guid guid)
+            {
+                return "HEXTORAW('" + Convert.ToHexString(guid.ToByteArray()) + "')";
+            }
             if (value is DateTime dt)
             {
                 if (dt == DateTime.MinValue)
@@ -794,6 +784,10 @@ ORDER BY PERMISSION;";
         /// <returns>Converted value.</returns>
         internal override object ChangeType(object value, Type type)
         {
+            if (type == typeof(Guid) && value is byte[] ba)
+            {
+                return new Guid(ba);
+            }
             if (type == typeof(DateTimeOffset) && value is DateTime dt)
             {
                 if (dt == DateTime.MinValue)
@@ -811,7 +805,7 @@ ORDER BY PERMISSION;";
         /// <inheritdoc />
         public override string GetLastInsertId(string tableName, string columnName)
         {
-            return "SELECT IDENTITY_VAL_LOCAL() FROM SYSIBM.SYSDUMMY1";
+            return $"SELECT MAX({columnName}) FROM {tableName}";
         }
 
         /// <inheritdoc />
@@ -821,13 +815,51 @@ ORDER BY PERMISSION;";
         }
 
         /// <inheritdoc />
-        public override string GetTables(string schema)
+        public override string GetTablesQuery(string schema)
         {
             if (string.IsNullOrEmpty(schema))
             {
                 return "SELECT TABNAME FROM SYSCAT.TABLES WHERE TABSCHEMA = CURRENT SCHEMA AND TYPE = 'T'";
             }
             return $"SELECT TABNAME FROM SYSCAT.TABLES WHERE TABSCHEMA = '{schema}' AND TYPE = 'T'";
+        }
+
+        public override string UniqueQuery(string schema, string tableName, string columnName)
+        {
+            return string.Format("SELECT COUNT(1) FROM SYSCAT.INDEXES i INNER JOIN SYSCAT.INDEXCOLUSE ic ON i.INDSCHEMA = ic.INDSCHEMA AND i.INDNAME = ic.INDNAME WHERE i.UNIQUERULE IN ('U', 'D') AND i.TABSCHEMA = CURRENT SCHEMA AND i.TABNAME = '{1}' AND UPPER(ic.COLNAME) = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+        }
+
+
+        /// <inheritdoc />
+        public override bool IsIdentity(object value)
+        {
+            if (value is string s)
+            {
+                return string.Compare(s, "Y", true) == 0;
+            }
+            return Convert.ToBoolean(value);
+        }
+
+        /// <inheritdoc />
+        public override string IsIdentityQuery(string schema, string tableName, string columnName)
+        {
+            return $@"SELECT IDENTITY FROM SYSCAT.COLUMNS WHERE TABSCHEMA = UPPER('{schema}') AND TABNAME = UPPER('{tableName}') AND COLNAME = UPPER('{columnName}')";
+        }
+
+        public override string TableIndexesQuery(string schema, string tableName)
+        {
+            return $@"SELECT i.INDNAME, CASE WHEN i.UNIQUERULE IN ('U', 'P') THEN 1 ELSE 0 END, ic.COLNAME, ic.COLSEQ, ic.COLORDER
+FROM SYSCAT.INDEXES i
+INNER JOIN SYSCAT.INDEXCOLUSE ic ON i.INDSCHEMA = ic.INDSCHEMA AND i.INDNAME = ic.INDNAME
+WHERE i.TABSCHEMA = CURRENT SCHEMA
+  AND i.TABNAME = UPPER('{tableName}')
+  AND i.UNIQUERULE <> 'P'
+ORDER BY i.INDNAME, ic.COLSEQ";
+        }
+
+        public override void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value)
+        {
+            UpdateTableIndexesFromRows(schema, value);
         }
 
         /// <inheritdoc />

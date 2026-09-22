@@ -32,6 +32,9 @@
 
 namespace Gurux.Service.Orm.Enums
 {
+    /// <summary>
+    /// Default value kind for the property.
+    /// </summary>
     public enum DefaultValueKind
     {
         /// <summary>

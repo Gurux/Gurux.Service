@@ -31,6 +31,7 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
@@ -70,58 +71,46 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetForeignKeysQuery(string tableName)
         {
-            throw new NotImplementedException();
+            return $@"SELECT CONSTRAINT_NAME AS constraint_name, TABLE_NAME AS table_name
+FROM SYS.REFERENTIAL_CONSTRAINTS
+WHERE REFERENCED_TABLE_NAME = '{tableName}'
+  AND SCHEMA_NAME = CURRENT_SCHEMA";
+        }
+
+        private static string GetTableFilter(string tableName, string? tableAlias = null)
+        {
+            tableName = tableName.Replace("'", "''").ToUpperInvariant();
+            string tableColumn = string.IsNullOrEmpty(tableAlias)
+                ? "TABLE_NAME"
+                : tableAlias + ".TABLE_NAME";
+            string schemaColumn = string.IsNullOrEmpty(tableAlias)
+                ? "SCHEMA_NAME"
+                : tableAlias + ".SCHEMA_NAME";
+            return $@"UPPER({tableColumn}) = '{tableName}'
+  AND
+  (
+      {schemaColumn} = CURRENT_SCHEMA
+      OR
+      (
+          NOT EXISTS (
+              SELECT 1
+              FROM TABLES
+              WHERE SCHEMA_NAME = CURRENT_SCHEMA
+                AND UPPER(TABLE_NAME) = '{tableName}'
+          )
+          AND {schemaColumn} NOT LIKE '_SYS%'
+          AND {schemaColumn} NOT IN ('PUBLIC', 'SYS', 'SYSTEM')
+      )
+  )";
         }
 
         /// <inheritdoc />
-        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            onDelete = ParseOnDelete(Convert.ToString(values[1], CultureInfo.InvariantCulture));
-            onUpdate = ParseOnUpdate(Convert.ToString(values[2], CultureInfo.InvariantCulture));
-            return (string)values[0];
-        }
-
-        private static ForeignKeyDelete ParseOnDelete(string value)
-        {
-            value = value ?? string.Empty;
-            switch (value.Replace(" ", "_").ToUpperInvariant())
-            {
-                case "NO_ACTION":
-                case "SET_NULL":
-                case "SET_DEFAULT":
-                    return ForeignKeyDelete.None;
-                case "CASCADE":
-                    return ForeignKeyDelete.Cascade;
-                case "RESTRICT":
-                    return ForeignKeyDelete.Restrict;
-                default:
-                    return ForeignKeyDelete.None;
-            }
-        }
-
-        private static ForeignKeyUpdate ParseOnUpdate(string value)
-        {
-            value = value ?? string.Empty;
-            switch (value.Replace(" ", "_").ToUpperInvariant())
-            {
-                case "NO_ACTION":
-                case "SET_DEFAULT":
-                    return ForeignKeyUpdate.None;
-                case "CASCADE":
-                    return ForeignKeyUpdate.Cascade;
-                case "SET_NULL":
-                    return ForeignKeyUpdate.Null;
-                case "RESTRICT":
-                    return ForeignKeyUpdate.Restrict;
-                default:
-                    return ForeignKeyUpdate.None;
-            }
-        }
-
-        /// <inheritdoc />
-        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
-        {
-            return string.Format("SELECT rc.REFERENCED_TABLE_NAME, rc.DELETE_RULE, rc.UPDATE_RULE FROM REFERENTIAL_CONSTRAINTS rc INNER JOIN CONSTRAINTS c ON rc.SCHEMA_NAME = c.SCHEMA_NAME AND rc.TABLE_NAME = c.TABLE_NAME AND rc.CONSTRAINT_NAME = c.CONSTRAINT_NAME WHERE rc.SCHEMA_NAME = CURRENT_SCHEMA AND rc.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format(@"SELECT rc.CONSTRAINT_NAME, rc.REFERENCED_SCHEMA_NAME, rc.REFERENCED_TABLE_NAME, rc.COLUMN_NAME, rc.REFERENCED_COLUMN_NAME, rc.POSITION, rc.DELETE_RULE, rc.UPDATE_RULE
+FROM SYS.REFERENTIAL_CONSTRAINTS rc
+WHERE {1}
+ORDER BY rc.CONSTRAINT_NAME, rc.POSITION", schema, GetTableFilter(tableName, "rc"));
         }
 
         /// <inheritdoc />
@@ -144,16 +133,14 @@ namespace Gurux.Service.Orm.Settings
                 return
                     $"SELECT COMMENTS " +
                     $"FROM SYS.TABLES " +
-                    $"WHERE SCHEMA_NAME = CURRENT_SCHEMA " +
-                    $"AND TABLE_NAME = '{tableName}'";
+                    $"WHERE {GetTableFilter(tableName)}";
             }
             columnName = columnName.Replace("'", "''");
             return
                 $"SELECT COMMENTS " +
                 $"FROM SYS.TABLE_COLUMNS " +
-                $"WHERE SCHEMA_NAME = CURRENT_SCHEMA " +
-                $"AND TABLE_NAME = '{tableName}' " +
-                $"AND COLUMN_NAME = '{columnName}'";
+                $"WHERE {GetTableFilter(tableName)} " +
+                $"AND UPPER(COLUMN_NAME) = '{columnName.ToUpperInvariant()}'";
         }
 
         /// <inheritdoc />
@@ -172,9 +159,8 @@ namespace Gurux.Service.Orm.Settings
             return
                 $"SELECT POSITION " +
                 $"FROM SYS.TABLE_COLUMNS " +
-                $"WHERE SCHEMA_NAME = {schema} " +
-                $"AND TABLE_NAME = '{tableName}' " +
-                $"AND COLUMN_NAME = '{columnName}'";
+                $"WHERE {GetTableFilter(tableName)} " +
+                $"AND UPPER(COLUMN_NAME) = '{columnName.ToUpperInvariant()}'";
         }
 
         /// <inheritdoc />
@@ -230,7 +216,7 @@ namespace Gurux.Service.Orm.Settings
 
 
         /// <inheritdoc />
-        public override string GetUsersQuery(string databaseName)
+        public override string GetUsersQuery(string? databaseName)
         {
             if (string.IsNullOrEmpty(databaseName))
             {
@@ -249,8 +235,9 @@ ORDER BY GRANTEE;";
         }
 
         /// <inheritdoc />
-        public override string GetDatabasesQuery()
+        public override string GetDatabasesQuery(out int index)
         {
+            index = 0;
             //SAP Hana uses schemas as databases.
             //The following query returns all schemas that are not system schemas.
             return @"SELECT SCHEMA_NAME
@@ -266,8 +253,13 @@ ORDER BY SCHEMA_NAME";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string databaseName, string userName)
+        public override string GetDatabaseUserPermissionQuery(string? databaseName, string userName)
         {
+            if (string.IsNullOrEmpty(databaseName))
+            {
+                return $@"SELECT privilege, object_type, schema_name, object_name
+                    FROM effective_privileges WHERE user_name = '{userName}'";
+            }
             return $@"SELECT privilege, object_type, schema_name, object_name
 FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{databaseName}'";
         }
@@ -316,15 +308,11 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
             {
                 permissions |= DatabasePermission.Alter;
             }
-            if (permissions == DatabasePermission.None)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value), "No valid permissions specified.");
-            }
             return permissions;
         }
 
         /// <inheritdoc />
-        public override string RemoveUserQuery(string databaseName, string userName)
+        public override string RemoveUserQuery(string? databaseName, string userName)
         {
             if (!string.IsNullOrWhiteSpace(databaseName))
             {
@@ -372,7 +360,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         /// <inheritdoc />
         public override string GetColumnNullableQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT IS_NULLABLE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT IS_NULLABLE FROM TABLE_COLUMNS WHERE {1} AND UPPER(COLUMN_NAME) = '{2}'", schema, GetTableFilter(tableName), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
@@ -393,12 +381,13 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         /// <inheritdoc />
         public override bool IsAutoIncrement(object value)
         {
-            if (value is bool b)
-            {
-                return b;
-            }
-            return string.Compare(Convert.ToString(value, CultureInfo.InvariantCulture), "TRUE", true) == 0 ||
-                string.Compare(Convert.ToString(value, CultureInfo.InvariantCulture), "YES", true) == 0;
+            return Convert.ToBoolean(value, CultureInfo.InvariantCulture);
+        }
+
+        /// <inheritdoc />
+        public override bool IsUnique(object value)
+        {
+            return Convert.ToBoolean(value, CultureInfo.InvariantCulture);
         }
 
         /// <inheritdoc />
@@ -412,27 +401,20 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
                 $"WHEN GENERATION_TYPE IN ('ALWAYS AS IDENTITY', 'BY DEFAULT AS IDENTITY') THEN 1 " +
                 $"ELSE 0 END " +
                 $"FROM SYS.TABLE_COLUMNS " +
-                $"WHERE SCHEMA_NAME = '{schema}' " +
-                $"AND TABLE_NAME = '{tableName}' " +
-                $"AND COLUMN_NAME = '{columnName}'";
-        }
-
-        /// <inheritdoc />
-        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
-        {
-            return string.Format("SELECT rc.REFERENCED_TABLE_NAME FROM REFERENTIAL_CONSTRAINTS rc INNER JOIN CONSTRAINTS c ON rc.SCHEMA_NAME = c.SCHEMA_NAME AND rc.TABLE_NAME = c.TABLE_NAME AND rc.CONSTRAINT_NAME = c.CONSTRAINT_NAME WHERE rc.SCHEMA_NAME = CURRENT_SCHEMA AND rc.TABLE_NAME = '{1}' AND c.COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+                $"WHERE {GetTableFilter(tableName)} " +
+                $"AND UPPER(COLUMN_NAME) = '{columnName.ToUpperInvariant()}'";
         }
 
         /// <inheritdoc />
         public override string GetPrimaryKeyQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT COUNT(1) FROM CONSTRAINTS WHERE IS_PRIMARY_KEY = 'TRUE' AND SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT COUNT(1) FROM CONSTRAINTS WHERE IS_PRIMARY_KEY = 'TRUE' AND {1} AND UPPER(COLUMN_NAME) = '{2}'", schema, GetTableFilter(tableName), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc/>
         public override string GetColumnDefaultValueQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT DEFAULT_VALUE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT DEFAULT_VALUE FROM TABLE_COLUMNS WHERE {1} AND UPPER(COLUMN_NAME) = '{2}'", schema, GetTableFilter(tableName), columnName.ToUpperInvariant());
         }
         /// <inheritdoc />
         public override string GetColumnDefaultValue(object value, Type columnType)
@@ -456,15 +438,9 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
                     DefaultValueKind.UtcNow when columnType == typeof(DateOnly) =>
                         "CURRENT_UTCDATE",
 
-                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) =>
-                        "CURRENT_UTCTIME",
-
-                    DefaultValueKind.UtcNow =>
-                        "CURRENT_UTCTIMESTAMP",
-
-                    DefaultValueKind.NewGuid =>
-                        "SYSUUID",
-
+                    DefaultValueKind.UtcNow when columnType == typeof(TimeOnly) => "CURRENT_UTCTIME",
+                    DefaultValueKind.UtcNow => "CURRENT_UTCTIMESTAMP",
+                    DefaultValueKind.NewGuid => "SYSUUID",
                     _ => throw new ArgumentOutOfRangeException(nameof(value))
                 };
             }
@@ -478,14 +454,17 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         /// <inheritdoc />
         public override string GetColumnTypeQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT DATA_TYPE_NAME, LENGTH, SCALE FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{1}' AND COLUMN_NAME = '{2}'", schema, tableName.ToUpperInvariant(), columnName.ToUpperInvariant());
+            return string.Format("SELECT DATA_TYPE_NAME, LENGTH, SCALE FROM TABLE_COLUMNS WHERE {1} AND UPPER(COLUMN_NAME) = '{2}'", schema, GetTableFilter(tableName), columnName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
         public override string GetColumnsQuery(string schema, string name, out int index)
         {
             index = 0;
-            return string.Format("SELECT COLUMN_NAME FROM TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{0}' ORDER BY POSITION", name.ToUpperInvariant());
+            return string.Format(@"SELECT COLUMN_NAME
+FROM TABLE_COLUMNS
+WHERE {0}
+ORDER BY POSITION", GetTableFilter(name));
         }
 
         /// <inheritdoc />
@@ -519,15 +498,6 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         }
 
         /// <inheritdoc/>
-        public override bool SelectUsingAs
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <inheritdoc/>
         public override char TableNameQuoteCharacter
         {
             get
@@ -541,7 +511,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         {
             get
             {
-                return 1;
+                return 500;
             }
         }
 
@@ -582,7 +552,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         }
 
         /// <inheritdoc />
-        override public string AutoIncrementDefinition
+        override public string? AutoIncrementDefinition
         {
             get
             {
@@ -888,9 +858,50 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
         }
 
         /// <inheritdoc />
-        public override string GetTables(string schema)
+        public override string GetTablesQuery(string schema)
         {
             return "SELECT TABLE_NAME FROM TABLES WHERE SCHEMA_NAME = CURRENT_SCHEMA";
+        }
+
+        public override string UniqueQuery(string schema, string tableName, string columnName)
+        {
+            return $@"SELECT COUNT(1)
+FROM SYS.CONSTRAINTS
+WHERE {GetTableFilter(tableName)}
+  AND UPPER(COLUMN_NAME) = '{columnName.ToUpperInvariant()}'
+  AND IS_UNIQUE_KEY = 'TRUE' AND IS_PRIMARY_KEY = 'FALSE'";
+        }
+
+
+        /// <inheritdoc />
+        public override bool IsIdentity(object value)
+        {
+            return Convert.ToBoolean(value);
+        }
+
+        /// <inheritdoc />
+        public override string IsIdentityQuery(string schema, string tableName, string columnName)
+        {
+            return $@"SELECT CASE 
+    WHEN GENERATION_TYPE IN ('ALWAYS AS IDENTITY', 'BY DEFAULT AS IDENTITY') 
+    THEN 1 ELSE 0 END
+FROM SYS.TABLE_COLUMNS WHERE SCHEMA_NAME = CURRENT_SCHEMA AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}';";
+        }
+
+        public override string TableIndexesQuery(string schema, string tableName)
+        {
+            return $@"SELECT INDEX_NAME, CASE WHEN ""CONSTRAINT"" IN ('UNIQUE', 'NOT_NULL_UNIQUE') THEN 1 ELSE 0 END, COLUMN_NAME, POSITION,
+CASE WHEN ASCENDING_ORDER = 'FALSE' THEN 'DESC' ELSE 'ASC' END
+FROM SYS.INDEX_COLUMNS
+WHERE SCHEMA_NAME = CURRENT_SCHEMA
+  AND TABLE_NAME = UPPER('{tableName}')
+  AND (""CONSTRAINT"" IS NULL OR ""CONSTRAINT"" NOT IN ('PRIMARY_KEY', 'PRIMARY KEY'))
+ORDER BY INDEX_NAME, POSITION";
+        }
+
+        public override void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value)
+        {
+            UpdateTableIndexesFromRows(schema, value);
         }
 
         /// <inheritdoc />

@@ -32,6 +32,7 @@
 
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Internal;
+using Gurux.Service.Orm.Settings;
 using System.Text;
 namespace Gurux.Service.Orm
 {
@@ -47,12 +48,12 @@ namespace Gurux.Service.Orm
         {
         }
 
-        internal void UpdateTables(System.Type table1, System.Type table2)
+        internal void UpdateTables(GXDBSettings settings, System.Type table1, System.Type table2)
         {
             Table1Type = table1;
             Table2Type = table2;
-            Table1 = GXDbHelpers.ConvertToString(null, TargetType.Table | TargetType.Plain, null, table1, null);
-            Table2 = GXDbHelpers.ConvertToString(null, TargetType.Table | TargetType.Plain, null, table2, null);
+            Table1 = GXDbHelpers.ConvertToString(settings, TargetType.Table | TargetType.Plain, null, table1, null);
+            Table2 = GXDbHelpers.ConvertToString(settings, TargetType.Table | TargetType.Plain, null, table2, null);
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -32,11 +32,14 @@
 
 using Gurux.Common.Internal;
 using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Settings;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -48,10 +51,10 @@ namespace Gurux.Service.Orm.Internal
     internal sealed class GXGetMembersArgs
     {
         internal GXDBSettings Settings;
-        internal Expression Expression;
+        internal Expression? Expression;
         internal TargetType TargetType;
 
-        internal string Post;
+        internal string? Post;
         /// <summary>
         /// List separator is used when multiple columns are generated with one expression. 
         /// For example in insert when columns are defined with new operator. 
@@ -71,8 +74,10 @@ namespace Gurux.Service.Orm.Internal
 
         internal UnaryExpression UnaryExpression;
         internal MethodCallExpression MethodCallExpression;
-
-        internal StringBuilder StringBuilder;
+        /// <summary>
+        /// Generated SQL query is stored in this string builder.
+        /// </summary>
+        internal StringBuilder? StringBuilder;
 
         public GXGetMembersArgs(GXDBSettings settings, TargetType targetType)
         {
@@ -95,11 +100,13 @@ namespace Gurux.Service.Orm.Internal
         /// <summary>
         /// Add quotes around the value.
         /// </summary>
-        /// <param name="value"></param>
-        /// <param name="dataQuote"></param>
-        /// <param name="quoteSeparator"></param>
-        /// <returns></returns>
-        internal static string AddQuotes(string value, string dataQuote, char quoteSeparator)
+        /// <param name="value">The text to quote and escape.</param>
+        /// <param name="dataQuote">Replacement text used to escape embedded quote characters.</param>
+        /// <param name="quoteSeparator">The quote character surrounding the value.</param>
+        /// <returns>The value enclosed in the requested quote characters, or unchanged when no quote character is configured.</returns>
+        internal static string AddQuotes(string value,
+            string? dataQuote,
+            char quoteSeparator)
         {
             if (!string.IsNullOrEmpty(dataQuote) &&
                 string.IsNullOrEmpty(value))
@@ -115,11 +122,6 @@ namespace Gurux.Service.Orm.Internal
                 return quoteSeparator + value + quoteSeparator;
             }
             return value;
-        }
-
-        private static string GetQuetedValue(string value)
-        {
-            return '\'' + value + '\'';
         }
 
         internal static string OriginalTableName(Type type)
@@ -143,976 +145,12 @@ namespace Gurux.Service.Orm.Internal
 
         internal static bool IsAliasName(Type type)
         {
-            return type.GetCustomAttributes(typeof(AliasAttribute), true).Length != 0;
+            return type.GetCustomAttributes(typeof(AliasAttribute), true).Any();
         }
 
         internal static bool IsSharedTable(Type type)
         {
             return type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0;
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="args">GXGetMembersArgs caller.</param>
-        /// <param name="upd">GXUpdateArgs caller.</param>
-        /// <param name="values">List of values to be updated or added.</param>
-        /// <param name="excluded">List of excluded columns.</param>
-        /// <param name="queries">List of generated queries.</param>
-        /// <param name="where">Where clause collection.</param>
-        /// <param name="insertedObjects">List of inserted objects.</param>
-        internal static void GetQueries(
-            GXGetMembersArgs args,
-            GXUpdateArgs upd,
-            List<KeyValuePair<object, LambdaExpression>> values,
-            List<KeyValuePair<Type, LambdaExpression>> excluded,
-            List<string> queries,
-            GXWhereCollection where,
-            List<object> insertedObjects)
-        {
-            List<KeyValuePair<Type, GXUpdateItem>> list = new List<KeyValuePair<Type, GXUpdateItem>>();
-            List<object> handledObjects = new List<object>();
-            foreach (KeyValuePair<object, LambdaExpression> it in values)
-            {
-                GetValues(args, it.Key, null, it.Value, list, excluded, upd == null, false,
-                    args.Settings.ColumnNameQuoteCharacter, false, where, handledObjects, insertedObjects);
-            }
-            foreach (KeyValuePair<Type, GXUpdateItem> table in list)
-            {
-                if (upd != null)
-                {
-                    GetUpdateQuery(upd, table, args.Settings, queries);
-                }
-                else
-                {
-                    GetInsertQuery(args, table, queries);
-                }
-            }
-        }
-
-        internal static void GetUpdateQuery(
-            GXUpdateArgs args,
-            KeyValuePair<Type, GXUpdateItem> table,
-            GXDBSettings settings,
-            List<string> queries)
-        {
-            if (!table.Value.Inserted)
-            {
-                StringBuilder sb = new StringBuilder();
-                int index = 0, colIndex = 0;
-                object value;
-                sb.Length = 0;
-                TargetType type = TargetType.Table;
-                if (!AddQuetationAlways(settings))
-                {
-                    type |= TargetType.Plain;
-                }
-                string tableName = ConvertToString(args.Settings,
-                     type, null, table.Key, null);
-                bool first;
-                foreach (var col in table.Value.Rows)
-                {
-                    ++index;
-                    if (args.Count != 0 && index == args.Count)
-                    {
-                        break;
-                    }
-                    sb.Append("UPDATE ");
-                    sb.Append(tableName);
-                    sb.Append(" SET ");
-                    colIndex = 0;
-                    first = true;
-                    foreach (var it in col)
-                    {
-                        if (first)
-                        {
-                            first = false;
-                        }
-                        else
-                        {
-                            sb.Append(", ");
-                        }
-                        sb.Append(ConvertToString(args.Settings, TargetType.Column, null, table.Value.Columns[colIndex], null));
-                        sb.Append(" = ");
-                        GXSerializedItem row = it.Value;
-                        if (row != null)
-                        {
-                            value = row.Get(it.Key);
-                            if (row.Relation != null && value != null)
-                            {
-                                if (!GXInternal.IsGenericDataType(row.Type))
-                                {
-                                    GXSerializedItem si = GXSqlBuilder.FindUnique(row.Type);
-                                    if (si != null)
-                                    {
-                                        value = si.Get(value);
-                                    }
-                                    else
-                                    {
-                                        value = null;
-                                    }
-                                }
-                            }
-                        }
-                        else
-                        {
-                            value = it;
-                        }
-                        if (value == null && (row.Attributes & Attributes.AllowNull) == 0)
-                        {
-                            //Get the default value if nullable value is null and it's not allowed.
-                            value = row.DefaultValue;
-                        }
-                        sb.Append(ConvertToString(settings, TargetType.Value, null, value, null));
-                        ++colIndex;
-                    }
-                    if (table.Value.Where.Count != 0)
-                    {
-                        sb.Append(" ");
-                        sb.Append(table.Value.Where[0]);
-                        table.Value.Where.RemoveAt(0);
-                    }
-                    queries.Add(sb.ToString());
-                    sb.Length = 0;
-                }
-            }
-        }
-
-        private static void GetInsert(GXDBSettings settings, bool first, StringBuilder sb)
-        {
-            switch (settings.Type)
-            {
-                case DatabaseType.Oracle:
-                    if (first)
-                    {
-                        sb.Append("INSERT ALL INTO ");
-                    }
-                    else
-                    {
-                        sb.Append(" INTO ");
-                    }
-                    break;
-                default:
-                    sb.Append("INSERT INTO ");
-                    break;
-            }
-        }
-
-        private static bool AddQuetationAlways(GXDBSettings settings)
-        {
-            return settings.Type == DatabaseType.PostgreSQL;
-        }
-
-        private static void GetInsertColumns(
-            GXDBSettings settings,
-            bool first,
-            KeyValuePair<Type, GXUpdateItem> table,
-            StringBuilder sb,
-            bool select)
-        {
-            TargetType type = TargetType.Table;
-            if (!AddQuetationAlways(settings))
-            {
-                type |= TargetType.Plain;
-            }
-            string tableName = ConvertToString(settings,
-                type,
-                null, table.Key, null);
-            GetInsert(settings, first, sb);
-            sb.Append(tableName);
-            sb.Append(" (");
-            bool empty = true;
-            foreach (var col in table.Value.Columns)
-            {
-                if (empty)
-                {
-                    empty = false;
-                }
-                else
-                {
-                    sb.Append(", ");
-                }
-                sb.Append(ConvertToString(settings, TargetType.Column, null, col, null));
-            }
-            if (select)
-            {
-                sb.Append(") SELECT ");
-            }
-            else
-            {
-                sb.Append(") VALUES(");
-            }
-        }
-
-        static bool IsZeroOrEmpty(object o1)
-        {
-            bool ret = true;
-            object ZeroValue = 0;
-
-            if (o1 != null)
-            {
-                if (o1.GetType() == typeof(Guid))
-                {
-                    ret = o1.Equals(Guid.Empty);
-                }
-                else if (o1.GetType().IsValueType)
-                {
-                    ret = (o1 as ValueType).Equals(Convert.ChangeType(ZeroValue, o1.GetType()));
-                }
-                else if (o1.GetType() == typeof(string))
-                {
-                    ret = o1.Equals(string.Empty);
-                }
-                else
-                {
-                    ret = false;
-                }
-            }
-            return ret;
-        }
-
-        internal static int GetInsertQuery(
-            GXGetMembersArgs args,
-            KeyValuePair<Type, GXUpdateItem> table,
-            List<string> queries,
-            List<int> queryRowCounts = null)
-        {
-            StringBuilder sb = new StringBuilder();
-            object value;
-            sb.Length = 0;
-            bool firstRow = true, first, select = false;
-            string post = null;
-            int maxRows = GXSqlBuilder.FindAutoIncrement(table.Key) != null ?
-                1 : Math.Max(1, args.Settings.MaximumRowUpdate);
-            foreach (var col in table.Value.Rows)
-            {
-                foreach (var it in col)
-                {
-                    if (it.Key is GXSelectArgs)
-                    {
-                        select = true;
-                        break;
-                    }
-                }
-                break;
-            }
-            GetInsertColumns(args.Settings, true, table, sb, select);
-            args.TargetType = TargetType.Value;
-            int rowCnt = 1;
-            foreach (var col in table.Value.Rows)
-            {
-                if (firstRow)
-                {
-                    firstRow = false;
-                    rowCnt = 1;
-                }
-                else
-                {
-                    if (args.Settings.Type == DatabaseType.Oracle)
-                    {
-                        GetInsertColumns(args.Settings, false, table, sb, select);
-                    }
-                    else
-                    {
-                        sb.Append(", (");
-                    }
-                    ++rowCnt;
-                }
-                first = true;
-                foreach (var it in col)
-                {
-                    if (first)
-                    {
-                        if (it.Key is GXSelectArgs sa)
-                        {
-                            //Remove VALUES( or SELECT
-                            sb.Length -= 7;
-                            sb.Append(sa.ToString(false));
-                            break;
-                        }
-                        first = false;
-                    }
-                    else
-                    {
-                        sb.Append(args.ListSeparator);
-                    }
-                    GXSerializedItem row = it.Value;
-                    if (row != null)
-                    {
-                        if (it.Key is GXSelectArgs s)
-                        {
-                            s.Columns.Insert = true;
-                            try
-                            {
-                                string sql = s.ToString(false);
-                                if (select)
-                                {
-                                    //Remove duplicate select
-                                    sql = sql.Substring(7);
-                                    int index = sql.IndexOf(" FROM ", StringComparison.OrdinalIgnoreCase);
-                                    post = sql.Substring(index);
-                                    sql = sql.Substring(0, index);
-                                }
-                                sb.Append(sql);
-                            }
-                            finally
-                            {
-                                s.Columns.Insert = false;
-                            }
-                            continue;
-                        }
-                        else
-                        {
-                            if (row.Get != null)
-                            {
-                                value = row.Get(it.Key);
-                                if ((row.Attributes & Attributes.AllowNull) == 0)
-                                {
-                                    if ((row.Attributes & Attributes.ForeignKey) != 0 &&
-                                        IsZeroOrEmpty(value))
-                                    {
-                                        if (row.Target is PropertyInfo pi)
-                                        {
-                                            throw new ArgumentException("Foreign key can't be null. " + table.Key.Name + "." + pi.Name);
-                                        }
-                                        throw new ArgumentException("Foreign key can't be null. + " + table.Key.Name);
-                                    }
-                                    if (value == null)
-                                    {
-                                        //Get the dafault value.
-                                        value = row.DefaultValue;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                value = GXInternal.GetValue(it.Key, row.Target);
-                            }
-                            if ((row.Attributes & Attributes.MsIgnored) != 0)
-                            {
-                                //If ms part is ignored.
-                                args.TargetType |= TargetType.IgnoreMs;
-                            }
-                            else
-                            {
-                                args.TargetType &= ~TargetType.IgnoreMs;
-                            }
-                            if (row.Relation != null && value != null)
-                            {
-                                if (!GXInternal.IsGenericDataType(row.Type))
-                                {
-                                    GXSerializedItem si = GXSqlBuilder.FindUnique(row.Type);
-                                    if (si != null)
-                                    {
-                                        value = si.Get(value);
-                                    }
-                                    else
-                                    {
-                                        value = null;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        value = it;
-                    }
-                    sb.Append(ConvertToString(args, value));
-                }
-                if (!select)
-                {
-                    sb.Append(")");
-                }
-                //If all rows can't insert with one query.
-                if (rowCnt >= maxRows)
-                {
-                    if (args.Settings.Type == DatabaseType.Oracle)
-                    {
-                        sb.Append(" SELECT 1 FROM DUAL");
-                    }
-                    queries.Add(sb.ToString());
-                    queryRowCounts?.Add(rowCnt);
-                    sb.Length = 0;
-                    GetInsertColumns(args.Settings, true, table, sb, select);
-                    firstRow = true;
-                }
-            }
-            if (!string.IsNullOrEmpty(post))
-            {
-                sb.Append(post);
-            }
-            if (!firstRow)
-            {
-                if (args.Settings.Type == DatabaseType.Oracle)
-                {
-                    sb.Append(" SELECT 1 FROM DUAL");
-                }
-                queries.Add(sb.ToString());
-                queryRowCounts?.Add(rowCnt);
-            }
-            return table.Value.Rows.Count;
-        }
-
-        /// <summary>
-        /// Get added or updated values.
-        /// </summary>
-        /// <param name="args">Database settings.</param>
-        /// <param name="value">Value to insert or update.</param>
-        /// <param name="parent">Parent object.</param>
-        /// <param name="columns">Columns to update or insert.</param>
-        /// <param name="itemsList">List of items to update.</param>
-        /// <param name="excluded">Excluded columns.</param>
-        /// <param name="insert">Indicates if the operation is an insert.</param>
-        /// <param name="mapTable">Indicates if the table should be mapped.</param>
-        /// <param name="columnQuotation">Character used for column quotation.</param>
-        /// <param name="updating">Indicates if the operation is an update.</param>
-        /// <param name="where">Indicates if the operation is a where clause.</param>
-        /// <param name="handledObjects">List of handled objects.</param>
-        /// <param name="insertedObjects">List of inserted objects.</param>
-        internal static void GetValues(
-            GXGetMembersArgs args,
-            object value,
-            object parent,
-            LambdaExpression columns,
-            List<KeyValuePair<Type, GXUpdateItem>> itemsList,
-            List<KeyValuePair<Type, LambdaExpression>> excluded,
-            bool insert,
-            bool mapTable,
-            char columnQuotation,
-            bool updating,
-            GXWhereCollection where,
-            List<object> handledObjects,
-            List<object> insertedObjects)
-        {
-            //Check if value is already added.
-            if (handledObjects != null)
-            {
-                if (handledObjects.Contains(value))
-                {
-                    return;
-                }
-            }
-            bool inserted = false;
-            object tmp;
-            GXSerializedItem si = null;
-            if (value != null)
-            {
-                Type type;
-                if (value is GXSelectArgs arg)
-                {
-                    arg.Settings = args.Settings;
-                    if (columns.Body is ConstantExpression c)
-                    {
-                        //Data is copy from one table to other.
-                        type = ((Type)c.Value).UnderlyingSystemType;
-                        columns = null;
-                    }
-                    else if (columns.Body is MemberExpression m)
-                    {
-                        type = m.Expression.Type;
-                    }
-                    else if (columns.Body is NewExpression newExpression)
-                    {
-                        type = ((MemberExpression)newExpression.Arguments[0]).Member.DeclaringType;
-                    }
-                    else
-                    {
-                        throw new ArgumentOutOfRangeException("Invalid GXSelectArgs parameter.");
-                    }
-                }
-                else
-                {
-                    type = value.GetType();
-                }
-                si = GXSqlBuilder.FindUnique(type);
-                object target;
-                GXUpdateItem u = null;
-                List<KeyValuePair<object, GXSerializedItem>> row = new List<KeyValuePair<object, GXSerializedItem>>();
-                if (!mapTable)
-                {
-                    if (typeof(IEnumerable).IsAssignableFrom(type))
-                    {
-                        foreach (object v in (IEnumerable)value)
-                        {
-                            if (v is GXTableBase b)
-                            {
-                                if (insert)
-                                {
-                                    b.BeforeAdd();
-                                }
-                                else
-                                {
-                                    b.BeforeUpdate();
-                                }
-                            }
-                            GetValues(args, v, parent, columns, itemsList, excluded, insert, false,
-                                columnQuotation, updating, where, handledObjects, insertedObjects);
-                        }
-                        return;
-                    }
-                    //For relation map table do not have Id.
-                    if (si == null)
-                    {
-                        mapTable = true;
-                    }
-                    else
-                    {
-                        if (value is GXSelectArgs sel)
-                        {
-                            //Auto increment keys are added to excluded list.
-                            PropertyInfo pi = si.Target as PropertyInfo;
-                            string name;
-                            DataMemberAttribute[] attr = (DataMemberAttribute[])pi.GetCustomAttributes(typeof(DataMemberAttribute), true);
-                            if (attr.Length == 0 || attr[0].Name == null)
-                            {
-                                name = pi.Name;
-                            }
-                            else
-                            {
-                                name = attr[0].Name;
-                            }
-                            Expression<Func<object, object>> expression = q => name;
-                            sel.Columns.Excluded.Add(new KeyValuePair<Type, LambdaExpression>(type, expression));
-                        }
-                        else
-                        {
-                            //If ID is zero do not update item if it's auto increment value.
-                            if ((si.Attributes & Attributes.Id) != 0)
-                            {
-                                tmp = si.Get(value);
-                                //If Id is not autoincrement.
-                                if (IsZeroOrEmpty(tmp))
-                                {
-                                    if (!insert && where == null)
-                                    {
-                                        inserted = true;
-                                    }
-                                    else if (si.Type == typeof(Guid))
-                                    {
-                                        //Generate new Guid if it's used as ID.
-                                        si.Set(value, Guid.NewGuid());
-                                        if (insertedObjects != null)
-                                        {
-                                            insertedObjects.Add(value);
-                                        }
-                                    }
-                                    else if (si.Type == typeof(string))
-                                    {
-                                        //Generate new Guid if it's used as ID.
-                                        si.Set(value, Guid.NewGuid().ToString());
-                                        if (insertedObjects != null)
-                                        {
-                                            insertedObjects.Add(value);
-                                        }
-                                    }
-                                }
-                                //Do not add item if it's already inserted but loop through all relation tables to add them if needed.
-                                else
-                                {
-                                    if (insertedObjects != null && insertedObjects.Contains(value))
-                                    {
-                                        inserted = false;
-                                    }
-                                    else
-                                    {
-                                        if (insert && (updating || si.Type != typeof(string)))
-                                        {
-                                            inserted = true;
-                                        }
-                                        else
-                                        {
-                                            inserted = false;
-                                        }
-                                    }
-                                }
-                            }
-                            else if (insert && updating) //On update we do not want to save values that do not have ID twice.
-                            {
-                                return;
-                            }
-                        }
-                    }
-                }
-                string[] updatedProperties = null;
-                Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(type);
-                //If we are adding a new row columns are not need to update.
-                bool update = false;
-                //Check is table added already.
-
-                foreach (var it in itemsList)
-                {
-                    if (it.Key == type)
-                    {
-                        u = it.Value;
-                        if (!inserted)
-                        {
-                            u.Rows.Add(row);
-                        }
-                        update = true;
-                        break;
-                    }
-                }
-                if (u == null)
-                {
-                    u = new GXUpdateItem();
-                    if (!inserted)
-                    {
-                        itemsList.Add(new KeyValuePair<Type, GXUpdateItem>(type, u));
-                        u.Rows.Add(row);
-                    }
-                    else
-                    {
-                        if (!insert && handledObjects != null)
-                        {
-                            handledObjects.Add(value);
-                        }
-                    }
-                }
-                if (!insert && !inserted)
-                {
-                    if (where != null && where.List.Count > 1)
-                    {
-                        GXWhereCollection tmp2 = new GXWhereCollection(where.Parent, where.Joins);
-                        tmp2.List.AddRange(where.List);
-                        //Remove get by ID if where is added.
-                        tmp2.List.RemoveAt(0);
-                        u.Where.Add(tmp2.ToString());
-                    }
-                    else
-                    {
-                        StringBuilder sb = new StringBuilder();
-                        sb.Append("WHERE ");
-                        sb.Append(ConvertToString(args.Settings, TargetType.Column, null, si.Target, null));
-                        sb.Append(" = ");
-                        sb.Append(ConvertToString(args.Settings, TargetType.Value, null, si.Get(value), null));
-                        u.Where.Add(sb.ToString());
-                    }
-                }
-                //Get inserted column names.
-                if (columns != null && !update)
-                {
-                    args.Expression = columns.Body;
-                    var colums = GetMembers(args, TargetType.Column | TargetType.Plain);
-                    var colums2 = GetMemberList(args);
-                    foreach (string item in colums)
-                    {
-                        KeyValuePair<string, GXSerializedItem> it = new KeyValuePair<string, GXSerializedItem>(item, properties[item]);
-                        GetColumn(args, value, itemsList, excluded, insert, mapTable, columnQuotation, updating, where, type, u, update, it);
-                    }
-                }
-                else
-                {
-                    Dictionary<Type, List<(string, Type)>> cols = null;
-                    if (value is GXSelectArgs s)
-                    {
-                        if (columns != null)
-                        {
-                            //Remove last row.
-                            u.Rows.RemoveAt(u.Rows.Count - 1);
-                            row = u.Rows.Last();
-                            args.Expression = columns.Body;
-                            updatedProperties = GetMemberList(args);
-                            //Check if column is updated earlier and remove old update.
-                            if (!u.Columns.Any(s => updatedProperties.Contains(s)))
-                            {
-                                u.Columns.AddRange(updatedProperties);
-                            }
-                            else
-                            {
-                                List<string> updated = new List<string>();
-                                foreach (string p in updatedProperties)
-                                {
-                                    int pos = u.Columns.IndexOf(p);
-                                    if (pos != -1)
-                                    {
-                                        KeyValuePair<object, GXSerializedItem> old = row[pos];
-                                        row.RemoveAt(pos);
-                                        row.Insert(pos, new KeyValuePair<object, GXSerializedItem>(value, old.Value));
-                                        inserted = true;
-                                    }
-                                    else
-                                    {
-                                        u.Columns.Add(p);
-                                        updated.Add(p);
-                                    }
-                                }
-                                updatedProperties = updated.ToArray();
-                            }
-                        }
-                        //ToString is called to update the ColumnList.
-                        //Do not remove!
-                        try
-                        {
-                            s.Columns.Insert = true;
-                            s.Columns.ToString();
-                        }
-                        finally
-                        {
-                            s.Columns.Insert = false;
-                        }
-                        //Make copy.
-                        cols = s.Columns.ColumnList.ToDictionary();
-                        //Unknown columns are not added to select.
-                        foreach (var c in cols)
-                        {
-                            if (c.Key == type)
-                            {
-                                foreach (string r in c.Value.Select(s => s.Item1))
-                                {
-                                    if (!properties.ContainsKey(r))
-                                    {
-                                        Expression<Func<object, object>> expression = _ => r;
-                                        s.Columns.Excluded.Add(new KeyValuePair<Type, LambdaExpression>(c.Key, expression));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    //if column is excluded.
-                    string[] removed = null;
-                    if (excluded != null)
-                    {
-                        foreach (KeyValuePair<Type, LambdaExpression> e in excluded)
-                        {
-                            if (e.Key == type)
-                            {
-                                List<string> list = new List<string>();
-                                if (removed != null)
-                                {
-                                    list.AddRange(removed);
-                                }
-                                args.Expression = e.Value.Body;
-                                list.AddRange(GetMemberList(args));
-                                removed = list.ToArray();
-                            }
-                        }
-                    }
-                    foreach (var it in properties)
-                    {
-                        bool skip = false;
-                        if (removed != null)
-                        {
-                            foreach (string col in removed)
-                            {
-                                if (col == it.Key)
-                                {
-                                    skip = true;
-                                    break;
-                                }
-                            }
-                            if (skip)
-                            {
-                                continue;
-                            }
-                        }
-                        if (value is GXSelectArgs args2)
-                        {
-                            //Unknown columns are not added.
-                            bool found = false;
-                            foreach (var c in cols)
-                            {
-                                if (c.Key == type)
-                                {
-                                    foreach (var r in c.Value.Select(s => s.Item1))
-                                    {
-                                        if (it.Key == r)
-                                        {
-                                            //Don't add auto increment value.
-                                            if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
-                                            {
-                                                Expression<Func<object, object>> expression = q => r;
-                                                args2.Columns.Excluded.Add(new KeyValuePair<Type, LambdaExpression>(c.Key, expression));
-                                            }
-                                            found = true;
-                                            break;
-                                        }
-                                    }
-                                    if (found)
-                                    {
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        GetColumn(args, value, itemsList, excluded, insert, mapTable, columnQuotation, updating, where, type, u, update, it);
-                    }
-                }
-                if (excluded != null)
-                {
-                    foreach (KeyValuePair<Type, LambdaExpression> it in excluded)
-                    {
-                        if (it.Key == type)
-                        {
-                            args.Expression = it.Value;
-                            string[] removed = GetMemberList(args);
-                            foreach (string col in removed)
-                            {
-                                u.Columns.Remove(col);
-                            }
-                        }
-                    }
-                }
-
-                //Get values.
-                foreach (string it in u.Columns)
-                {
-                    if (updatedProperties != null &&
-                        updatedProperties.Length != 0 &&
-                        !updatedProperties.Contains(it))
-                    {
-                        continue;
-                    }
-                    GXSerializedItem item = properties[it];
-                    if (item.Relation != null && item.Relation.ForeignTable != type &&
-                        item.Relation.RelationMapTable == null &&
-                        //If relation is to the class not Id.
-                        !GXInternal.IsGenericDataType(item.Type) &&
-                        !(value is GXSelectArgs))
-                    {
-                        if (parent != null && parent.GetType() == item.Relation.ForeignTable)
-                        {
-                            item = GXSqlBuilder.FindUnique(parent.GetType());
-                            target = GXInternal.GetValue(parent, item.Target);
-                            row.Add(new KeyValuePair<object, GXSerializedItem>(parent, item));
-                        }
-                        else if (item.Relation.RelationType == RelationType.OneToOne)
-                        {
-                            target = GXInternal.GetValue(value, item.Target);
-                            if (target != null && !mapTable)
-                            {
-                                if (typeof(IEnumerable).IsAssignableFrom(item.Type))
-                                {
-                                    si = GXSqlBuilder.FindUnique(GXInternal.GetPropertyType(item.Type));
-                                }
-                                else
-                                {
-                                    si = GXSqlBuilder.FindUnique(item.Type);
-                                }
-                                tmp = si.Get(target);
-                                //Add item if not insert yet.
-                                if (IsZeroOrEmpty(tmp))
-                                {
-                                    Dictionary<Type, GXUpdateItem> tmpList = new Dictionary<Type, GXUpdateItem>();
-                                    tmpList = itemsList.Concat(tmpList).ToDictionary(x => x.Key, x => x.Value);
-                                    itemsList.Clear();
-                                    GetValues(args, target, parent, null, itemsList, excluded,
-                                        insert, mapTable, columnQuotation, updating, where, handledObjects, insertedObjects);
-                                    foreach (var it2 in tmpList)
-                                    {
-                                        itemsList.Add(new KeyValuePair<Type, GXUpdateItem>(it2.Key, it2.Value));
-                                    }
-                                    row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
-                                }
-                                else
-                                {
-                                    row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
-                                }
-                            }
-                            else
-                            {
-                                row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
-                            }
-                        }
-                        else if (item.Relation.RelationType == RelationType.OneToMany)
-                        {
-                            if (item.Get != null)
-                            {
-                                target = item.Get(value);
-                            }
-                            else
-                            {
-                                target = GXInternal.GetValue(value, item.Target);
-                            }
-                            si = GXSqlBuilder.FindUnique(GXInternal.GetPropertyType(item.Type));
-                            foreach (object v in (IEnumerable)target)
-                            {
-                                tmp = si.Get(v);
-                                GetValues(args, v, parent, null, itemsList, excluded, insert, mapTable,
-                                    columnQuotation, updating, where, handledObjects, null);
-                            }
-                            row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
-                        }
-                        else if (item.Relation.RelationType == RelationType.Relation)
-                        {
-                            row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
-                        }
-                    }
-                    else if (!inserted)
-                    {
-                        row.Add(new KeyValuePair<object, GXSerializedItem>(value, item));
-                    }
-                }
-            }
-        }
-        /// <summary>
-        /// Get selected column.
-        /// </summary>
-        private static void GetColumn(GXGetMembersArgs args, object value,
-            List<KeyValuePair<Type, GXUpdateItem>> itemsList,
-            List<KeyValuePair<Type, LambdaExpression>> excluded,
-            bool insert, bool mapTable, char columnQuotation, bool updating, GXWhereCollection where, Type type, GXUpdateItem u, bool update, KeyValuePair<string, GXSerializedItem> it)
-        {
-            if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type)
-            {
-                if (it.Value.Relation.RelationType != RelationType.OneToOne)
-                {
-                    object target;
-                    if (it.Value.Get != null)
-                    {
-                        target = it.Value.Get(value);
-                    }
-                    else
-                    {
-                        target = GXInternal.GetValue(value, it.Value.Target);
-                    }
-                    if (GXInternal.IsGenericDataType(it.Value.Type))
-                    {
-                        if (!update)
-                        {
-                            u.Columns.Add(it.Key);
-                        }
-                    }
-                    //Relations are not inserted. They are expected to be in DB already.
-                    else if (target != null && it.Value.Relation.RelationType != RelationType.Relation)
-                    {
-                        GetValues(args, target, value, null, itemsList,
-                            excluded, insert, mapTable, columnQuotation, updating, where, null, null);
-                    }
-                }
-                else if (!update)
-                {
-                    u.Columns.Add(it.Key);
-                }
-                if (it.Value.Relation.RelationMapTable != null)
-                {
-                    object relations = GXInternal.GetValue(value, it.Value.Target);
-                    if (relations != null)
-                    {
-                        GXSerializedItem r2 = GXSqlBuilder.FindUnique(type);
-                        //Create relation table(s).
-                        foreach (var r in (IList)relations)
-                        {
-                            //Add map row.
-                            GXUpdateItem m = new GXUpdateItem();
-                            m.Columns.Add(ConvertToString(args.Settings, TargetType.Column | TargetType.Plain, null, it.Value.Relation.RelationMapTable.Relation.PrimaryId.Target as PropertyInfo, null));
-                            m.Columns.Add(ConvertToString(args.Settings, TargetType.Column | TargetType.Plain, null, GXSqlBuilder.FindRelation(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, type).Target as PropertyInfo, null));
-                            itemsList.Add(new KeyValuePair<Type, GXUpdateItem>((it.Value.Relation.RelationMapTable.Target as PropertyInfo).DeclaringType, m));
-                            List<KeyValuePair<object, GXSerializedItem>> mr = new List<KeyValuePair<object, GXSerializedItem>>();
-                            m.Rows.Add(mr);
-                            mr.Add(new KeyValuePair<object, GXSerializedItem>(r, it.Value.Relation.RelationMapTable.Relation.ForeignId));
-                            mr.Add(new KeyValuePair<object, GXSerializedItem>(value, r2));
-                        }
-                    }
-                }
-            }
-            //Do not try to add or update auto increment value.
-            else if (!update && (it.Value.Attributes & Attributes.AutoIncrement) == 0
-                //Primary key is not set in update.
-                && !(!insert && (it.Value.Attributes & Attributes.PrimaryKey) != 0))
-            {
-                u.Columns.Add(it.Key);
-            }
         }
 
         internal static string GetMemberStringValue(GXGetMembersArgs args)
@@ -1129,11 +167,34 @@ namespace Gurux.Service.Orm.Internal
             return tmp;
         }
 
-        internal static string[] GetMemberList(GXGetMembersArgs args)
+        internal static Type GetType(Expression expression)
+        {
+            //Get type.
+            if (expression is LambdaExpression lambdaEx)
+            {
+                return GetType(lambdaEx.Body);
+            }
+            if (expression is ConstantExpression c)
+            {
+                return (Type)c.Value!;
+            }
+            if (expression is MemberExpression m)
+            {
+                return m.Expression!.Type;
+            }
+            if (expression is NewExpression ne)
+            {
+                return GetType(ne.Arguments[0]);
+            }
+            throw new NotImplementedException();
+        }
+
+        internal static string[]? GetMemberList(GXGetMembersArgs args)
         {
             var type = args.TargetType;
             var old = args.StringBuilder;
             args.StringBuilder = null;
+            args.TargetType |= TargetType.Plain;
             var list = GetMembers(args);
             args.StringBuilder = old;
             args.TargetType = type;
@@ -1280,10 +341,12 @@ namespace Gurux.Service.Orm.Internal
                 if (args.MethodCallExpression.Method.Name == "Contains")
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
-                    var tmp = "(" + GetMembers(args)[0];
-                    tmp += " LIKE('%";
+                    GetMembers(args);
+                    args.StringBuilder.Append(" LIKE('%");
                     args.Expression = args.MethodCallExpression.Arguments[1];
-                    tmp += GetMembers(args)[0] + "%'))";
+                    args.TargetType |= TargetType.Plain;
+                    GetMembers(args);
+                    args.StringBuilder.Append("%')");
                 }
                 if (args.MethodCallExpression.Method.Name == "IsEmpty")
                 {
@@ -1292,21 +355,31 @@ namespace Gurux.Service.Orm.Internal
                     {
                         args.Post += " FROM DUAL";
                     }
+                    else if (args.Settings.Type == DatabaseType.SapHana)
+                    {
+                        args.Post += " FROM DUMMY";
+                    }
+                    else if (args.Settings.Type == DatabaseType.DB2)
+                    {
+                        args.Post += " FROM SYSIBM.SYSDUMMY1";
+                    }
                     return ["CASE WHEN NOT EXISTS (SELECT 1"];
                 }
                 if (args.MethodCallExpression.Method.Name == "Greater")
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
-                    var tmp = "(" + GetMembers(args)[0] + " > ";
+                    GetMembers(args);
+                    args.StringBuilder.Append(" > ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
-                    tmp += GetMembers(args)[0] + ")";
+                    GetMembers(args);
                 }
                 if (args.MethodCallExpression.Method.Name == "Less")
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
-                    var tmp = "(" + GetMembers(args)[0] + " < ";
+                    GetMembers(args);
+                    args.StringBuilder.Append(" < ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
-                    tmp += GetMembers(args)[0] + ")";
+                    GetMembers(args);
                 }
                 if (args.MethodCallExpression.Method.Name == "GreaterOrEqual")
                 {
@@ -1327,12 +400,14 @@ namespace Gurux.Service.Orm.Internal
                 if (args.MethodCallExpression.Method.Name == "Null")
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
-                    var tmp = "(" + GetMembers(args)[0] + " IS NULL)";
+                    GetMembers(args);
+                    args.StringBuilder.Append(" IS NULL");
                 }
                 if (args.MethodCallExpression.Method.Name == "NotNull")
                 {
                     args.Expression = args.MethodCallExpression.Arguments[1];
-                    var tmp = "(" + GetMembers(args)[0] + " IS NOT NULL)";
+                    GetMembers(args);
+                    args.StringBuilder.Append(" IS NOT NULL");
                 }
             }
             if (args.MethodCallExpression.Method.Name == "Contains" &&
@@ -1435,7 +510,7 @@ namespace Gurux.Service.Orm.Internal
                         return null;
                     }
                     args.StringBuilder.Append(" = ");
-                    args.StringBuilder.Append(value.ToUpper());
+                    args.StringBuilder.Append(value);
                     return null;
                 }
             }
@@ -1478,6 +553,15 @@ namespace Gurux.Service.Orm.Internal
                 return HandleOperation(args, args.MethodCallExpression.Method.Name.ToUpper());
             }
             object value22 = Expression.Lambda(args.MethodCallExpression).Compile().DynamicInvoke();
+            if (value22 is GXColumnSchema cs)
+            {
+                string? name = args.Settings.ConvertToString(cs.Name, ConvertOption.None);
+                if (args.StringBuilder != null)
+                {
+                    args.StringBuilder.Append(name);
+                }
+                return [name];
+            }
             return [args.Settings.ConvertToString(value22, ConvertOption.None)];
         }
 
@@ -1535,35 +619,26 @@ namespace Gurux.Service.Orm.Internal
             }
         }
 
-        internal static string GetTableName(GXDBSettings settings, Type type, bool addQuotation = false)
+        internal static string GetTableName(GXDBSettings settings, Type type, bool plain)
         {
             if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Any())
             {
-                return GetTableName(settings, type.BaseType);
-            }
-            if (!addQuotation)
-            {
-                addQuotation = settings != null &&
-                    (settings.IsReservedWord(type.Name));
+                return GetTableName(settings, type.BaseType, plain);
             }
             DataContractAttribute[] attr = (DataContractAttribute[])type.GetCustomAttributes(typeof(DataContractAttribute), true);
             if (!attr.Any() || attr[0].Name == null)
             {
-                if (settings == null)
-                {
-                    return type.Name;
-                }
-                if (!addQuotation)
+                if (plain)
                 {
                     return settings.TablePrefix + type.Name;
                 }
-                return AddQuotes(settings.TablePrefix + type.Name, null, settings.TableNameQuoteCharacter);
+                return settings.EscapeIdentifier(settings.TablePrefix, type.Name);
             }
-            if (!addQuotation)
+            if (plain)
             {
-                return settings.TablePrefix + attr[0].Name;
+                return settings?.TablePrefix + attr[0].Name;
             }
-            return AddQuotes(settings.TablePrefix + attr[0].Name, null, settings.TableNameQuoteCharacter);
+            return settings.EscapeIdentifier(settings.TablePrefix, attr[0].Name);
         }
 
         internal static string GetColumnName(GXDBSettings settings, MemberInfo info)
@@ -1576,27 +651,21 @@ namespace Gurux.Service.Orm.Internal
             }
             else
             {
-                name = attr[0].Name;
+                name = attr[0].Name!;
             }
-            if (settings.IsReservedWord(name) ||
-                AddQuetationAlways(settings))
-            {
-                return AddQuotes(name, null, settings.ColumnNameQuoteCharacter);
-            }
-            return name;
+            return settings.EscapeIdentifier(null, name);
         }
 
         internal static string ConvertToString(GXGetMembersArgs args, object value)
         {
-            string tableName = null;
-            return ConvertToString(args.Settings, args.TargetType, tableName, value, null);
+            return ConvertToString(args.Settings, args.TargetType, null, value, null);
         }
 
         internal static string ConvertToString(GXDBSettings settings,
             TargetType targetType,
-            string tableName,
-            object value,
-            Dictionary<string, string> maps)
+            string? tableName,
+            object? value,
+            Dictionary<string, string>? maps)
         {
             bool plain = (targetType & TargetType.Plain) != 0;
             if ((targetType & TargetType.Value) != 0)
@@ -1633,11 +702,9 @@ namespace Gurux.Service.Orm.Internal
                         {
                             return cn;
                         }
-                        if (!plain &&
-                            (settings.IsReservedWord(cn) ||
-                            AddQuetationAlways(settings)))
+                        if (!plain)
                         {
-                            return AddQuotes(cn, null, settings.ColumnNameQuoteCharacter);
+                            return settings.EscapeIdentifier(null, cn);
                         }
                         return cn;
                     }
@@ -1688,7 +755,7 @@ namespace Gurux.Service.Orm.Internal
                         {
                             if (tableName != null)
                             {
-                                name = GetTableName(settings, type) + ".";
+                                name = GetTableName(settings, type, true) + ".";
                             }
                             name += GetColumnName(settings, type);
                         }
@@ -1738,35 +805,83 @@ namespace Gurux.Service.Orm.Internal
                     {
                         return settings.TablePrefix + tn;
                     }
-                    if (settings.IsReservedWord(tn) || AddQuetationAlways(settings))
-                    {
-                        return AddQuotes(settings.TablePrefix + tn, null, settings.TableNameQuoteCharacter);
-                    }
-                    return settings.TablePrefix + tn;
+                    return settings.EscapeIdentifier(settings.TablePrefix, tn);
                 }
                 if (value is Type tableType)
                 {
-                    if (settings != null && AddQuetationAlways(settings))
-                    {
-                        return GetTableName(settings, tableType, !plain);
-                    }
-                    return GetTableName(settings, tableType);
+                    return GetTableName(settings, tableType, plain);
                 }
             }
             throw new ArgumentOutOfRangeException();
         }
 
+        /// <summary>
+        /// Get excluded properties for a given type based on the provided list of excluded expressions.
+        /// </summary>
+        /// <param name="Excluded">Excluded member expressions grouped by entity type.</param>
+        /// <param name="args">Options used to resolve members from the expressions.</param>
+        /// <param name="type">The mapped CLR type.</param>
+        /// <returns>The names of excluded members for the requested entity type.</returns>
+        static internal List<string> ExcludedProperties(List<KeyValuePair<Type, LambdaExpression>> Excluded,
+            GXGetMembersArgs args, Type type)
+        {
+            var expression = args.Expression;
+            List<string> list = new List<string>();
+            foreach (KeyValuePair<Type, LambdaExpression> it in Excluded)
+            {
+                if (it.Key == type)
+                {
+                    args.Expression = it.Value;
+                    string[]? removed = GetMemberList(args);
+                    if (removed != null)
+                    {
+                        list.AddRange(removed);
+                    }
+                }
+            }
+            args.Expression = expression;
+            return list;
+        }
 
-        internal static string[] GetMembers(GXGetMembersArgs args)
+        /// <summary>
+        /// Returns the names of properties whose values are null for all items
+        /// in the collection.
+        /// </summary>
+        /// <param name="type">The type of items in the collection.</param>
+        /// <param name="items">The collection to inspect.</param>
+        /// <returns>
+        /// Property names whose values are null for every item in the collection.
+        /// </returns>
+        public static List<string> GetAlwaysNullProperties(Type type, IEnumerable<object> items)
+        {
+            if (type == typeof(GXSelectArgs))
+            {
+                return [];
+            }
+            ArgumentNullException.ThrowIfNull(items);
+
+            if (!items.Any())
+            {
+                return [];
+            }
+            var list = items.Where(item => !(item is GXSelectArgs)).ToArray();
+            return type
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanRead)
+                .Where(p => list.All(item => p.GetValue(item) == null))
+                .Select(p => p.Name)
+                .ToList();
+        }
+
+        internal static string[]? GetMembers(GXGetMembersArgs args)
         {
             if (args.Expression == null)
             {
                 throw new ArgumentException("The expression cannot be null.");
             }
 
-            if (args.Expression is LambdaExpression)
+            if (args.Expression is LambdaExpression lambdaEx)
             {
-                LambdaExpression lambdaEx = args.Expression as LambdaExpression;
                 args.Expression = lambdaEx.Body;
                 return GetMembers(args);
             }
@@ -1774,7 +889,7 @@ namespace Gurux.Service.Orm.Internal
             if (args.Expression is MemberExpression memberExpression)
             {
                 // Reference type property or field
-                Expression e = memberExpression.Expression;
+                Expression e = memberExpression.Expression!;
                 if (memberExpression.Member.DeclaringType == typeof(GXSql) &&
                     memberExpression.Member.Name == nameof(GXSql.One))
                 {
@@ -1870,8 +985,13 @@ namespace Gurux.Service.Orm.Internal
                             "." + ConvertToString(args.Settings, TargetType.Column, tableName, value, null) ];
                             }
                         }
-                        args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, tableName, value, null));
-                        return null;
+                        string name = ConvertToString(args.Settings, TargetType.Column, tableName, value, null);
+                        if (args.StringBuilder != null)
+                        {
+                            args.StringBuilder.Append(name);
+                            return null;
+                        }
+                        return [name];
                     }
                     if (value != null && value.GetType().IsClass)
                     {
@@ -1908,6 +1028,12 @@ namespace Gurux.Service.Orm.Internal
                     {
                         return [null];
                     }
+                    if (target is GXColumnSchema cs)
+                    {
+                        string? name = args.Settings.ConvertToString(cs.Name, ConvertOption.None);
+                        args.StringBuilder?.Append(name);
+                        return [name!];
+                    }
                     Dictionary<string, GXSerializedItem> properties;
                     if (target is string || target is GXSelectArgs || !target.GetType().IsClass)//String is class.
                     {
@@ -1928,15 +1054,14 @@ namespace Gurux.Service.Orm.Internal
                         List<string> list = new List<string>();
                         properties = GXSqlBuilder.GetProperties(GXInternal.GetPropertyType(target.GetType()));
                         //If this is a basic type list. example int[].
-                        if (properties.Count == 0)
+                        if (!properties.Any())
                         {
                             foreach (object it in t)
                             {
                                 if (args.StringBuilder == null)
                                 {
                                     first = false;
-                                    string tableName = null;
-                                    list.Add(ConvertToString(args.Settings, args.TargetType | TargetType.Value, tableName, it, null));
+                                    list.Add(ConvertToString(args.Settings, args.TargetType | TargetType.Value, null, it, null));
                                 }
                                 else
                                 {
@@ -1951,7 +1076,7 @@ namespace Gurux.Service.Orm.Internal
                                     args.StringBuilder.Append(ConvertToString(args.Settings, (args.TargetType | TargetType.Value) & ~TargetType.Plain, null, it, null));
                                 }
                             }
-                            if (first)
+                            if (first && args.StringBuilder != null)
                             {
                                 throw new ArgumentOutOfRangeException("List is empty.");
                             }
@@ -1979,14 +1104,7 @@ namespace Gurux.Service.Orm.Internal
                                 first = true;
                                 foreach (var e2 in list)
                                 {
-                                    if (it.Value.Get != null)
-                                    {
-                                        value = it.Value.Get(e2);
-                                    }
-                                    else
-                                    {
-                                        value = GXInternal.GetValue(e2, it.Value);
-                                    }
+                                    value = it.Value.Get(e2);
                                     if (first)
                                     {
                                         first = false;
@@ -2003,27 +1121,29 @@ namespace Gurux.Service.Orm.Internal
                                 }
                                 return null;
                             }
-                            if (it.Value.Get != null)
+                            value = it.Value.Get(target);
+                            if (!((it.Value.Attributes & Attributes.Id) != 0 &&
+                                IsZero(value)))
                             {
-                                value = it.Value.Get(target);
-                            }
-                            else
-                            {
-                                value = GXInternal.GetValue(target, it.Value);
-                            }
-                            if (it.Value.Target is PropertyInfo pi)
-                            {
-                                string tableName = null;
-                                if (args.TargetType != TargetType.Value)
+                                if (it.Value.Target is PropertyInfo pi)
                                 {
-                                    args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, tableName, pi, null));
-                                    args.StringBuilder.Append(" = ");
+                                    string tableName = null;
+                                    if (args.TargetType != TargetType.Value)
+                                    {
+                                        args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, tableName, pi, null));
+                                        args.StringBuilder.Append(" = ");
+                                    }
+                                    args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Value, null, value, null));
                                 }
-                                args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Value, null, value, null));
+                                else
+                                {
+                                    throw new Exception("Primary key must be property.");
+                                }
                             }
-                            else
+                            else if (args.StringBuilder?.Length == 1)
                             {
-                                throw new Exception("Primary key must be property.");
+                                //Remove ) from the string.
+                                --args.StringBuilder.Length;
                             }
                             return null;
                         }
@@ -2049,14 +1169,7 @@ namespace Gurux.Service.Orm.Internal
                             args.StringBuilder.Append('(');
                             foreach (var it in GXSqlBuilder.GetProperties(itemType))
                             {
-                                if (it.Value.Get != null)
-                                {
-                                    value = it.Value.Get(e2.Current);
-                                }
-                                else
-                                {
-                                    value = GXInternal.GetValue(e2.Current, it.Value);
-                                }
+                                value = it.Value.Get(e2.Current);
                                 if (first)
                                 {
                                     first = false;
@@ -2086,14 +1199,7 @@ namespace Gurux.Service.Orm.Internal
                     args.StringBuilder.Append('(');
                     foreach (var it in GXSqlBuilder.GetProperties(target.GetType()))
                     {
-                        if (it.Value.Get != null)
-                        {
-                            value = it.Value.Get(target);
-                        }
-                        else
-                        {
-                            value = GXInternal.GetValue(target, it.Value);
-                        }
+                        value = it.Value.Get(target);
                         if (first)
                         {
                             first = false;
@@ -2109,16 +1215,7 @@ namespace Gurux.Service.Orm.Internal
                         }
                         else
                         {
-                            if (args.Settings.UseQuotationWhereColumns)
-                            {
-                                args.StringBuilder.Append(AddQuotes(it.Key,
-                                    null,
-                                    args.Settings.ColumnNameQuoteCharacter));
-                            }
-                            else
-                            {
-                                args.StringBuilder.Append(it.Key);
-                            }
+                            args.StringBuilder.Append(it.Key);
                             args.StringBuilder.Append(" = ");
                             args.StringBuilder.Append(args.Settings.ConvertToString(value));
                         }
@@ -2351,9 +1448,11 @@ namespace Gurux.Service.Orm.Internal
                     tmp = null;
                 }
                 args.Expression = bi.Left;
+                var old = args.TargetType;
                 args.TargetType = TargetType.Column;
                 var list = GetMembers(args);
-                if (args.StringBuilder == null)
+                args.TargetType = old;
+                if (args.StringBuilder == null && list != null)
                 {
                     return ["(" + list[0] + op + tmp + ")"];
                 }
@@ -2373,8 +1472,12 @@ namespace Gurux.Service.Orm.Internal
                     args.StringBuilder.Append("*");
                     return null;
                 }
-                string tableName = null;
-                args.StringBuilder.Append(ConvertToString(args.Settings, args.TargetType | TargetType.Value, tableName, ce.Value, null));
+                string tmp = ConvertToString(args.Settings, args.TargetType | TargetType.Value, null, ce.Value, null);
+                if (args.StringBuilder == null)
+                {
+                    return [tmp];
+                }
+                args.StringBuilder.Append(tmp);
                 return null;
             }
             if (args.Expression is ParameterExpression pe)
@@ -2441,32 +1544,159 @@ namespace Gurux.Service.Orm.Internal
             return false;
         }
 
-        public static string GetDatabaseName(DatabaseType type, string databaseName)
+        /// <summary>
+        /// Check is value is zero. 
+        /// This method is used to check if a numeric value is zero, regardless of its type (e.g., int, float, double, etc.). It returns true if the value is zero, and false otherwise.
+        /// </summary>
+        /// <param name="value">The value to check.</param>
+        /// <returns>true if the value is zero; otherwise, false.</returns>
+        public static bool IsZero(object? value)
         {
-            if (string.IsNullOrEmpty(databaseName))
+            return value switch
             {
-                return databaseName;
-            }
-            if (type == DatabaseType.PostgreSQL)
-            {
-                if (databaseName.StartsWith("\"") && databaseName.EndsWith("\""))
-                {
-                    return databaseName;
-                }
-                return databaseName.ToLower();
-            }
-            if (type == DatabaseType.Oracle ||
-                type == DatabaseType.DB2 ||
-                type == DatabaseType.SapHana)
-            {
-                if (databaseName.StartsWith("\"") && databaseName.EndsWith("\""))
-                {
-                    return databaseName;
-                }
-                return databaseName.ToUpper();
-            }
-            return databaseName;
+                byte v => v == 0,
+                sbyte v => v == 0,
+                short v => v == 0,
+                ushort v => v == 0,
+                int v => v == 0,
+                uint v => v == 0,
+                long v => v == 0,
+                ulong v => v == 0,
+                float v => v == 0,
+                double v => v == 0,
+                decimal v => v == 0,
+                Guid v => v == Guid.Empty,
+                string v => v == string.Empty,
+                null => true,
+                _ => false
+            };
         }
 
+        public static Type GetType(string typeName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type? type = FindType(assembly, typeName);
+                if (type != null)
+                {
+                    return type;
+                }
+                foreach (AssemblyName satelliteName in assembly.GetReferencedAssemblies())
+                {
+                    try
+                    {
+                        Assembly satellite = Assembly.Load(satelliteName);
+                        type = FindType(satellite, typeName);
+                        if (type != null)
+                        {
+                            return type;
+                        }
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        // Referenced assembly is not available.
+                    }
+                    catch (FileLoadException)
+                    {
+                        // Assembly could not be loaded.
+                    }
+                }
+            }
+
+            throw new TypeLoadException($"Type '{typeName}' was not found.");
+        }
+
+        public static object CreateInstance(string typeName)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(typeName);
+
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type? type = FindType(assembly, typeName);
+                if (type != null)
+                {
+                    return Activator.CreateInstance(type)
+                        ?? throw new InvalidOperationException(
+                            $"Failed to create an instance of type '{type.FullName}'.");
+                }
+
+                foreach (AssemblyName satelliteName in assembly.GetReferencedAssemblies())
+                {
+                    try
+                    {
+                        Assembly satellite = Assembly.Load(satelliteName);
+
+                        type = FindType(satellite, typeName);
+                        if (type != null)
+                        {
+                            return Activator.CreateInstance(type)
+                                ?? throw new InvalidOperationException(
+                                    $"Failed to create an instance of type '{type.FullName}'.");
+                        }
+                    }
+                    catch (FileNotFoundException)
+                    {
+                        // Referenced assembly is not available.
+                    }
+                    catch (FileLoadException)
+                    {
+                        // Assembly could not be loaded.
+                    }
+                }
+            }
+
+            throw new TypeLoadException($"Type '{typeName}' was not found.");
+        }
+
+        private static Type? FindType(Assembly assembly, string typeName)
+        {
+            // Fast path if full type name was supplied.
+            Type? type = assembly.GetType(typeName, throwOnError: false, ignoreCase: false);
+            if (type != null)
+            {
+                return type;
+            }
+
+            try
+            {
+                return assembly.GetTypes().FirstOrDefault(
+                    t => string.Equals(t.Name, typeName, StringComparison.Ordinal) ||
+                         string.Equals(t.FullName, typeName, StringComparison.Ordinal));
+            }
+            catch (ReflectionTypeLoadException ex)
+            {
+                return ex.Types
+                    .Where(t => t != null)
+                    .FirstOrDefault(
+                        t => string.Equals(t!.Name, typeName, StringComparison.Ordinal) ||
+                             string.Equals(t.FullName, typeName, StringComparison.Ordinal));
+            }
+        }
+
+        /// <summary>Adds an integer offset to a supported numeric value while preserving its numeric type.</summary>
+        /// <param name="value">The numeric value to increment.</param>
+        /// <param name="add">The integer offset to add.</param>
+        /// <returns>The incremented value boxed as its numeric type.</returns>
+        /// <exception cref="ArgumentException">The value is null or is not a supported numeric type.</exception>
+        public static object Add(object? value, int add)
+        {
+            return value switch
+            {
+                byte v => (byte)(v + add),
+                sbyte v => (sbyte)(v + add),
+                short v => (short)(v + add),
+                ushort v => (ushort)(v + add),
+                int v => v + add,
+                uint v => v + (uint)add,
+                long v => v + add,
+                ulong v => v + (ulong)add,
+                float v => v + add,
+                double v => v + add,
+                decimal v => v + add,
+                _ => throw new ArgumentException("Value must be a numeric type.", nameof(value))
+            };
+        }
     }
 }

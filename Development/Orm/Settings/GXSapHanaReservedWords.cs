@@ -40,50 +40,91 @@ namespace Gurux.Service.Orm.Settings
     public static class GXSapHanaReservedWords
     {
         /// <summary>
-        /// A set of reserved words in HANA. 
-        /// This list is based on the official documentation and may not be exhaustive.
+        /// A set of reserved words in SAP HANA. 
         /// </summary>
         private static readonly HashSet<string> ReservedWords =
             new(StringComparer.OrdinalIgnoreCase)
-           {
-        "ALL", "ALTER", "AND", "ANY", "AS", "ASC",
-        "BETWEEN", "BIGINT", "BINARY", "BLOB", "BOOLEAN", "BOTH",
-        "CASE", "CHAR", "CHARACTER", "CLOB", "CONDITION",
-        "CONNECT", "CONSTRAINT", "CONTINUE", "CORRESPONDING",
-        "CREATE", "CROSS", "CURRENT", "CURRENT_CONNECTION",
-        "CURRENT_DATE", "CURRENT_SCHEMA", "CURRENT_TIME",
-        "CURRENT_TIMESTAMP", "CURRENT_TRANSACTION_ISOLATION_LEVEL",
-        "CURRENT_USER", "CURSOR",
-        "DATE", "DAY", "DEC", "DECIMAL", "DECLARE", "DEFAULT",
-        "DELETE", "DESC", "DISTINCT", "DOUBLE", "DROP",
-        "ELSE", "ELSEIF", "END", "ESCAPE", "EXCEPT", "EXEC",
-        "EXECUTE", "EXISTS", "EXIT",
-        "FALSE", "FETCH", "FOR", "FROM", "FULL",
+            {
+        "ALL",
+        "ALTER",
+        "AS",
+        "BEFORE",
+        "BEGIN",
+        "BOTH",
+        "CASE",
+        "CHAR",
+        "CONDITION",
+        "CONNECT",
+        "CROSS",
+        "CUBE",
+        "CURRENT_CONNECTION",
+        "CURRENT_DATE",
+        "CURRENT_SCHEMA",
+        "CURRENT_TIME",
+        "CURRENT_TIMESTAMP",
+        "CURRENT_TRANSACTION_ISOLATION_LEVEL",
+        "CURRENT_USER",
+        "CURRENT_UTCDATE",
+        "CURRENT_UTCTIME",
+        "CURRENT_UTCTIMESTAMP",
+        "DEALLOCATE",
+        "DISTINCT",
+        "ELSE",
+        "ELSEIF",
+        "END",
+        "EXCEPT",
+        "EXCEPTION",
+        "EXEC",
+        "FOR",
+        "FROM",
+        "FULL",
         "GROUP",
         "HAVING",
-        "IF", "IN", "INNER", "INOUT", "INSERT", "INT",
-        "INTEGER", "INTERSECT", "INTO", "IS",
+        "IF",
+        "IN",
+        "INNER",
+        "INOUT",
+        "INTERSECT",
+        "INTO",
+        "IS",
         "JOIN",
-        "LEADING", "LEFT", "LIKE", "LIMIT", "LOCALTEMPORARY",
-        "LONGDATE", "LONGVARCHAR", "LOOP",
+        "LEADING",
+        "LEFT",
+        "LOOP",
         "MINUS",
-        "NATURAL", "NCHAR", "NCLOB", "NEW", "NO", "NOT",
-        "NULL", "NVARCHAR",
-        "ON", "OR", "ORDER", "OUT", "OUTER",
-        "PRIMARY", "PROCEDURE",
-        "REAL", "RETURN", "RETURNS", "REVOKE", "RIGHT",
-        "SELECT", "SESSION_USER", "SET", "SMALLDECIMAL",
-        "SMALLINT", "SQL", "SQLSCRIPT",
-        "TABLE", "THEN", "TIME", "TIMESTAMP", "TINYINT",
-        "TO", "TOP", "TRAILING", "TRIGGER", "TRUE",
-        "UNION", "UNIQUE", "UPDATE", "USER", "USING",
-        "VALUES", "VARCHAR",
-        "WHEN", "WHERE", "WHILE", "WITH",
-        "COLUMN", "ROW", "SEQUENCE", "VIEW", "INDEX",
-        "SCHEMA", "DATABASE", "SYNONYM",
-        "DO", "BEGIN", "SIGNAL", "RESIGNAL", "CONDITION",
-        "DECLARE", "HANDLER"
+        "NATURAL",
+        "NULL",
+        "ON",
+        "ORDER",
+        "OUT",
+        "PRIOR",
+        "RETURN",
+        "RETURNS",
+        "REVERSE",
+        "RIGHT",
+        "ROLLUP",
+        "ROWID",
+        "SELECT",
+        "SET",
+        "SQL",
+        "START",
+        "SYSDATE",
+        "SYSTIME",
+        "SYSTIMESTAMP",
+        "SYSUUID",
+        "TRAILING",
+        "UNION",
+        "USING",
+        "UTCDATE",
+        "UTCTIME",
+        "UTCTIMESTAMP",
+        "VALUES",
+        "WHEN",
+        "WHERE",
+        "WHILE",
+        "WITH"
     };
+
 
         /// <summary>
         /// Checks if the given identifier is a reserved word in HANA.
@@ -94,6 +135,21 @@ namespace Gurux.Service.Orm.Settings
         {
             return !string.IsNullOrWhiteSpace(identifier) &&
                    ReservedWords.Contains(identifier);
+        }
+
+        /// <summary>
+        /// Escapes the given identifier if it is a reserved word in SAP Hana.
+        /// </summary>
+        /// <param name="tablePrefix">The table prefix to use.</param>
+        /// <param name="value">The identifier to escape.</param>
+        /// <returns>The escaped identifier if it is a reserved word; otherwise, the original identifier.</returns>
+        public static string EscapeIdentifier(string? tablePrefix, string value)
+        {
+            if (IsReservedWord(value))
+            {
+                return $"\"{tablePrefix}{value}\"";
+            }
+            return $"{tablePrefix}{value.ToUpperInvariant()}";
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -33,8 +33,12 @@
 using System;
 namespace Gurux.Service.Orm.Model
 {
+    /// <summary>Contains the name and source code of a generated class.</summary>
     public sealed class GXClassGeneratedEventArgs : EventArgs
     {
+        /// <summary>Initializes the generated class information.</summary>
+        /// <param name="className">Name of the generated class.</param>
+        /// <param name="source">Generated source code.</param>
         public GXClassGeneratedEventArgs(string className, string source)
         {
             ClassName = className;

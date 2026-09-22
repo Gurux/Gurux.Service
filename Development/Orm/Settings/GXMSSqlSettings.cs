@@ -31,12 +31,12 @@
 //---------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Xml.Linq;
 
 namespace Gurux.Service.Orm.Settings
 {
@@ -78,33 +78,19 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetColumnConstraints(object[] values, out ForeignKeyDelete onDelete, out ForeignKeyUpdate onUpdate)
+        public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            string str = (string)values[1];
-            if (str == "NO_ACTION")
-            {
-                onDelete = ForeignKeyDelete.None;
-            }
-            else
-            {
-                onDelete = (ForeignKeyDelete)Enum.Parse(typeof(ForeignKeyDelete), str, true);
-            }
-            str = (string)values[2];
-            if (str == "NO_ACTION")
-            {
-                onUpdate = ForeignKeyUpdate.None;
-            }
-            else
-            {
-                onUpdate = (ForeignKeyUpdate)Enum.Parse(typeof(ForeignKeyUpdate), str, true);
-            }
-            return (string)values[0];
-        }
-
-        /// <inheritdoc />
-        public override string GetColumnConstraintsQuery(string schema, string tableName, string columnName)
-        {
-            return string.Format("SELECT OBJECT_NAME(f.parent_object_id) AS 'Table name', delete_referential_action_desc AS 'On Delete', update_referential_action_desc AS 'On Update' FROM sys.foreign_keys AS f, sys.foreign_key_columns AS fc, sys.tables t WHERE f.OBJECT_ID = fc.constraint_object_id AND t.OBJECT_ID = fc.referenced_object_id AND f.parent_object_id = OBJECT_ID('{1}') AND COL_NAME(fc.parent_object_id, fc.parent_column_id) = '{2}'", schema, tableName, columnName);
+            return string.Format(@"SELECT fk.name, rs.name, rt.name, pc.name, rc.name, fkc.constraint_column_id, fk.delete_referential_action_desc, fk.update_referential_action_desc
+FROM sys.foreign_keys fk
+INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+INNER JOIN sys.tables pt ON fk.parent_object_id = pt.object_id
+INNER JOIN sys.schemas ps ON pt.schema_id = ps.schema_id
+INNER JOIN sys.columns pc ON fkc.parent_object_id = pc.object_id AND fkc.parent_column_id = pc.column_id
+INNER JOIN sys.tables rt ON fk.referenced_object_id = rt.object_id
+INNER JOIN sys.schemas rs ON rt.schema_id = rs.schema_id
+INNER JOIN sys.columns rc ON fkc.referenced_object_id = rc.object_id AND fkc.referenced_column_id = rc.column_id
+WHERE fk.parent_object_id = OBJECT_ID(N'{1}')
+ORDER BY fk.name, fkc.constraint_column_id", schema, tableName.Replace("'", "''"));
         }
 
         /// <inheritdoc />
@@ -117,7 +103,7 @@ namespace Gurux.Service.Orm.Settings
             }
             columnName = columnName.Replace("'", "''");
             return $"SELECT CAST(ep.value AS nvarchar(max)) FROM sys.extended_properties ep INNER JOIN sys.columns c ON c.object_id = ep.major_id AND c.column_id = ep.minor_id WHERE ep.major_id = OBJECT_ID(N'{tableName}') AND c.name = N'{columnName}' AND ep.name = N'MS_Description'";
-        
+
         }
 
         /// <inheritdoc />
@@ -125,20 +111,21 @@ namespace Gurux.Service.Orm.Settings
         {
             tableName = tableName.Replace("'", "''");
             columnName = columnName.Replace("'", "''");
-            return $"SELECT column_id FROM sys.columns WHERE object_id = OBJECT_ID(N'{tableName}') AND name = N'{columnName}'";        
+            return $"SELECT column_id FROM sys.columns WHERE object_id = OBJECT_ID(N'{tableName}') AND name = N'{columnName}'";
         }
 
         /// <inheritdoc />
         public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
         {
-            tableName = tableName.Replace("'", "''");
             comment = comment.Replace("'", "''");
             string query = $"EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'{comment}', @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'{tableName}'";
             if (string.IsNullOrEmpty(columnName))
             {
                 return query;
             }
-            columnName = columnName.Replace("'", "''");
+            // Remove square brackets from column name if present
+            columnName = columnName.Replace("[", "");
+            columnName = columnName.Replace("]", "");
             return query + $", @level2type=N'COLUMN', @level2name=N'{columnName}'";
         }
 
@@ -183,7 +170,7 @@ namespace Gurux.Service.Orm.Settings
 
 
         /// <inheritdoc />
-        public override string GetUsersQuery(string databaseName)
+        public override string GetUsersQuery(string? databaseName)
         {
             if (string.IsNullOrEmpty(databaseName))
             {
@@ -194,13 +181,14 @@ namespace Gurux.Service.Orm.Settings
         }
 
         /// <inheritdoc />
-        public override string GetDatabasesQuery()
+        public override string GetDatabasesQuery(out int index)
         {
+            index = 0;
             return @"SELECT name AS database_name FROM sys.databases WHERE database_id > 4 ORDER BY name";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string databaseName, string userName)
+        public override string GetDatabaseUserPermissionQuery(string? databaseName, string userName)
         {
             userName = userName.Replace("'", "''");
             if (string.IsNullOrEmpty(databaseName))
@@ -367,7 +355,7 @@ ORDER BY permission_name";
         }
 
         /// <inheritdoc />
-        public override string RemoveUserQuery(string databaseName, string userName)
+        public override string RemoveUserQuery(string? databaseName, string userName)
         {
             if (!string.IsNullOrWhiteSpace(databaseName))
             {
@@ -453,15 +441,15 @@ END");
         }
 
         /// <inheritdoc />
-        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
+        public override bool IsUnique(object value)
         {
-            return string.Format("SELECT is_identity FROM sys.columns WHERE object_id = object_id('{0}.{1}') AND name = '{2}'", schema, tableName, columnName);
+            return Convert.ToBoolean(value);
         }
 
         /// <inheritdoc />
-        public override string GetReferenceTablesQuery(string schema, string tableName, string columnName)
+        public override string GetAutoIncrementQuery(string schema, string tableName, string columnName)
         {
-            return string.Format("SELECT OBJECT_NAME(f.referenced_object_id)FROM sys.foreign_keys AS f, sys.foreign_key_columns AS fc, sys.tables t WHERE f.OBJECT_ID = fc.constraint_object_id AND t.OBJECT_ID = fc.referenced_object_id AND f.parent_object_id = OBJECT_ID('{1}') AND COL_NAME(fc.parent_object_id, fc.parent_column_id) = '{2}'", schema, tableName, columnName);
+            return string.Format("SELECT is_identity FROM sys.columns WHERE object_id = object_id('{0}.{1}') AND name = '{2}'", "dbo", tableName, columnName);
         }
 
         /// <inheritdoc />
@@ -546,15 +534,6 @@ END");
         }
 
         /// <inheritdoc/>
-        public override bool SelectUsingAs
-        {
-            get
-            {
-                return false;
-            }
-        }
-
-        /// <inheritdoc/>
         public override char TableNameQuoteCharacter
         {
             get
@@ -568,7 +547,7 @@ END");
         {
             get
             {
-                return 999;
+                return 500;
             }
         }
 
@@ -609,7 +588,7 @@ END");
         }
 
         /// <inheritdoc />
-        override public string AutoIncrementDefinition
+        override public string? AutoIncrementDefinition
         {
             get
             {
@@ -876,17 +855,52 @@ END");
         }
 
         /// <inheritdoc />
-        public override string GetTables(string schema)
+        public override string GetTablesQuery(string schema)
         {
-            return $@"
-SELECT t.name
-FROM sys.tables t
-JOIN sys.schemas s
+            return $@"SELECT t.name
+FROM [{schema}].sys.tables t
+JOIN [{schema}].sys.schemas s
     ON t.schema_id = s.schema_id
-WHERE s.name = '{schema}'
+WHERE s.name = 'dbo'
   AND t.is_ms_shipped = 0
-ORDER BY t.name";
-            // return "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA = 'dbo'";
+ORDER BY t.name;";
+        }
+
+        /// <inheritdoc />
+        public override string UniqueQuery(string schema, string tableName, string columnName)
+        {
+            return string.Format("SELECT COUNT(1) FROM sys.indexes i INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id WHERE i.is_unique = 1 AND i.is_primary_key = 0 AND i.object_id = OBJECT_ID(N'{0}.{1}') AND c.name = N'{2}'", schema, tableName, columnName);
+        }
+
+        /// <inheritdoc />
+        public override bool IsIdentity(object value)
+        {
+            return Convert.ToBoolean(value);
+        }
+
+        /// <inheritdoc />
+        public override string IsIdentityQuery(string schema, string tableName, string columnName)
+        {
+            return $@"SELECT c.is_identity FROM sys.columns c
+WHERE c.object_id = OBJECT_ID(N'dbo.{tableName}') AND c.name = N'{columnName}';";
+        }
+
+        public override string TableIndexesQuery(string schema, string tableName)
+        {
+            return $@"SELECT i.name, i.is_unique, c.name, ic.key_ordinal,
+CASE WHEN ic.is_descending_key = 1 THEN 'DESC' ELSE 'ASC' END
+FROM sys.indexes i
+INNER JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+INNER JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+WHERE i.object_id = OBJECT_ID(N'dbo.{tableName}')
+  AND i.is_primary_key = 0
+  AND ic.key_ordinal > 0
+ORDER BY i.name, ic.key_ordinal";
+        }
+
+        public override void UpdateTableIndexes(GXTableSchema schema, IEnumerable<IEnumerable<object>> value)
+        {
+            UpdateTableIndexesFromRows(schema, value);
         }
 
         /// <inheritdoc />
