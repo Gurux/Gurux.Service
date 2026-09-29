@@ -107,6 +107,13 @@ namespace Gurux.Service.Orm
                 }
             }
             string type2 = null;
+            if (Settings.Type == DatabaseType.DB2 &&
+                string.Equals(type, "BLOB", StringComparison.OrdinalIgnoreCase))
+            {
+                // DB2 reports a BLOB capacity in LENGTH. It does not make the
+                // column VARBINARY, which ByteArrayColumnDefinition(len) emits.
+                return typeof(byte[]);
+            }
             if (Settings.Type == DatabaseType.MSSQL &&
                 (string.Equals(type, "char", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(type, "nchar", StringComparison.OrdinalIgnoreCase)))
