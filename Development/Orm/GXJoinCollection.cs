@@ -30,8 +30,8 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
-using Gurux.Service.Orm.Internal;
 using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
@@ -43,7 +43,7 @@ namespace Gurux.Service.Orm
     /// </summary>
     public class GXJoinCollection
     {
-        internal List<KeyValuePair<JoinType, BinaryExpression>> List = new List<KeyValuePair<JoinType, BinaryExpression>>();
+        internal readonly List<(JoinType Type, Expression? On, GXSelectArgs? Source)> List = new();
         readonly GXSettingsArgs Parent;
 
         /// <summary>
@@ -93,7 +93,24 @@ namespace Gurux.Service.Orm
             {
                 d = Expression.Constant(destinationColumn.Body);
             }
-            List.Add(new KeyValuePair<JoinType, BinaryExpression>(type, BinaryExpression.Equal(s, d)));
+            List.Add((type, Expression.Equal(s, d), null));
+        }
+
+        /// <summary>
+        /// Add join.
+        /// </summary>
+        private void AddJoin(JoinType type, GXColumnSchema sourceColumn, GXColumnSchema destinationColumn)
+        {
+            if (sourceColumn == null)
+            {
+                throw new ArgumentNullException("sourceColumn");
+            }
+            if (destinationColumn == null)
+            {
+                throw new ArgumentNullException("destinationColumn");
+            }
+            Expression s = Expression.Constant(sourceColumn), d = Expression.Constant(destinationColumn);
+            List.Add((type, Expression.Equal(s, d), null));
         }
 
         /// <summary>
@@ -133,6 +150,16 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Add cross join.
+        /// </summary>
+        public void AddCrossJoin<TSourceTable, TDestinationTable>(Expression<Func<TSourceTable, object>> sourceColumn,
+            Expression<Func<TDestinationTable, object>> destinationColumn)
+        {
+            AddJoin(JoinType.Cross, sourceColumn, destinationColumn);
+        }
+
+
+        /// <summary>
         /// Append joins.
         /// </summary>
         /// <param name="joins">The joins to append to this collection.</param>
@@ -140,6 +167,51 @@ namespace Gurux.Service.Orm
         {
             List.AddRange(joins.List);
         }
+
+        /// <summary>
+        /// Add inner join.
+        /// </summary>
+        public void AddInnerJoin(GXColumnSchema sourceColumn, GXColumnSchema destinationColumn)
+        {
+            AddJoin(JoinType.Inner, sourceColumn, destinationColumn);
+        }
+
+        /// <summary>
+        /// Add left join.
+        /// </summary>
+        public void AddLeftJoin(GXColumnSchema sourceColumn, GXColumnSchema destinationColumn)
+        {
+            AddJoin(JoinType.Left, sourceColumn, destinationColumn);
+        }
+
+        /// <summary>
+        /// Add right join.
+        /// </summary>
+        public void AddRightJoin(GXColumnSchema sourceColumn, GXColumnSchema destinationColumn)
+        {
+            AddJoin(JoinType.Right, sourceColumn, destinationColumn);
+        }
+
+        /// <summary>
+        /// Add full join.
+        /// </summary>
+        public void AddFullJoin(GXColumnSchema sourceColumn, GXColumnSchema destinationColumn)
+        {
+            AddJoin(JoinType.Full, sourceColumn, destinationColumn);
+        }
+
+        /// <summary>
+        /// Add cross join.
+        /// </summary>
+        public void AddCrossJoin(GXColumnSchema sourceColumn, GXColumnSchema destinationColumn)
+        {
+            AddJoin(JoinType.Cross, sourceColumn, destinationColumn);
+        }
+
+        public void Add(GXSelectArgs source, JoinType type, Expression? on = null) => List.Add((type, on, source));
+
+        public void AddRange(GXJoinCollection source) => Append(source);
+
 
         internal int GetItemHash()
         {

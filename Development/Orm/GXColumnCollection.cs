@@ -52,6 +52,8 @@ namespace Gurux.Service.Orm
     public class GXColumnCollection
     {
         internal bool Insert = false;
+        internal LambdaExpression? SourceExpression;
+        internal GXTableSchema? MetadataTable;
         /// <summary>
         /// Target columns.
         /// </summary>
@@ -64,8 +66,6 @@ namespace Gurux.Service.Orm
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<KeyValuePair<LambdaExpression, LambdaExpression?>> List = new List<KeyValuePair<LambdaExpression, LambdaExpression?>>();
 
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        internal List<GXColumnSchema> SchemaColumns = new List<GXColumnSchema>();
         /// <summary>
         /// List of values to exlude from update.
         /// </summary>
@@ -163,17 +163,27 @@ namespace Gurux.Service.Orm
 
         internal string ToString(ref string? post)
         {
+            string? sourceSql = null;
+            if (SourceExpression != null)
+            {
+                var sourceArgs = new GXGetMembersArgs(Parent.Settings, TargetType.Table)
+                {
+                    Expression = SourceExpression.Body,
+                    StringBuilder = new StringBuilder()
+                };
+                GXDbHelpers.GetMembers(sourceArgs);
+                sourceSql = sourceArgs.StringBuilder.ToString();
+            }
             string cacheKey = Parent.QueryCache.BuildKey(
                 Parent.Settings.Type,
                 List,
-                Parent.QueryCache.GetHash(SchemaColumns),
                 Excluded,
                 Joins != null ? Joins.GetItemHash() : 0,
                 Parent.QueryCache.GetHash(Maps),
                 Parent.Distinct,
                 Parent.Index,
                 Parent.Count,
-                Insert);
+                Insert, sourceSql, MetadataTable == null ? null : GetSchemaTableName(MetadataTable));
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
                 Debug.WriteLine("Cache SQL: " + cachedSql);
@@ -227,48 +237,63 @@ namespace Gurux.Service.Orm
                 }
             }
             bool first = true;
-            string table, name;
-            if (SchemaColumns.Count != 0)
+            if (SourceExpression != null && List.Count == 0)
             {
-                GXTableSchema? schema = SchemaColumns[0].Parent;
-                if (schema == null)
-                {
-                    throw new ArgumentException("Column schema does not define parent table.");
-                }
-                foreach (GXColumnSchema it in SchemaColumns.OrderBy(c => c.Ordinal == 0 ? int.MaxValue : c.Ordinal))
-                {
-                    if (string.IsNullOrWhiteSpace(it.Name))
-                    {
-                        throw new ArgumentException("Column name is empty.");
-                    }
-                    if (!ReferenceEquals(schema, it.Parent))
-                    {
-                        throw new ArgumentException("All columns must belong to the same table schema.");
-                    }
-                    if (first)
-                    {
-                        first = false;
-                    }
-                    else
-                    {
-                        args.StringBuilder.Append(", ");
-                    }
-                    name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Name, null);
-                    args.StringBuilder.Append(name);
-                }
-                args.StringBuilder.Append(" FROM ");
-                args.StringBuilder.Append(GetSchemaTableName(schema));
-                string schemaSql = args.StringBuilder.ToString();
-                if (!string.IsNullOrEmpty(schemaSql))
-                {
-                    Parent.QueryCache.Set(cacheKey, schemaSql, 0);
-                    Debug.WriteLine("New SQL: " + schemaSql);
-                }
-                return schemaSql;
+                args.StringBuilder.Append('*');
+                first = false;
             }
+            string table, name;
             foreach (var e in List)
             {
                 args.Expression = e.Key;
+                Expression body = e.Key.Body;
+                while (body is UnaryExpression conversion &&
+                    conversion.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
+                    body = conversion.Operand;
+                if (body is MethodCallExpression call && call.Method.DeclaringType == typeof(GXSql) &&
+                    call.Method.Name == nameof(GXSql.RowNumber))
+                {
+                    if (!first) args.StringBuilder.Append(", ");
+                    first = false;
+                    var windowArgs = new GXGetMembersArgs(Parent.Settings, TargetType.Column | TargetType.Plain)
+                    {
+                        Expression = e.Key.Body,
+                        SingleTable = !Joins.List.Any()
+                    };
+                    args.StringBuilder.Append(string.Join(", ", GXDbHelpers.GetMemberList(windowArgs)!));
+                    if (e.Value != null)
+                    {
+                        string alias = (string)Expression.Lambda(e.Value.Body).Compile().DynamicInvoke()!;
+                        ArgumentException.ThrowIfNullOrWhiteSpace(alias);
+                        args.StringBuilder.Append(" AS ").Append(Parent.Settings.EscapeIdentifier(null, alias));
+                    }
+                    continue;
+                }
+                if (e.Key.Parameters[0].Type == typeof(object))
+                {
+                    // Dynamic metadata projections have no CLR properties to map.
+                    args.TargetType = TargetType.Column | TargetType.Plain;
+                    if (!first) args.StringBuilder.Append(", ");
+                    GXDbHelpers.GetMembers(args);
+                    if (e.Value != null)
+                    {
+                        string alias = (string)Expression.Lambda(e.Value.Body).Compile().DynamicInvoke()!;
+                        ArgumentException.ThrowIfNullOrWhiteSpace(alias);
+                        args.StringBuilder.Append(" AS ").Append(Parent.Settings.EscapeIdentifier(null, alias));
+                    }
+                    first = false;
+                    continue;
+                }
+                Expression selected = e.Key.Body;
+                while (selected is UnaryExpression conversion) selected = conversion.Operand;
+                if (selected is MemberExpression member && GXDbHelpers.GetTableAlias(Parent.Settings, member.Expression) != null)
+                {
+                    if (!first) args.StringBuilder.Append(", ");
+                    first = false;
+                    args.Expression = selected;
+                    GXDbHelpers.GetMembers(args);
+                    continue;
+                }
                 var excluded = GXDbHelpers.ExcludedProperties(Excluded, args, e.Key.Parameters[0].Type);
                 string[] list = GXDbHelpers.GetMemberList(args);
                 foreach (var col in list)
@@ -375,20 +400,31 @@ namespace Gurux.Service.Orm
                 }
             }
             args.StringBuilder.Append(" FROM ");
-            if (!joinList.Any())
+            if (SourceExpression != null)
             {
-                Type tmp = List.First().Key.Parameters[0].Type;
-                args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, tmp, null));
+                args.StringBuilder.Append(sourceSql);
             }
-            else
+            if (SourceExpression == null && !joinList.Any())
             {
-                first = true;
+                if (MetadataTable != null)
+                    args.StringBuilder.Append(GetSchemaTableName(MetadataTable));
+                else
+                {
+                    Type tmp = List.First().Key.Parameters[0].Type;
+                    args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, tmp, null));
+                }
+            }
+            else if (joinList.Any())
+            {
+                first = SourceExpression == null;
                 foreach (var it in joinList)
                 {
                     if (first)
                     {
                         first = false;
                         args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null));
+                        if (it.Alias1 != null)
+                            args.StringBuilder.Append(" AS ").Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias1, null));
                     }
                     switch (it.Type)
                     {
@@ -404,16 +440,31 @@ namespace Gurux.Service.Orm
                         case JoinType.Full:
                             args.StringBuilder.Append(" FULL OUTER JOIN ");
                             break;
+                        case JoinType.Cross:
+                            args.StringBuilder.Append(" CROSS JOIN ");
+                            break;
                         default:
                             throw new ArgumentOutOfRangeException("Invalid join type.");
                     }
                     args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2, null));
-                    args.StringBuilder.Append(" ON ");
-                    table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null);
-                    args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, it.Column1, null));
-                    args.StringBuilder.Append(" = ");
-                    table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2, null);
-                    args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, it.Column2, null));
+                    if (it.Alias2 != null)
+                    {
+                        args.StringBuilder.Append(" AS ").Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias2, null));
+                    }
+                    if (it.Type != JoinType.Cross)
+                    {
+                        args.StringBuilder.Append(" ON ");
+                        table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null);
+                        if (it.Alias1 != null) table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias1, null);
+                        args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, it.Column1, null));
+                        args.StringBuilder.Append(" = ");
+                        table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2, null);
+                        if (it.Alias2 != null)
+                        {
+                            table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias2, null);
+                        }
+                        args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, it.Column2, null));
+                    }
                     args.StringBuilder.Append(' ');
                 }
                 --args.StringBuilder.Length;
@@ -455,9 +506,20 @@ namespace Gurux.Service.Orm
         /// Add columns from table schema.
         /// </summary>
         /// <param name="columns">Schema columns.</param>
+        public void Add<T>(IEnumerable<GXColumnSchema> columns)
+        {
+            ArgumentNullException.ThrowIfNull(columns);
+            var selected = columns.ToArray();
+            Add<T>(_ => selected);
+        }
+
         internal void Add(IEnumerable<GXColumnSchema> columns)
         {
-            SchemaColumns.AddRange(columns);
+            ArgumentNullException.ThrowIfNull(columns);
+            columns = columns.ToArray();
+            MetadataTable = columns.FirstOrDefault()?.Parent;
+            Expression<Func<object, IEnumerable<GXColumnSchema>>> e = _ => columns;
+            List.Add(new(e, null));
         }
 
         private string GetSchemaTableName(GXTableSchema schema)
@@ -500,7 +562,6 @@ namespace Gurux.Service.Orm
         public void Clear()
         {
             List.Clear();
-            SchemaColumns.Clear();
         }
 
         /// <summary>

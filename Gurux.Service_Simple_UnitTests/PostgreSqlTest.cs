@@ -98,6 +98,14 @@ namespace Gurux.Service_Simple_Unit_Test
             base.CountTest3(expected);
         }
 
+        [TestMethod]
+        [DataRow("SELECT COUNT(supplier.supplierid) FROM supplier CROSS JOIN product")]
+        public override void CrossJoinTest(string expected)
+        {
+            base.CrossJoinTest(expected);
+        }
+
+
         /// <summary>
         /// Distinct count test.
         /// </summary>
@@ -251,6 +259,20 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void DeleteByWhereTest(string expected)
         {
             base.DeleteByWhereTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("DELETE FROM testtable")]
+        public override void DeleteAllBySchema(string expected)
+        {
+            base.DeleteAllBySchema(expected);
+        }
+
+        [TestMethod]
+        [DataRow("DELETE FROM testtable WHERE text = 'Gurux'")]
+        public override void DeleteBySelectSchemaTest(string expected)
+        {
+            base.DeleteBySelectSchemaTest(expected);
         }
 
         /// <summary>
@@ -407,7 +429,7 @@ namespace Gurux.Service_Simple_Unit_Test
         /// Select Guid where class array is given as parameter.
         /// </summary>
         [TestMethod]
-        [DataRow("SELECT guid FROM testclass WHERE id IN(1, 2)")]
+        [DataRow("SELECT guid FROM testclass WHERE id IN (1, 2)")]
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
@@ -1688,6 +1710,37 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void ReservedWordUpdateTest(string expected)
         {
             base.ReservedWordUpdateTest(expected);
+        }
+
+        /// <summary>
+        /// Count test.
+        /// </summary>
+        [TestMethod]
+        [DataRow("SELECT supplier.id FROM supplier INNER JOIN product ON supplier.id = product.supplierid")]
+        public override void InnerSchemaJoin(string expected)
+        {
+            base.InnerSchemaJoin(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT COUNT(1) FROM supplier INNER JOIN product ON supplier.id = product.supplierid")]
+        public override void InnerSchemaJoinCount(string expected)
+        {
+            base.InnerSchemaJoinCount(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT id, countryname FROM country WHERE id = (SELECT id FROM company WHERE UPPER(name) LIKE('GURUX'))")]
+        public override void SubQueryTest(string expected)
+        {
+            base.SubQueryTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT id, countryname FROM country WHERE id = (SELECT MAX(countryid) FROM company WHERE name = 'Gurux')")]
+        public override void ScalarTest(string expected)
+        {
+            base.ScalarTest(expected);
         }
     }
 }

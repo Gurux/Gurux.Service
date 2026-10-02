@@ -74,7 +74,7 @@ namespace Gurux.Service.Orm
             }
             List<GXJoin> joinList = new List<GXJoin>();
             List<GXOrder> orderList = new List<GXOrder>();
-            UpdateJoins(Parent.Settings, Parent.Joins, joinList);
+            GXOrderByCollection.UpdateJoins(Parent.Settings, Parent.Joins, joinList);
             foreach (var it in List)
             {
                 GroupBy(Parent.Settings, joinList, it, orderList);
@@ -150,28 +150,6 @@ namespace Gurux.Service.Orm
                 return GetMemberExpression(ce.Value as Expression, out allowNull);
             }
             throw new ArgumentOutOfRangeException("Invalid join.");
-        }
-
-        internal static void UpdateJoins(GXDBSettings settings, GXJoinCollection list, List<GXJoin> joins)
-        {
-            char separtor = settings.ColumnNameQuoteCharacter;
-            bool allowNull;
-            MemberExpression me;
-            foreach (KeyValuePair<JoinType, BinaryExpression> it in list.List)
-            {
-                GXJoin join = new GXJoin();
-                join.Type = it.Key;
-                me = GetMemberExpression(it.Value.Left, out allowNull);
-                MemberInfo m = me.Member;
-                Expression e = me.Expression;
-                join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column, null, m, null);
-                join.AllowNull1 = allowNull;
-                m = GetMemberExpression(it.Value.Right, out allowNull).Member;
-                join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column, null, m, null);
-                join.AllowNull2 = allowNull;
-                join.UpdateTables(settings, e.Type, m.DeclaringType);
-                joins.Add(join);
-            }
         }
 
         internal static void GroupByToString(GXSelectArgs parent, StringBuilder sb, List<GXOrder> groupList, List<GXJoin> joinList)

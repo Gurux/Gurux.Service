@@ -572,6 +572,49 @@ else
 
 ## 📚 Further Resources
 
+### Queries using physical schema metadata
+
+Use `GXTableSchema` and its `GXColumnSchema` instances when table names are
+determined at runtime. The existing argument classes accept this metadata;
+there is no separate metadata query model. Columns must retain their `Parent`.
+
+```csharp
+GXTableSchema table = new GXSchemaManager(dbConnection).Describe("Customer");
+GXColumnSchema id = table.Columns.Single(c => c.Name == "Id");
+GXColumnSchema name = table.Columns.Single(c => c.Name == "Name");
+
+var select = GXSelectArgs.Select(table.Columns, _ => id == requestedId);
+select.OrderBy.Add<GXColumnSchema>(_ => id);
+using var readCommand = orm.CreateCommand(select, transaction);
+
+var insert = GXInsertArgs.Insert(new[] { id, name },
+    new object?[] { requestedId, customerName });
+await orm.InsertAsync(transaction, insert, cancellationToken);
+
+var update = GXUpdateArgs.Update(new object?[] { customerName }, new[] { name });
+update.Where.And<GXColumnSchema>(_ => id == requestedId);
+await orm.UpdateAsync(transaction, update, cancellationToken);
+
+Expression<Func<GXColumnSchema, bool>> predicate = _ => id == requestedId;
+var delete = GXDeleteArgs.Delete(predicate, new[] { id });
+await orm.DeleteAsync(transaction, delete, cancellationToken);
+```
+
+Schema writes bind values in supplied column order. Updates and deletes require
+an explicit predicate; an explicit `true` predicate requests all rows. Commands
+use the supplied transaction's connection and leave connection/transaction
+ownership with the caller.
+
+For dynamic projections, aliases, derived tables and window functions, `GXSql`
+helpers build ordinary `System.Linq.Expressions` trees and `GXSelectArgs`.
+The existing query collections accept those expressions. `CreateCommand` builds
+the command and binds its parameters directly. `ToSql(provider)` returns preview
+SQL using the same renderer; do not execute preview SQL as a standalone string.
+There is no intermediate prepared-query or parameter model. `GXSql.Table` parses a
+qualified identifier, including quoted components. When constructing physical
+metadata directly, keep catalog, schema and name separate; a dot in `Name`
+remains part of that name.
+
 For examples and tests, check:  
 `Gurux.Service_Simple_UnitTests` directory
 

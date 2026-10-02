@@ -30,6 +30,7 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Settings;
@@ -55,6 +56,14 @@ namespace Gurux.Service.Orm
             Table1 = GXDbHelpers.ConvertToString(settings, TargetType.Table | TargetType.Plain, null, table1, null);
             Table2 = GXDbHelpers.ConvertToString(settings, TargetType.Table | TargetType.Plain, null, table2, null);
         }
+
+        internal void UpdateTables(GXDBSettings settings, GXTableSchema table1, GXTableSchema table2)
+        {
+            Table2Type = Table1Type = typeof(GXColumnSchema);
+            Table1 = GXDbHelpers.ConvertToString(settings, TargetType.Table | TargetType.Plain, null, table1, null);
+            Table2 = GXDbHelpers.ConvertToString(settings, TargetType.Table | TargetType.Plain, null, table2, null);
+        }
+
 
         /// <summary>
         /// Join type.

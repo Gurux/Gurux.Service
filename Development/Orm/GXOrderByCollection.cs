@@ -30,12 +30,11 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using Gurux.Service.Orm.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Settings;
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
@@ -49,7 +48,7 @@ namespace Gurux.Service.Orm
     /// </summary>
     public class GXOrderByCollection
     {
-        internal List<LambdaExpression> List = new List<LambdaExpression>();
+        internal readonly List<(LambdaExpression Expression, bool? Descending)> List = new();
         GXSelectArgs Parent;
 
         /// <summary>
@@ -79,7 +78,7 @@ namespace Gurux.Service.Orm
             UpdateJoins(Parent.Settings, Parent.Joins, joinList);
             foreach (var it in List)
             {
-                OrderBy(Parent.Settings, it, joinList, orderList);
+                OrderBy(Parent.Settings, it.Expression, joinList, orderList);
             }
             StringBuilder sb = new StringBuilder();
             OrderByToString(Parent, sb, orderList, joinList);
@@ -155,29 +154,98 @@ namespace Gurux.Service.Orm
             }
             if (expression is ConstantExpression ce)
             {
+                if (ce.Value is GXColumnSchema)
+                {
+                    throw new NotSupportedException("Column metadata joins require a schema SELECT.");
+                }
                 return GetMemberExpression(ce.Value as Expression, out allowNull);
             }
             throw new ArgumentOutOfRangeException("Invalid join.");
+        }
+
+        internal static (GXColumnSchema Column, string? Alias)? GetSchemaJoinColumn(
+            GXDBSettings settings, Expression expression)
+        {
+            while (true)
+            {
+                if (expression is UnaryExpression conversion &&
+                    (conversion.NodeType == ExpressionType.Convert || conversion.NodeType == ExpressionType.ConvertChecked))
+                    expression = conversion.Operand;
+                else if (expression is ConstantExpression wrapper && wrapper.Value is Expression inner)
+                    expression = inner;
+                else
+                    break;
+            }
+            if (expression is ConstantExpression constant && constant.Value is GXColumnSchema column)
+                return (column, null);
+
+            Expression? collection = null;
+            Expression? index = null;
+            if (expression is MethodCallExpression item && item.Method.Name == "get_Item" && item.Arguments.Count == 1)
+            {
+                collection = item.Object;
+                index = item.Arguments[0];
+            }
+            else if (expression is IndexExpression indexed && indexed.Arguments.Count == 1)
+            {
+                collection = indexed.Object;
+                index = indexed.Arguments[0];
+            }
+            if (collection is MemberExpression columns && columns.Member.Name == nameof(GXTableSchema.Columns) &&
+                columns.Member.DeclaringType == typeof(GXTableSchema) &&
+                columns.Expression is MethodCallExpression aliasCall &&
+                aliasCall.Method.DeclaringType == typeof(GXSql) && aliasCall.Method.Name == nameof(GXSql.As))
+            {
+                // Evaluate only captured metadata and the index, never the SQL marker itself.
+                var table = Expression.Lambda<Func<GXTableSchema>>(aliasCall.Arguments[0]).Compile()();
+                ArgumentNullException.ThrowIfNull(table);
+                int position = Expression.Lambda<Func<int>>(index!).Compile()();
+                return (table.Columns[position], GXDbHelpers.GetTableAlias(settings, aliasCall));
+            }
+            return null;
         }
 
         internal static void UpdateJoins(GXDBSettings settings, GXJoinCollection list, List<GXJoin> joins)
         {
             bool allowNull;
             MemberExpression me;
-            foreach (KeyValuePair<JoinType, BinaryExpression> it in list.List)
+            foreach (var it in list.List)
             {
+                if (it.Source != null || it.On is not BinaryExpression predicate)
+                    throw new NotSupportedException("Query-source joins require a schema SELECT.");
                 GXJoin join = new GXJoin();
-                join.Type = it.Key;
-                me = GetMemberExpression(it.Value.Left, out allowNull);
-                MemberInfo m = me.Member;
-                Expression e = me.Expression;
-                join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
-                join.AllowNull1 = allowNull;
-                m = GetMemberExpression(it.Value.Right, out allowNull).Member;
-                join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
-                join.AllowNull2 = allowNull;
-                join.UpdateTables(settings, e.Type, m.DeclaringType);
-                joins.Add(join);
+                join.Type = it.Type;
+                var source = GetSchemaJoinColumn(settings, predicate.Left);
+                var destination = GetSchemaJoinColumn(settings, predicate.Right);
+                if (source.HasValue && destination.HasValue)
+                {
+                    var s = source.Value.Column;
+                    var t = destination.Value.Column;
+                    join.Alias1 = source.Value.Alias;
+                    join.Alias2 = destination.Value.Alias;
+                    join.AllowNull1 = s.IsNullable;
+                    join.AllowNull2 = t.IsNullable;
+                    join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, s.Name, null);
+                    join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, t.Name, null);
+                    join.UpdateTables(settings, s.Parent, t.Parent);
+                    joins.Add(join);
+                }
+                else
+                {
+                    me = GetMemberExpression(predicate.Left, out allowNull);
+                    MemberInfo m = me.Member;
+                    Expression e = me.Expression;
+                    join.Alias1 = GXDbHelpers.GetTableAlias(settings, e);
+                    join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
+                    join.AllowNull1 = allowNull;
+                    var rightMember = GetMemberExpression(predicate.Right, out allowNull);
+                    join.Alias2 = GXDbHelpers.GetTableAlias(settings, rightMember.Expression);
+                    m = rightMember.Member;
+                    join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
+                    join.AllowNull2 = allowNull;
+                    join.UpdateTables(settings, e.Type, m.DeclaringType);
+                    joins.Add(join);
+                }
             }
         }
 
@@ -231,7 +299,17 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("expression");
             }
-            List.Add(expression);
+            List.Add((expression, null));
+        }
+
+        public void Add(Expression expression, bool descending = false)
+        {
+            var lambda = Expression.Lambda(expression);
+            List.Add((lambda, descending));
+        }
+        public void AddRange(IEnumerable<(Expression Expression, bool Descending)> columns)
+        {
+            foreach (var column in columns) Add(column.Expression, column.Descending);
         }
 
         private bool Find(Type type, List<string> path, int index)
@@ -249,7 +327,7 @@ namespace Gurux.Service.Orm
                     {
                         found = true;
                         var expression = MethodCallExpression.Parameter(type, path[index]);
-                        List.Add(Expression.Lambda(expression));
+                        List.Add((Expression.Lambda(expression), null));
                     }
                     break;
                 }

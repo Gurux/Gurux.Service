@@ -302,6 +302,19 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Execute scalar.
+        /// </summary>
+        /// <param name="query">The scalar query.</param>
+        /// <returns>Returns the result of the scalar query.</returns>
+        /// <typeparam name="T">CLR type used to convert the scalar result.</typeparam>
+        /// <param name="cancellationToken">Token used to cancel query execution.</param>
+        public async ValueTask<T?> ExecuteScalarAsync<T>(GXSelectArgs args, CancellationToken cancellationToken = default)
+        {
+            args.Settings = Builder.Settings;
+            return (T?)await GXSchemaManager.ExecuteScalarInternalAsync(Connection, args.ToString(), typeof(T), cancellationToken);
+        }
+
+        /// <summary>
         /// Execute given SQL query that does not return any result.
         /// </summary>
         /// <param name="query">Query to execute.</param>
@@ -1432,9 +1445,9 @@ namespace Gurux.Service.Orm
         /// Insert new object.
         /// </summary>
         /// <param name="arg">The insert arguments describing the entities to insert.</param>
-        public void Insert(GXInsertArgs arg)
+        public int Insert(GXInsertArgs arg)
         {
-            Insert(null, arg);
+            return Insert(null, arg);
         }
 
         /// <summary>
@@ -1442,7 +1455,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Insert arguments.</param>
-        public void Insert(IDbTransaction? transaction,
+        public int Insert(IDbTransaction? transaction,
             GXInsertArgs arg)
         {
             if (arg == null)
@@ -1462,17 +1475,18 @@ namespace Gurux.Service.Orm
             if (string.IsNullOrEmpty(query))
             {
                 //If there is no data to insert, we just return.
-                return;
+                return 0;
             }
             bool autoTransaction = transaction == null && AutoTransaction;
             IDbConnection connection = transaction?.Connection ?? Connection;
+            int rows;
             try
             {
                 if (autoTransaction)
                 {
                     transaction = connection.BeginTransaction();
                 }
-                GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                rows = GXSchemaManager.ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
                 if (arg.Id != null)
                 {
                     //Get last ID.
@@ -1507,15 +1521,16 @@ namespace Gurux.Service.Orm
                 }
                 throw;
             }
+            return rows;
         }
 
         /// <summary>
         /// Insert new object as async.
         /// </summary>
         /// <param name="arg">Insert argument.</param>
-        public async Task InsertAsync(GXInsertArgs arg)
+        public Task<int> InsertAsync(GXInsertArgs arg)
         {
-            await InsertAsync(null, arg, CancellationToken.None);
+            return InsertAsync(null, arg, CancellationToken.None);
         }
 
         /// <summary>
@@ -1523,9 +1538,9 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Insert argument.</param>
-        public async Task InsertAsync(IDbTransaction? transaction, GXInsertArgs arg)
+        public Task<int> InsertAsync(IDbTransaction? transaction, GXInsertArgs arg)
         {
-            await InsertAsync(transaction, arg, CancellationToken.None);
+            return InsertAsync(transaction, arg, CancellationToken.None);
         }
 
         /// <summary>
@@ -1533,10 +1548,10 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="arg">Insert argument.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task InsertAsync(GXInsertArgs arg,
+        public Task<int> InsertAsync(GXInsertArgs arg,
             CancellationToken cancellationToken = default)
         {
-            await InsertAsync(null, arg, cancellationToken);
+            return InsertAsync(null, arg, cancellationToken);
         }
 
         /// <summary>
@@ -1545,11 +1560,11 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Transaction.</param>
         /// <param name="arg">Insert argument.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task InsertAsync(IDbTransaction? transaction,
+        public async Task<int> InsertAsync(IDbTransaction? transaction,
             GXInsertArgs arg,
             CancellationToken cancellationToken = default)
         {
-            await Task.Run(() => Insert(transaction, arg), cancellationToken);
+            return await Task.Run(() => Insert(transaction, arg), cancellationToken);
         }
 
         /// <summary>

@@ -34,6 +34,7 @@ using Gurux.Service.DB;
 using Gurux.Service.Orm;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using System.Globalization;
 using System.Runtime.Serialization;
 using System.Text;
@@ -396,6 +397,18 @@ namespace Gurux.Service_Simple_Unit_Test
         }
 
         /// <summary>
+        /// Cross join test.
+        /// </summary>
+        [TestMethod]
+        public virtual void CrossJoinTest(string expected)
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<Supplier>(q => GXSql.Count(q.Id), _cache);
+            arg.Joins.AddCrossJoin<Supplier, Product>(j => j.Id, j => j.SupplierID);
+            AssertSqlEqual(expected, arg.ToString(false));
+        }
+
+
+        /// <summary>
         /// Distinct count test.
         /// </summary>
         [TestMethod]
@@ -566,6 +579,32 @@ namespace Gurux.Service_Simple_Unit_Test
         public virtual void DeleteByWhereTest(string expected)
         {
             GXDeleteArgs del = GXDeleteArgs.Delete<TestClass>(q => q.Text == "Gurux", _cache);
+            AssertSqlEqual(expected, del.ToString(false));
+        }
+
+        /// <summary>
+        /// Delete all by schema test.
+        /// </summary>
+        [TestMethod]
+        public virtual void DeleteAllBySchema(string expected)
+        {
+            var schema = new GXTableSchema() { Name = "TestTable" };
+            GXDeleteArgs arg = GXDeleteArgs.DeleteAll(schema, _cache);
+            AssertSqlEqual(expected, arg.ToString(false));
+        }
+
+        /// <summary>
+        /// Delete schema using where.
+        /// </summary>
+        [TestMethod]
+        public virtual void DeleteBySelectSchemaTest(string expected)
+        {
+            var schema = new GXTableSchema() { Name = "TestTable" };
+            var col = new GXColumnSchema() { Name = "Text" };
+            schema.Columns.Add(col);
+            col.Parent = schema;
+            GXDeleteArgs del = GXDeleteArgs.Delete(col, _cache);
+            del.Where.And(_ => col == "Gurux");
             AssertSqlEqual(expected, del.ToString(false));
         }
 
@@ -759,7 +798,13 @@ namespace Gurux.Service_Simple_Unit_Test
             TestClass t = new TestClass();
             t.Id = 1;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Id, _cache);
-            arg.Where.And<TestClass>(q => t);
+            arg.Where.And<TestClass>(q => q == t);
+            AssertSqlEqual(expected, arg.ToString(false));
+            arg = GXSelectArgs.Select<TestClass>(x => x.Id, _cache);
+            arg.Where.And<TestClass>(q => q.Equals(t));
+            AssertSqlEqual(expected, arg.ToString(false));
+            arg = GXSelectArgs.Select<TestClass>(x => x.Id, _cache);
+            arg.Where.And<TestClass>(q => q.Id == t.Id);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -773,7 +818,7 @@ namespace Gurux.Service_Simple_Unit_Test
             list[0].Id = 1;
             list[1].Id = 2;
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid }, _cache);
-            arg.Where.And<TestClass>(q => list);
+            arg.Where.And<TestClass>(q => list.Contains(q));
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2297,7 +2342,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void SumTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Sum(q.DoubleTest), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Sum(q.DoubleTest), "SUM1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2307,7 +2352,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void SumColumnsTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Sum(new { q.DoubleTest, q.FloatTest }), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Sum(new { q.DoubleTest, q.FloatTest }), "SUM1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2318,7 +2363,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void MinTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Min(q.DoubleTest), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Min(q.DoubleTest), "MIN1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2328,7 +2373,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void MinColumnsTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Min(new { q.DoubleTest, q.FloatTest }), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Min(new { q.DoubleTest, q.FloatTest }), "MIN1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2338,7 +2383,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void MaxTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Max(q.DoubleTest), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Max(q.DoubleTest), "MAX1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2348,7 +2393,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void MaxColumnsTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Max(new { q.DoubleTest, q.FloatTest }), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Max(new { q.DoubleTest, q.FloatTest }), "MAX1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2358,7 +2403,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void AverageTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Avg(q.DoubleTest), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Avg(q.DoubleTest), "AVG1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2368,7 +2413,7 @@ namespace Gurux.Service_Simple_Unit_Test
         [TestMethod]
         public virtual void AverageColumnsTest(string expected)
         {
-            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.Avg(new { q.DoubleTest, q.FloatTest }), _cache);
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => GXSql.As(GXSql.Avg(new { q.DoubleTest, q.FloatTest }), "AVG1"), _cache);
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
@@ -2446,6 +2491,76 @@ namespace Gurux.Service_Simple_Unit_Test
             GXInsertArgs args = GXInsertArgs.Insert(product, _cache);
             AssertSqlEqual(expected, args.ToString(false));
         }
+
+        /// <summary>
+        /// Count test.
+        /// </summary>
+        [TestMethod]
+        public virtual void InnerSchemaJoin(string expected)
+        {
+            var Supplier = new GXTableSchema() { Name = "Supplier" };
+            var SupplierId = new GXColumnSchema() { Name = "Id" };
+            Supplier.Columns.Add(SupplierId);
+            SupplierId.Parent = Supplier;
+
+            var Product = new GXTableSchema() { Name = "Product" };
+            var ProductParentCol = new GXColumnSchema() { Name = "SupplierID" };
+            Product.Columns.Add(ProductParentCol);
+            ProductParentCol.Parent = Product;
+
+            GXSelectArgs args = GXSelectArgs.Select([SupplierId], null, _cache);
+            args.Joins.AddInnerJoin(SupplierId, ProductParentCol);
+            AssertSqlEqual(expected, args.ToString(false));
+        }
+
+        /// <summary>
+        /// Count test for schema.
+        /// </summary>
+        [TestMethod]
+        public virtual void InnerSchemaJoinCount(string expected)
+        {
+            var Supplier = new GXTableSchema() { Name = "Supplier" };
+            var SupplierId = new GXColumnSchema() { Name = "Id" };
+            Supplier.Columns.Add(SupplierId);
+            SupplierId.Parent = Supplier;
+
+            var Product = new GXTableSchema() { Name = "Product" };
+            var ProductParentCol = new GXColumnSchema() { Name = "SupplierID" };
+            Product.Columns.Add(ProductParentCol);
+            ProductParentCol.Parent = Product;
+
+            GXSelectArgs args = GXSelectArgs.Select<GXColumnSchema>(q => GXSql.Count(q), _cache);
+            args.Joins.AddInnerJoin(SupplierId, ProductParentCol);
+            AssertSqlEqual(expected, args.ToString(false));
+        }
+
+        /// <summary>
+        /// Sub query test.
+        /// </summary>
+        [TestMethod]
+        public virtual void SubQueryTest(string expected)
+        {
+            GXSelectArgs arg2 = GXSelectArgs.Select<Company>(q => q.Id, _cache);
+            arg2.Where.And<Company>(q => q.Name.Equals("Gurux"));
+            GXSelectArgs arg = GXSelectArgs.SelectAll<Country>(_cache);
+            arg.Where.And<Country>(c => c.Id == GXSql.Subquery<int>(arg2));
+            string actual = arg.ToString(false);
+            AssertSqlEqual(expected, actual);
+        }
+
+        /// <summary>
+        /// Scalar test.
+        /// </summary>
+        [TestMethod]
+        public virtual void ScalarTest(string expected)
+        {
+            var subquery = GXSelectArgs.Select<Company>(c => GXSql.Max(c.Country), _cache);
+            subquery.Where.And<Company>(c => c.Name == "Gurux");
+            var query = GXSelectArgs.SelectAll<Country>(_cache);
+            query.Where.And<Country>(c => c.Id == GXSql.Scalar<int>(subquery));
+            AssertSqlEqual(expected, query.ToString(false));
+        }
+
     }
 }
 

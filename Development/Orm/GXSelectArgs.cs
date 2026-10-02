@@ -50,7 +50,7 @@ namespace Gurux.Service.Orm
     /// <summary>
     /// Select arguments.
     /// </summary>
-    public class GXSelectArgs
+    public partial class GXSelectArgs
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal GXSettingsArgs Parent;
@@ -79,6 +79,20 @@ namespace Gurux.Service.Orm
 
         internal string? query;
 
+        /// <summary>
+        /// Select all columns from a source expression. Use GXSql.As to alias a subquery.
+        /// </summary>
+        /// <typeparam name="T">Source row type.</typeparam>
+        /// <param name="source">Source expression, for example () => GXSql.As(GXSql.Subquery&lt;T&gt;(query), "r").</param>
+        /// <returns>Select arguments whose projection can be configured using Columns.</returns>
+        public static GXSelectArgs From<T>(Expression<Func<T>> source)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            var args = new GXSelectArgs();
+            args.Columns.SourceExpression = source;
+            return args;
+        }
+
         /// <inheritdoc />
         public override string ToString()
         {
@@ -102,7 +116,7 @@ namespace Gurux.Service.Orm
             {
                 sb.Append(" ");
                 sb.Append(where);
-            }            
+            }
             str = OrderBy.ToString();
             if (!string.IsNullOrEmpty(str))
             {
@@ -177,8 +191,13 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentException("Descending expects that OrderBy is used.");
             }
+            // Physical metadata does not have a mapped CLR class or IUnique member.
             if (Index != 0)
             {
+                if (Columns.MetadataTable != null && OrderBy.List.Count != 0)
+                {
+                    return;
+                }
                 List<Type> tables = new List<Type>();
                 foreach (var it in Columns.List)
                 {
@@ -225,6 +244,8 @@ namespace Gurux.Service.Orm
         public void Clear()
         {
             Parent.Clear();
+            Columns.SourceExpression = null;
+            Columns.MetadataTable = null;
             Joins.List.Clear();
             Columns.Clear();
             Columns.Clear();
@@ -253,7 +274,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">Table type to select from.</typeparam>
         public static GXSelectArgs SelectAll<T>()
         {
-            return Select<T>((Expression<Func<T, object>>)null, (Expression<Func<T, object>>)null);
+            return Select<T>((Expression<Func<T, object>>?)null, (Expression<Func<T, bool>>)null);
         }
 
         /// <summary>
@@ -263,7 +284,7 @@ namespace Gurux.Service.Orm
         /// <param name="queryCache">The query cache instance to use.</param>
         public static GXSelectArgs SelectAll<T>(GXQueryCache queryCache)
         {
-            return Select<T>((Expression<Func<T, object>>)null, (Expression<Func<T, object>>)null, queryCache);
+            return Select<T>((Expression<Func<T, object>>)null, (Expression<Func<T, bool>>)null, queryCache);
         }
 
         /// <summary>
@@ -271,7 +292,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T">Table type to select from.</typeparam>
         /// <param name="where">Filter expression.</param>
-        public static GXSelectArgs SelectAll<T>(Expression<Func<T, object>> where)
+        public static GXSelectArgs SelectAll<T>(Expression<Func<T, bool>> where)
         {
             return Select<T>(null, where);
         }
@@ -360,7 +381,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">Table type to select from.</typeparam>
         /// <param name="where">Filter expression.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
-        public static GXSelectArgs SelectAll<T>(Expression<Func<T, object>> where, GXQueryCache queryCache)
+        public static GXSelectArgs SelectAll<T>(Expression<Func<T, bool>> where, GXQueryCache queryCache)
         {
             return Select<T>(null, where, queryCache);
         }
@@ -393,7 +414,7 @@ namespace Gurux.Service.Orm
         /// <param name="columns">Columns to select.</param>
         /// <param name="where">Filter expression.</param>
         public static GXSelectArgs Select<T>(Expression<Func<T, object>>? columns,
-            Expression<Func<T, object>> where)
+            Expression<Func<T, bool>> where)
         {
             return Select<T>(columns, where, null);
         }
@@ -406,7 +427,7 @@ namespace Gurux.Service.Orm
         /// <param name="where">Filter expression.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
         public static GXSelectArgs Select<T>(Expression<Func<T, object>>? columns,
-            Expression<Func<T, object>>? where, GXQueryCache queryCache)
+            Expression<Func<T, bool>>? where, GXQueryCache queryCache)
         {
             GXSelectArgs arg = new GXSelectArgs(queryCache);
             if (columns != null)
@@ -435,7 +456,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Check if there are no items that match the where clause.
         /// </summary>
-        public static GXSelectArgs IsEmpty<T>(Expression<Func<T, object>>? where,
+        public static GXSelectArgs IsEmpty<T>(Expression<Func<T, bool>>? where,
             GXQueryCache? queryCache = null)
         {
             return Select<T>(q => GXSql.IsEmpty(q), where, queryCache);
@@ -656,6 +677,16 @@ namespace Gurux.Service.Orm
         /// <param name="columns">Columns to select.</param>
         /// <param name="where">Filter expression.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXSelectArgs Select<T>(IEnumerable<GXColumnSchema> columns)
+        {
+            ArgumentNullException.ThrowIfNull(columns);
+            var selected = columns.ToArray();
+            if (selected.Length == 0) throw new ArgumentException("No columns are selected.", nameof(columns));
+            var args = new GXSelectArgs();
+            args.Columns.Add<T>(_ => selected);
+            return args;
+        }
+
         public static GXSelectArgs Select(IEnumerable<GXColumnSchema> columns,
             Expression<Func<GXColumnSchema, bool>>? where = null, GXQueryCache? queryCache = null)
         {
@@ -668,12 +699,11 @@ namespace Gurux.Service.Orm
             {
                 arg.Where.List.Add(new(WhereType.And, where));
             }
-            List<GXColumnSchema> list = columns.ToList();
-            if (list.Count == 0)
+            if (!columns.Any())
             {
                 throw new ArgumentException("No columns are selected.", nameof(columns));
             }
-            arg.Columns.Add(list);
+            arg.Columns.Add(columns);
             return arg;
         }
 

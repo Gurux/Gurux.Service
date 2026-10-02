@@ -145,6 +145,7 @@ namespace Gurux.Service.Orm
                 Type? table = null;
                 List<string>? excluded = null;
                 sql = Where.ToString();
+                string tmp;
                 foreach (KeyValuePair<object, LambdaExpression> it in Values)
                 {
                     if (it.Key is GXSelectArgs)
@@ -153,12 +154,30 @@ namespace Gurux.Service.Orm
                         Type type = GXDbHelpers.GetType(it.Value);
                         table = type;
                     }
+                    else if (it.Key is IEnumerable<GXColumnSchema> columns)
+                    {
+                        args.StringBuilder.Append("UPDATE ");
+                        args.StringBuilder.Append(columns.First().Parent.Name);
+                        args.StringBuilder.Append(" SET ");
+                        foreach (var c in columns)
+                        {
+                            tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, c.Name, null);
+                            args.StringBuilder.Append(tmp);
+                            args.StringBuilder.Append(" = ");
+                            args.Expression = it.Value;
+                            args.TargetType = TargetType.Value;
+                            GXDbHelpers.GetMembers(args);
+                            args.StringBuilder.Append(", ");
+                        }
+                        args.StringBuilder.Length -= 2;
+                        continue;
+                    }
                     else
                     {
                         table = it.Key.GetType();
                     }
                     excluded = GXDbHelpers.ExcludedProperties(Excluded, args, table);
-                    string tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, table, null);
+                    tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, table, null);
                     if (args.StringBuilder.Length != 0)
                     {
                         //Add space after the first row.
@@ -405,26 +424,50 @@ namespace Gurux.Service.Orm
         }
 
         /// <summary>
+        /// Update value in the database using column schema.
+        /// </summary>
+        /// <param name="values">The values to update.</param>
+        public static GXUpdateArgs Update(IEnumerable<(GXColumnSchema Column, object? Value)> values)
+        {
+            GXUpdateArgs args = new GXUpdateArgs();
+            var schemas = values.Select(v => v.Column).ToArray();
+            var body = Expression.NewArrayInit(
+                typeof(object),
+                values.Select(x =>
+                    Expression.Convert(
+                        Expression.Constant(x.Value),
+                        typeof(object))));
+            args.Values.Add(new(schemas, Expression.Lambda(body)));
+            return args;
+        }
+
+        /// <summary>
         /// Create new update expression with schema.
         /// </summary>
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="value">The entity whose values are used by this operation.</param>
-        /// <param name="schema">Column metadata used to construct the query.</param>
+        /// <param name="schemas">Columns metadata used to construct the query.</param>
         /// <returns>The update arguments built from the entity and column metadata.</returns>
         /// <exception cref="ArgumentNullException">The value or schema is null.</exception>
-        public static GXUpdateArgs Update<T>(T value, params IEnumerable<GXColumnSchema> schema)
+        public static GXUpdateArgs Update<T>(T value, params IEnumerable<GXColumnSchema> schemas)
         {
-            if (value == null)
+            ArgumentNullException.ThrowIfNull(value);
+            ArgumentNullException.ThrowIfNull(schemas);
+            if (value is IEnumerable<object?> row && schemas.Any())
             {
-                throw new ArgumentNullException("Invalid value");
+                var data = row.ToArray();
+                if (schemas.Count() != data.Length)
+                {
+                    throw new ArgumentException("Inserted columns and items must have the same count.");
+                }
+                return Update(schemas.Zip(data, (column, item) => (Column: column, Value: item)));
             }
             if (value is IEnumerable && value is not string)
             {
                 throw new ArgumentException("Use UpdateRange to update a collection.");
             }
-            ArgumentNullException.ThrowIfNull(schema);
             Type type = typeof(T) == typeof(object) ? value.GetType() : typeof(T);
-            List<GXColumnSchema> columns = GetSchemaUpdateColumns(type, schema);
+            List<GXColumnSchema> columns = GetSchemaUpdateColumns(type, schemas);
             if (columns.Count == 0)
             {
                 return Update(value, (Expression<Func<T, object>>?)null);
@@ -437,7 +480,7 @@ namespace Gurux.Service.Orm
             args.Values.Add(new KeyValuePair<object, LambdaExpression?>(
                 value,
                 CreateSchemaExpression(type, columns)));
-            args.Where.And<T>(q => value);
+            args.Where.AndEntity<T>(q => value);
             return args;
         }
 
@@ -463,7 +506,7 @@ namespace Gurux.Service.Orm
             }
             GXUpdateArgs args = new GXUpdateArgs();
             args.Values.Add(new(value, columns));
-            args.Where.And<T>(q => value);
+            args.Where.AndEntity<T>(q => value);
             return args;
         }
 

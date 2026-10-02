@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -608,9 +608,16 @@ namespace Gurux.Service.Orm
         /// <returns>This <see cref="GXInsertArgs"/> instance.</returns>
         public static GXInsertArgs Insert<T>(T value, params IEnumerable<GXColumnSchema> schemas)
         {
-            if (value == null)
+            ArgumentNullException.ThrowIfNull(value);
+            ArgumentNullException.ThrowIfNull(schemas);
+            if (value is IEnumerable<object?> row && schemas.Any())
             {
-                throw new ArgumentNullException("Inserted item can't be null.");
+                var data = row.ToArray();
+                if (schemas.Count() != data.Length)
+                {
+                    throw new ArgumentException("Inserted columns and items must have the same count.");
+                }
+                return Insert(schemas.Zip(data, (column, item) => (Column: column, Value: item)));
             }
             if (value is GXInsertArgs)
             {
@@ -685,37 +692,18 @@ namespace Gurux.Service.Orm
         /// Insert value to the database using column schema.
         /// </summary>
         /// <param name="values">The values to insert.</param>
-        /// <param name="columns">The column schema to use for the insert.</param>
-        /// <returns>This <see cref="GXInsertArgs"/> instance.</returns>
-        public static GXInsertArgs Insert(IEnumerable<GXColumnSchema> columns,
-            IEnumerable<object?> values)
+        public static GXInsertArgs Insert(IEnumerable<(GXColumnSchema Column, object? Value)> values)
         {
-            if (columns == null)
-            {
-                throw new ArgumentNullException("Inserted columns can't be null.");
-            }
-            if (values == null)
-            {
-                throw new ArgumentNullException("Inserted items can't be null.");
-            }
-            if (columns.Count() != values.Count())
-            {
-                throw new ArgumentException("Inserted columns and items must have the same count.");
-            }
             GXInsertArgs args = new GXInsertArgs();
-            for (int index = 0; index != values.Count(); ++index)
-            {
-                var col = columns.ElementAt(index);
-                var value = values.ElementAt(index);
-                if (value != null && value.GetType() != col.Type)
-                {
-                    value = Convert.ChangeType(value, col.Type);
-                }
-                var parameter = Expression.Parameter(col.Type, "q");
-                var body = Expression.Constant(value, col.Type);
-                LambdaExpression e = Expression.Lambda(body, parameter);
-                args.Values.Add(new KeyValuePair<object?, LambdaExpression?>(value, e));
-            }
+            var schemas = values.Select(v => v.Column).ToArray();
+            var body = Expression.NewArrayInit(
+                typeof(object),
+                values.Select(x =>
+                    Expression.Convert(
+                        Expression.Constant(x.Value),
+                        typeof(object))));
+
+            args.Values.Add(new(schemas, Expression.Lambda(body)));
             return args;
         }
 

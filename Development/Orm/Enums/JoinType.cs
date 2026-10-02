@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 // 
@@ -52,6 +52,10 @@ namespace Gurux.Service.Orm.Enums
         /// <summary>
         /// Full join.
         /// </summary>
-        Full
+        Full,
+        /// <summary>
+        /// Cartesian product without a join predicate.
+        /// </summary>
+        Cross
     }
 }
