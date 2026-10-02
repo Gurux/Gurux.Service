@@ -10,7 +10,7 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         public MariaDbSqlTest() : base(DatabaseType.MariaDB) { }
 
-        /// <inheritdoc/>
+        /// <inheritdoc/> 
         [TestMethod]
         [DataRow("SELECT ID, Guid, Time, Text, SimpleText, Text3, Text4, BooleanTest, IntTest, DoubleTest, FloatTest, Span, Object, Status FROM TestClass")]
         public override void SelectTest(string expected)
