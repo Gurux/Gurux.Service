@@ -30,16 +30,15 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System;
-using System.Collections.Generic;
+using Gurux.Service.Orm;
 using System.Reflection;
 
-namespace Gurux.Service
+namespace Gurux.Service_Simple_Unit_Test
 {
     /// <summary>
     /// SQL helper methods.
     /// </summary>
-    public static class GXObjectComparer
+    internal static class GXObjectComparer
     {
         /// <summary>
         /// Compares two instances of the same type and returns the properties

@@ -30,9 +30,7 @@
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-using System.Reflection;
-
-namespace Gurux.Service
+namespace Gurux.Service.Orm
 {
     /// <summary>
     /// Represents a difference between two property values.
