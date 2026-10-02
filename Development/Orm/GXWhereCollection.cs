@@ -32,6 +32,7 @@
 
 using Gurux.Common.Internal;
 using Gurux.Service.Orm.Common.Enums;
+using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Internal;
 using Gurux.Service.Orm.Settings;
 using System;
@@ -70,7 +71,7 @@ namespace Gurux.Service.Orm
         /// <inheritdoc/>
         public override string ToString()
         {
-            string cacheKey = Parent.QueryCache.BuildKey(Parent.Settings.Type, 
+            string cacheKey = Parent.QueryCache.BuildKey(Parent.Settings.Type,
                 List,
                 Joins != null ? Joins.GetItemHash() : 0);
             if (Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
@@ -118,7 +119,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add And expression to where.
         /// </summary>
-        public void And<T>(Expression<Func<T, object>> expression)
+        public void And<T>(Expression<Func<T, bool>> expression)
         {
             if (expression == null)
             {
@@ -127,16 +128,59 @@ namespace Gurux.Service.Orm
             List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.And, expression));
         }
 
+        /// <summary>Adds a predicate for a physical column.</summary>
+        public void And(Expression<Func<GXColumnSchema, bool>> predicate)
+        {
+            And<GXColumnSchema>(predicate);
+        }
+
+        /// <summary>
+        /// Add And expression to where using <see cref="GXSelectArgs"/>. 
+        /// This allows for more complex conditions to be added to the WHERE clause.
+        /// </summary>
+        /// <param name="args"></param>
+        public void And(GXSelectArgs args)
+        {
+            var constant = Expression.Constant(args, typeof(GXSelectArgs));
+            var expression = Expression.Lambda(constant);
+            List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.And, expression));
+        }
+
+        /// <summary>
+        /// Add And expression to where using <see cref="GXSelectArgs"/>. 
+        /// This allows for more complex conditions to be added to the WHERE clause.
+        /// </summary>
+        /// <param name="args"></param>
+        public void Or(GXSelectArgs args)
+        {
+            var constant = Expression.Constant(args, typeof(GXSelectArgs));
+            var expression = Expression.Lambda(constant);
+            List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.Or, expression));
+        }
+
         /// <summary>
         /// Add or expression to where.
         /// </summary>
-        public void Or<T>(Expression<Func<T, object>> expression)
+        public void Or<T>(Expression<Func<T, bool>> expression)
         {
             if (expression == null)
             {
                 throw new ArgumentNullException("expression");
             }
             List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.Or, expression));
+        }
+
+        // Entity expressions are translated into key predicates by the ORM.
+        internal void AndEntity<T>(Expression<Func<T, object>> expression)
+        {
+            ArgumentNullException.ThrowIfNull(expression);
+            List.Add(new(WhereType.And, expression));
+        }
+
+        internal void OrEntity<T>(Expression<Func<T, object>> expression)
+        {
+            ArgumentNullException.ThrowIfNull(expression);
+            List.Add(new(WhereType.Or, expression));
         }
 
         private static void WhereToString(GXGetMembersArgs args,
@@ -232,6 +276,22 @@ namespace Gurux.Service.Orm
         public void Append(GXWhereCollection where)
         {
             List.AddRange(where.List);
+        }
+
+        /// <summary>
+        /// Update where condition.
+        /// </summary>
+        /// <typeparam name="T">The mapped entity type.</typeparam>
+        /// <param name="filters">The object whose mapped values provide the filter.</param>
+        public void FilterBy(IEnumerable<(GXColumnSchema Column, object? value)> filters)
+        {
+            foreach(var it in filters)
+            {
+                if (it.value != null)
+                {
+                    And<GXColumnSchema>(q => it.Column == it.value);
+                }
+            }
         }
 
         /// <summary>
@@ -368,6 +428,6 @@ namespace Gurux.Service.Orm
                     }
                 }
             }
-        }       
+        }
     }
 }

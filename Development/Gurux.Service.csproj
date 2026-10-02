@@ -27,7 +27,7 @@
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Gurux.Service.Common" Version="3.0.2609.1801" />
+    <PackageReference Include="Gurux.Service.Common" Version="3.0.2609.2901" />
     <PackageReference Include="System.Data.Odbc" Version="10.0.12" />
     <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
  </ItemGroup>

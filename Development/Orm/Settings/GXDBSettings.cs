@@ -961,6 +961,10 @@ namespace Gurux.Service.Orm.Settings
                 }
                 return sb.ToString();
             }
+            if (value is GXColumnSchema cs)
+            {
+                return ConvertToString(cs.Name);
+            }
             return Convert.ToString(value, CultureInfo.InvariantCulture);
         }
 

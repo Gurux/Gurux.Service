@@ -1228,11 +1228,10 @@ namespace Gurux.Service.Orm
                 com.CommandText = query;
                 try
                 {
-                    int count = Math.Max(1, arg.Columns.Columns.Count != 0 ?
-                        arg.Columns.Columns.Count :
-                        arg.Columns.SchemaColumns.Count);
+                    int count;
                     using (IDataReader reader = com.ExecuteReader())
                     {
+                        count = reader.FieldCount;
                         while (reader.Read())
                         {
                             cancellationToken.ThrowIfCancellationRequested();
@@ -1287,13 +1286,6 @@ namespace Gurux.Service.Orm
                             {
                                 value = null;
                             }
-                            else if (value != null &&
-                                pos < arg.Columns.SchemaColumns.Count)
-                            {
-                                Type type = arg.Columns.SchemaColumns[pos].Type;
-                                type = Nullable.GetUnderlyingType(type) ?? type;
-                                value = Settings.ChangeType(value, type);
-                            }
                             values.SetValue(value, pos);
                         }
                         objects.Add((T)(object)values);
@@ -1318,25 +1310,7 @@ namespace Gurux.Service.Orm
                     tables[it.Key].indexes.Add(index, it.Value);
                     ++index;
                 }
-            }
-            else if (arg.Columns.SchemaColumns.Count != 0)
-            {
-                Type type = typeof(T);
-                tables.Add(type, new TreeLevel(type, 0, new Dictionary<int, GXSerializedItem>()));
-                Dictionary<string, GXSerializedItem> properties = GetProperties(type);
-                foreach (GXColumnSchema column in arg.Columns.SchemaColumns.OrderBy(c => c.Ordinal == 0 ? int.MaxValue : c.Ordinal))
-                {
-                    var property = properties
-                        .Where(w => string.Equals(w.Key, column.Name, StringComparison.OrdinalIgnoreCase))
-                        .Select(w => w.Value)
-                        .SingleOrDefault();
-                    if (property != null)
-                    {
-                        tables[type].indexes.Add(index, property);
-                    }
-                    ++index;
-                }
-            }
+            }          
             return TreeBuilder.BuildTree<T>(Settings, list, tables.Values);
         }
 

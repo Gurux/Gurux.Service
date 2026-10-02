@@ -34,7 +34,6 @@ using Gurux.Common.Internal;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Common.Model;
-using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Settings;
 using System;
 using System.Collections;
@@ -53,7 +52,6 @@ namespace Gurux.Service.Orm.Internal
         internal GXDBSettings Settings;
         internal Expression? Expression;
         internal TargetType TargetType;
-
         internal string? Post;
         /// <summary>
         /// List separator is used when multiple columns are generated with one expression. 
@@ -64,7 +62,7 @@ namespace Gurux.Service.Orm.Internal
         /// <summary>
         /// Keep list of amount of the operations.
         /// </summary>
-        internal Dictionary<string, int> OperationCount = null;
+        internal Dictionary<string, int>? OperationCount = null;
 
         /// <summary>
         /// Table name is not needed if data is retreaved from single table because of inheritance. 
@@ -95,7 +93,7 @@ namespace Gurux.Service.Orm.Internal
         }
     }
 
-    static class GXDbHelpers
+    static partial class GXDbHelpers
     {
         /// <summary>
         /// Add quotes around the value.
@@ -215,18 +213,27 @@ namespace Gurux.Service.Orm.Internal
             }
         }
 
-        internal static string[] HandleMethod(GXGetMembersArgs args)
+        internal static string[]? HandleMethod(GXGetMembersArgs args)
         {
+            var metadata = GXOrderByCollection.GetSchemaJoinColumn(args.Settings, args.MethodCallExpression);
+            if (metadata.HasValue)
+            {
+                string? alias = metadata.Value.Alias == null ? null :
+                    ConvertToString(args.Settings, TargetType.Column, null, metadata.Value.Alias, null);
+                string sql = ConvertToString(args.Settings, TargetType.Column, alias, metadata.Value.Column, null);
+                if (args.StringBuilder == null) return [sql];
+                args.StringBuilder.Append(sql);
+                return null;
+            }
             if (args.MethodCallExpression.Method.DeclaringType.IsGenericType &&
                 args.MethodCallExpression.Method.DeclaringType.GetGenericTypeDefinition() == typeof(ReadOnlySpan<>))
             {
                 args.Expression = args.MethodCallExpression.Arguments[0];
-                string[] ret = GetMembers(args);
-                return ret;
+                return GetMembers(args);
             }
             if (args.MethodCallExpression.Method.DeclaringType == typeof(GXSql))
             {
-                if (args.MethodCallExpression.Method.Name == "Count")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Count))
                 {
                     string value = null;
                     if (args.MethodCallExpression.Arguments[0].NodeType != ExpressionType.Parameter)
@@ -252,7 +259,7 @@ namespace Gurux.Service.Orm.Internal
                     }
                     return null;
                 }
-                if (args.MethodCallExpression.Method.Name == "DistinctCount")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.DistinctCount))
                 {
                     string value = null;
                     if (args.MethodCallExpression.Arguments[0].NodeType != ExpressionType.Parameter)
@@ -266,7 +273,7 @@ namespace Gurux.Service.Orm.Internal
                     }
                     return ["COUNT(DISTINCT " + value + ")"];
                 }
-                if (args.MethodCallExpression.Method.Name == "In")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.In))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
@@ -279,11 +286,11 @@ namespace Gurux.Service.Orm.Internal
                         args.StringBuilder.Append(" IN (");
                     }
                     args.Expression = args.MethodCallExpression.Arguments[1];
-                    GetMembers(args);
+                    GetMembers(args, TargetType.Value);
                     args.StringBuilder.Append(")");
                     return null;
                 }
-                if (args.MethodCallExpression.Method.Name == "Exists")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Exists))
                 {
                     if (args.MethodCallExpression.Arguments.Count == 3 || args.MethodCallExpression.Arguments.Count == 4)
                     {
@@ -329,7 +336,7 @@ namespace Gurux.Service.Orm.Internal
                             args.StringBuilder.Append("EXISTS (");
                         }
                         args.Expression = args.MethodCallExpression.Arguments[0];
-                        GetMembers(args);
+                        GetMembers(args, TargetType.Value);
                         args.StringBuilder.Append(")");
                         return null;
                     }
@@ -338,17 +345,155 @@ namespace Gurux.Service.Orm.Internal
                         throw new ArgumentOutOfRangeException("Exist failed.");
                     }
                 }
-                if (args.MethodCallExpression.Method.Name == "Contains")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.As))
                 {
+                    if (args.MethodCallExpression.Arguments.Count == 2)
+                    {
+                        bool empty = args.StringBuilder == null;
+                        if (args.StringBuilder == null)
+                        {
+                            args.StringBuilder = new StringBuilder();
+                        }
+                        try
+                        {
+                            var a = args.MethodCallExpression.Arguments;
+                            args.Expression = a[0];
+                            GetMembers(args, TargetType.Value);
+                            args.StringBuilder.Append(" AS ");
+                            args.Expression = a[1];
+                            GetMembers(args, TargetType.Value | TargetType.Plain);
+                            if (empty)
+                            {
+                                return [args.StringBuilder.ToString()];
+                            }
+                        }
+                        finally
+                        {
+                            if (empty)
+                            {
+                                args.StringBuilder = null;
+                            }
+                        }
+                        return null;
+                    }
+                    else
+                    {
+                        throw new ArgumentOutOfRangeException("Exist failed.");
+                    }
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Subquery))
+                {
+                    if (args.MethodCallExpression.Arguments.Count == 1)
+                    {
+                        bool empty = args.StringBuilder == null;
+                        if (args.StringBuilder == null)
+                        {
+                            args.StringBuilder = new StringBuilder();
+                        }
+                        try
+                        {
+                            args.StringBuilder!.Append("(");
+                            args.Expression = args.MethodCallExpression.Arguments[0];
+                            GetMembers(args, TargetType.Value);
+                            args.StringBuilder.Append(")");
+                            if (empty)
+                            {
+                                return [args.StringBuilder.ToString()];
+                            }
+                        }
+                        finally
+                        {
+                            if (empty)
+                            {
+                                args.StringBuilder = null;
+                            }
+                        }
+                        return null;
+                    }
+                    else
+                    {
+                        throw new ArgumentOutOfRangeException("Exist failed.");
+                    }
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Scalar))
+                {
+                    if (args.MethodCallExpression.Arguments.Count == 1)
+                    {
+                        bool empty = args.StringBuilder == null;
+                        if (args.StringBuilder == null)
+                        {
+                            args.StringBuilder = new StringBuilder();
+                        }
+                        try
+                        {
+                            args.StringBuilder!.Append("(");
+                            args.Expression = args.MethodCallExpression.Arguments[0];
+                            GetMembers(args, TargetType.Value);
+                            args.StringBuilder.Append(")");
+                            if (empty)
+                            {
+                                return [args.StringBuilder.ToString()];
+                            }
+                        }
+                        finally
+                        {
+                            if (empty)
+                            {
+                                args.StringBuilder = null;
+                            }
+                        }
+                        return null;
+                    }
+                    else
+                    {
+                        throw new ArgumentOutOfRangeException("Exist failed.");
+                    }
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Contains))
+                {
+                    var contains = args.MethodCallExpression;
+                    if (contains.Arguments.Count == 3 && contains.Arguments[0].Type == typeof(GXColumnSchema))
+                    {
+                        var comparison = Expression.Lambda<Func<StringComparison>>(contains.Arguments[2]).Compile()();
+                        if (comparison != StringComparison.OrdinalIgnoreCase)
+                            throw new NotSupportedException("Metadata text search supports OrdinalIgnoreCase.");
+                        string value = Expression.Lambda<Func<string>>(contains.Arguments[1]).Compile()();
+                        ArgumentNullException.ThrowIfNull(value);
+                        string pattern = "%" + value.ToUpperInvariant().Replace("!", "!!").Replace("%", "!%")
+                            .Replace("_", "!_").Replace("[", "![") + "%";
+                        var columnArgs = new GXGetMembersArgs(args.Settings, TargetType.Column)
+                        {
+                            Expression = contains.Arguments[0],
+                            StringBuilder = new StringBuilder(),
+                            SingleTable = args.SingleTable
+                        };
+                        GetMembers(columnArgs);
+                        string column = columnArgs.StringBuilder.ToString();
+                        string text = args.Settings.Type switch
+                        {
+                            DatabaseType.MSSQL => "CAST(" + column + " AS NVARCHAR(MAX))",
+                            DatabaseType.MySQL or DatabaseType.MariaDB => "CAST(" + column + " AS CHAR)",
+                            DatabaseType.Oracle => "TO_CHAR(" + column + ")",
+                            DatabaseType.SapHana => "TO_NVARCHAR(" + column + ")",
+                            DatabaseType.DB2 => "CAST(" + column + " AS VARCHAR(32672))",
+                            _ => "CAST(" + column + " AS TEXT)"
+                        };
+                        string sql = "UPPER(" + text + ") LIKE " +
+                            ConvertToString(args.Settings, TargetType.Value, null, pattern, null) + " ESCAPE '!'";
+                        if (args.StringBuilder == null) return [sql];
+                        args.StringBuilder.Append(sql);
+                        return null;
+                    }
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder.Append(" LIKE('%");
+                    args.StringBuilder!.Append(" LIKE('%");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     args.TargetType |= TargetType.Plain;
                     GetMembers(args);
                     args.StringBuilder.Append("%')");
+                    return null;
                 }
-                if (args.MethodCallExpression.Method.Name == "IsEmpty")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.IsEmpty))
                 {
                     args.Post = ") THEN 1 ELSE 0 END AS IsEmpty";
                     if (args.Settings.Type == DatabaseType.Oracle)
@@ -365,37 +510,110 @@ namespace Gurux.Service.Orm.Internal
                     }
                     return ["CASE WHEN NOT EXISTS (SELECT 1"];
                 }
-                if (args.MethodCallExpression.Method.Name == "Greater")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.RowNumber))
+                {
+                    var a = args.MethodCallExpression.Arguments;
+                    if ((a.Count == 1 && a[0] is MethodCallExpression partition &&
+                        partition.Method.DeclaringType == typeof(GXSql) &&
+                        partition.Method.Name == nameof(GXSql.PartitionBy)) ||
+                        (a.Count == 2 && a[1] is NewArrayExpression ordering && ordering.Expressions.Count == 0))
+                    {
+                        throw new ArgumentException("ROW_NUMBER requires at least one ordering.");
+                    }
+                    StringBuilder? sb = args.StringBuilder;
+                    if (args.StringBuilder == null)
+                    {
+                        args.StringBuilder = new StringBuilder();
+                    }
+                    args.StringBuilder.Append("ROW_NUMBER() OVER (");
+                    foreach (var arg in a)
+                    {
+                        args.Expression = arg;
+                        GetMembers(args);
+                    }
+                    args.StringBuilder.Append(")");
+                    return [args.StringBuilder.ToString()];
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.PartitionBy))
+                {
+                    args.StringBuilder.Append("PARTITION BY ");
+                    args.Expression = args.MethodCallExpression.Arguments[0];
+                    GetMembers(args);
+                    return null;
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.OrderBy))
+                {
+                    if (args.OperationCount == null)
+                    {
+                        args.OperationCount = new Dictionary<string, int>();
+                    }
+                    if (!args.OperationCount.ContainsKey(nameof(GXSql.OrderBy)))
+                    {
+                        args.OperationCount[nameof(GXSql.OrderBy)] = 0;
+                        args.StringBuilder!.Append(" ORDER BY ");
+                    }
+                    foreach (var arg in args.MethodCallExpression.Arguments)
+                    {
+                        args.Expression = arg;
+                        GetMembers(args);
+                    }
+                    args.StringBuilder.Append(" ASC");
+                    return null;
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.OrderByDescending))
+                {
+                    if (args.OperationCount == null)
+                    {
+                        args.OperationCount = new Dictionary<string, int>();
+                    }
+                    if (!args.OperationCount.ContainsKey(nameof(GXSql.OrderBy)))
+                    {
+                        args.OperationCount[nameof(GXSql.OrderBy)] = 0;
+                        args.StringBuilder!.Append(" ORDER BY ");
+                    }
+                    foreach (var arg in args.MethodCallExpression.Arguments)
+                    {
+                        args.Expression = arg;
+                        GetMembers(args);
+                    }
+                    args.StringBuilder.Append(" DESC");
+                    return null;
+                }
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Greater))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
                     args.StringBuilder.Append(" > ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
+                    return null;
                 }
-                if (args.MethodCallExpression.Method.Name == "Less")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.Less))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
                     args.StringBuilder.Append(" < ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
+                    return null;
                 }
-                if (args.MethodCallExpression.Method.Name == "GreaterOrEqual")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.GreaterOrEqual))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
                     args.StringBuilder.Append(" >= ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
+                    return null;
                 }
-                if (args.MethodCallExpression.Method.Name == "LessOrEqual")
+                if (args.MethodCallExpression.Method.Name == nameof(GXSql.LessOrEqual))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
                     args.StringBuilder.Append(" <= ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
+                    return null;
                 }
                 if (args.MethodCallExpression.Method.Name == "Null")
                 {
@@ -426,7 +644,7 @@ namespace Gurux.Service.Orm.Internal
                     args.StringBuilder.Append(" IN (");
                 }
                 args.Expression = tmp.Arguments[0];
-                GetMembers(args);
+                GetMembers(args, args.TargetType | TargetType.Plain);
                 args.StringBuilder.Append(")");
                 return null;
             }
@@ -523,7 +741,7 @@ namespace Gurux.Service.Orm.Internal
                 args.StringBuilder.Length = 0;
                 if (args.Settings.Type == DatabaseType.Oracle)
                 {
-                    if (args.UnaryExpression.NodeType == ExpressionType.Not)
+                    if (args.UnaryExpression?.NodeType == ExpressionType.Not)
                     {
                         args.StringBuilder.Append(sql + " IS NOT NULL");
                     }
@@ -534,7 +752,7 @@ namespace Gurux.Service.Orm.Internal
                 }
                 else
                 {
-                    if (args.UnaryExpression.NodeType == ExpressionType.Not)
+                    if (args.UnaryExpression?.NodeType == ExpressionType.Not)
                     {
                         args.StringBuilder.Append("(" + sql + " IS NOT NULL AND " + sql + " <> '')");
                     }
@@ -581,28 +799,29 @@ namespace Gurux.Service.Orm.Internal
         private static string[] HandleOperation(GXGetMembersArgs args, string operation)
         {
             args.Expression = args.MethodCallExpression.Arguments[0];
-            StringBuilder sb = new StringBuilder();
-            args.StringBuilder = sb;
-            sb.Append(operation);
-            sb.Append('(');
-            var listSeparator = args.ListSeparator;
-            args.ListSeparator = " + ";
-            GetMembers(args);
-            args.ListSeparator = listSeparator;
-            args.StringBuilder = null;
-            sb.Append(") AS ");
-            sb.Append(operation);
-            if (args.OperationCount == null)
+            bool empty = args.StringBuilder is null;
+            if (empty)
             {
-                args.OperationCount = new Dictionary<string, int>();
+                args.StringBuilder = new StringBuilder();
             }
-            if (!args.OperationCount.ContainsKey(operation))
+            try
             {
-                args.OperationCount[operation] = 0;
+                args.StringBuilder!.Append(operation);
+                args.StringBuilder.Append('(');
+                var listSeparator = args.ListSeparator;
+                args.ListSeparator = " + ";
+                GetMembers(args);
+                args.ListSeparator = listSeparator;
+                args.StringBuilder.Append(")");
+                return [args.StringBuilder.ToString()];
             }
-            ++args.OperationCount[operation];
-            sb.Append(args.OperationCount[operation]);
-            return [sb.ToString()];
+            finally
+            {
+                if (empty)
+                {
+                    args.StringBuilder = null;
+                }
+            }
         }
 
         internal static string[] GetMembers(GXGetMembersArgs args, TargetType targetType)
@@ -668,6 +887,14 @@ namespace Gurux.Service.Orm.Internal
             Dictionary<string, string>? maps)
         {
             bool plain = (targetType & TargetType.Plain) != 0;
+            if (value is GXColumnSchema cs)
+            {
+                return ConvertToString(settings, TargetType.Column, tableName, cs.Name, maps);
+            }
+            if (value is GXTableSchema ts)
+            {
+                return ConvertToString(settings, TargetType.Column, tableName, ts.Name, maps);
+            }
             if ((targetType & TargetType.Value) != 0)
             {
                 if (settings.UseEpochTimeFormat)
@@ -873,6 +1100,24 @@ namespace Gurux.Service.Orm.Internal
                 .ToList();
         }
 
+        internal static string? GetTableAlias(GXDBSettings settings, Expression? expression)
+        {
+            if (expression is MethodCallExpression call &&
+                call.Method.DeclaringType == typeof(GXSql) && call.Method.Name == nameof(GXSql.As))
+            {
+                var aliasArgs = new GXGetMembersArgs(settings, TargetType.Value | TargetType.Plain)
+                {
+                    Expression = call.Arguments[1],
+                    StringBuilder = new StringBuilder()
+                };
+                GetMembers(aliasArgs);
+                string alias = aliasArgs.StringBuilder.ToString();
+                ArgumentException.ThrowIfNullOrWhiteSpace(alias);
+                return alias;
+            }
+            return null;
+        }
+
         internal static string[]? GetMembers(GXGetMembersArgs args)
         {
             if (args.Expression == null)
@@ -890,6 +1135,18 @@ namespace Gurux.Service.Orm.Internal
             {
                 // Reference type property or field
                 Expression e = memberExpression.Expression!;
+                string? tableAlias = GetTableAlias(args.Settings, e);
+                if (tableAlias != null)
+                {
+                    string table = ConvertToString(args.Settings, TargetType.Column, null, tableAlias, null);
+                    string column = ConvertToString(args.Settings, TargetType.Column, table, memberExpression.Member, null);
+                    if (args.StringBuilder != null)
+                    {
+                        args.StringBuilder.Append(column);
+                        return null;
+                    }
+                    return [column];
+                }
                 if (memberExpression.Member.DeclaringType == typeof(GXSql) &&
                     memberExpression.Member.Name == nameof(GXSql.One))
                 {
@@ -1030,7 +1287,7 @@ namespace Gurux.Service.Orm.Internal
                     }
                     if (target is GXColumnSchema cs)
                     {
-                        string? name = args.Settings.ConvertToString(cs.Name, ConvertOption.None);
+                        string? name = args.Settings.EscapeIdentifier(args.Settings.TablePrefix, cs.Name);
                         args.StringBuilder?.Append(name);
                         return [name!];
                     }
@@ -1148,12 +1405,46 @@ namespace Gurux.Service.Orm.Internal
                             return null;
                         }
                     }
+                    if (target is IEnumerable<GXColumnSchema> columns)
+                    {
+                        if (args.StringBuilder == null)
+                        {
+                            return columns.Select(c => c.Name).ToArray();
+                        }
+                        foreach (var it in columns)
+                        {
+                            if (first)
+                            {
+                                first = false;
+                            }
+                            else
+                            {
+                                args.StringBuilder.Append(args.ListSeparator);
+                            }
+                            if (!args.SingleTable)
+                            {
+                                //Get table name.
+                                args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Table, null, it.Parent!.Name, null));
+                                args.StringBuilder.Append('.');
+                            }
+                            args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, null, it.Name, null));
+                        }
+                        return null;
+                    }
                     //If primary key is not used.
                     //If collection
                     if (target is IEnumerable)
                     {
                         Type itemType = GXInternal.GetPropertyType(target.GetType());
-                        args.StringBuilder.Append('(');
+                        StringBuilder? sb = args.StringBuilder;
+                        if (sb == null)
+                        {
+                            sb = new StringBuilder();
+                        }
+                        else
+                        {
+                            sb.Append('(');
+                        }
                         bool firstRow = true;
                         IEnumerator e2 = (target as IEnumerable).GetEnumerator();
                         while (e2.MoveNext())
@@ -1164,9 +1455,9 @@ namespace Gurux.Service.Orm.Internal
                             }
                             else
                             {
-                                args.StringBuilder.Append(" OR ");
+                                sb.Append(" OR ");
                             }
-                            args.StringBuilder.Append('(');
+                            sb.Append('(');
                             foreach (var it in GXSqlBuilder.GetProperties(itemType))
                             {
                                 value = it.Value.Get(e2.Current);
@@ -1176,24 +1467,28 @@ namespace Gurux.Service.Orm.Internal
                                 }
                                 else
                                 {
-                                    args.StringBuilder.Append(" AND ");
+                                    sb.Append(" AND ");
                                 }
                                 if (value == null && args.TargetType == TargetType.Where)
                                 {
-                                    args.StringBuilder.Append(it.Key);
-                                    args.StringBuilder.Append(" IS NULL ");
+                                    sb.Append(it.Key);
+                                    sb.Append(" IS NULL ");
                                 }
                                 else
                                 {
-                                    args.StringBuilder.Append(it.Key);
-                                    args.StringBuilder.Append(" = ");
-                                    args.StringBuilder.Append(args.Settings.ConvertToString(value));
+                                    sb.Append(it.Key);
+                                    sb.Append(" = ");
+                                    sb.Append(args.Settings.ConvertToString(value));
                                 }
                             }
-                            args.StringBuilder.Append(")");
+                            sb.Append(")");
                             first = true;
                         }
-                        args.StringBuilder.Append(")");
+                        sb.Append(")");
+                        if (args.StringBuilder == null)
+                        {
+                            return [sb.ToString()];
+                        }
                         return null;
                     }
                     args.StringBuilder.Append('(');
@@ -1233,7 +1528,10 @@ namespace Gurux.Service.Orm.Internal
                     (methodCallExpression.Arguments[0].NodeType == ExpressionType.MemberAccess ||
                     methodCallExpression.Arguments[0].NodeType == ExpressionType.Constant ||
                     methodCallExpression.Arguments[0].NodeType == ExpressionType.NewArrayInit ||
-                    methodCallExpression.Arguments[0].NodeType == ExpressionType.Convert))
+                    methodCallExpression.Arguments[0].NodeType == ExpressionType.Convert ||
+                    methodCallExpression.Arguments[0].NodeType == ExpressionType.Call ||
+                    methodCallExpression.Arguments[0].NodeType == ExpressionType.Quote ||
+                    methodCallExpression.Arguments[0].NodeType == ExpressionType.New))
                 {
                     args.MethodCallExpression = methodCallExpression;
                     return HandleMethod(args);
@@ -1338,18 +1636,31 @@ namespace Gurux.Service.Orm.Internal
                             args.StringBuilder.Append("(");
                         }
                         args.Expression = bi.Left;
+                        bool groupLeft = bi.Left.NodeType is ExpressionType.OrElse or ExpressionType.Or;
+                        if (groupLeft) args.StringBuilder.Append('(');
                         GetMembers(args);
+                        if (groupLeft) args.StringBuilder.Append(')');
                         args.StringBuilder.Append(" AND ");
                         args.Expression = bi.Right;
+                        bool groupRight = bi.Right.NodeType is ExpressionType.OrElse or ExpressionType.Or;
+                        if (groupRight) args.StringBuilder.Append('(');
                         GetMembers(args);
+                        if (groupRight) args.StringBuilder.Append(')');
                         if (!args.SingleTable)
                         {
                             args.StringBuilder.Append(")");
                         }
                         return null;
                     case ExpressionType.Coalesce:
-                        op = " COALESCE ";
-                        break;
+                        var coalesce = (BinaryExpression)args.Expression;
+                        args.StringBuilder.Append("COALESCE(");
+                        args.Expression = coalesce.Left;
+                        GetMembers(args);
+                        args.StringBuilder.Append(", ");
+                        args.Expression = coalesce.Right;
+                        GetMembers(args);
+                        args.StringBuilder.Append(')');
+                        return null;
                     case ExpressionType.Divide:
                         op = " / ";
                         break;
@@ -1431,7 +1742,8 @@ namespace Gurux.Service.Orm.Internal
                     tmp = GetMemberStringValue(args);
                 }
                 //Where string is empty is not working with oracle DB. We must use where string is null expression.
-                if (args.TargetType == TargetType.Where && (tmp == null || tmp == "NULL"))
+                if ((tmp == null || tmp == "NULL") &&
+                    (args.TargetType == TargetType.Where || nodeType is ExpressionType.Equal or ExpressionType.NotEqual))
                 {
                     if (nodeType == ExpressionType.NotEqual)
                     {
@@ -1482,6 +1794,16 @@ namespace Gurux.Service.Orm.Internal
             }
             if (args.Expression is ParameterExpression pe)
             {
+                if ((pe.Type.IsGenericType && pe.Type.GetGenericTypeDefinition() == typeof(IUnique<>)) ||
+                    pe.Type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IUnique<>)))
+                {
+                    var key = GXSqlBuilder.FindUnique(pe.Type);
+                    if (key?.Target is PropertyInfo property)
+                    {
+                        args.Expression = Expression.Property(pe, property);
+                        return GetMembers(args);
+                    }
+                }
                 string tableName = null;
                 TargetType type = TargetType.Column;
                 if (args.StringBuilder == null)

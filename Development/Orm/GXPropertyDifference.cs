@@ -1,7 +1,7 @@
-//
+﻿//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
-// 
+//
 //
 //
 // Filename:        $HeadURL$
@@ -19,43 +19,37 @@
 // This file is a part of Gurux Device Framework.
 //
 // Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License 
+// and/or modify it under the terms of the GNU General Public License
 // as published by the Free Software Foundation; version 2 of the License.
 // Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of 
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 // See the GNU General Public License for more details.
 //
-// This code is licensed under the GNU General Public License v2. 
+// This code is licensed under the GNU General Public License v2.
 // Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
 //---------------------------------------------------------------------------
 
-namespace Gurux.Service.Orm.Enums
+namespace Gurux.Service.Orm
 {
     /// <summary>
-    /// Join types.
+    /// Represents a difference between two property values.
     /// </summary>
-    public enum JoinType
+    public sealed class GXPropertyDifference
     {
         /// <summary>
-        /// Left join.
+        /// Gets the property that has changed.
         /// </summary>
-        Left,
+        public required string Name { get; init; }
+
         /// <summary>
-        /// Inner join.
+        /// Gets the original property value.
         /// </summary>
-        Inner,
+        public object? OldValue { get; init; }
+
         /// <summary>
-        /// Right join.
+        /// Gets the new property value.
         /// </summary>
-        Right,
-        /// <summary>
-        /// Full join.
-        /// </summary>
-        Full,
-        /// <summary>
-        /// Cartesian product without a join predicate.
-        /// </summary>
-        Cross
+        public object? NewValue { get; init; }
     }
 }

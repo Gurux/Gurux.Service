@@ -40,6 +40,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
@@ -52,14 +53,14 @@ namespace Gurux.Service.Orm
     public class GXDeleteArgs
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        private readonly Type Table;
+        internal readonly object Table;
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         private GXSettingsArgs Parent = new GXSettingsArgs();
 
         /// <summary>
         /// Constructor.
         /// </summary>
-        private GXDeleteArgs(Type table)
+        private GXDeleteArgs(object table)
         {
             Table = table;
             Where = new GXWhereCollection(Parent, null);
@@ -112,9 +113,10 @@ namespace Gurux.Service.Orm
         public string ToString(bool addGenerationTime)
         {
             string sql;
+            string? schemaTable = Table is GXTableSchema table ? table.Name : null;
             string cacheKey = Parent.QueryCache.BuildKey(
                 Parent.Settings.Type,
-                Table,
+                schemaTable ?? Table,
                 Where != null ? Where.GetItemHash() : 0,
                 Count);
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
@@ -139,7 +141,14 @@ namespace Gurux.Service.Orm
                     args.StringBuilder.Append(")");
                 }
                 args.StringBuilder.Append(" FROM ");
-                args.StringBuilder.Append(GXDbHelpers.ConvertToString(args, Table));
+                if (Table is GXTableSchema ts)
+                {
+                    args.StringBuilder.Append(GXDbHelpers.ConvertToString(args, ts.Name));
+                }
+                else
+                {
+                    args.StringBuilder.Append(GXDbHelpers.ConvertToString(args, (Type)Table));
+                }
                 sql = Where.ToString();
                 if (!string.IsNullOrEmpty(sql))
                 {
@@ -202,6 +211,18 @@ namespace Gurux.Service.Orm
             return new GXDeleteArgs(typeof(T)).UseQueryCache(queryCache);
         }
 
+        /// <summary>
+        /// Delete all items from the table and use the specified query cache.
+        /// </summary>
+        /// <param name="schema">The physical table to delete from.</param>
+        /// <param name="queryCache">The query cache instance to use.</param>
+        public static GXDeleteArgs DeleteAll(GXTableSchema schema, GXQueryCache? queryCache = null)
+        {
+            ArgumentNullException.ThrowIfNull(schema);
+            var args = new GXDeleteArgs(schema).UseQueryCache(queryCache);
+            return args;
+        }
+
         internal static GXDeleteArgs Delete(Type type)
         {
             return new GXDeleteArgs(type);
@@ -214,6 +235,12 @@ namespace Gurux.Service.Orm
         /// <param name="item">Item to delete.</param>
         public static GXDeleteArgs Delete<T>(T item)
         {
+            ArgumentNullException.ThrowIfNull(item);
+            if (item is GXColumnSchema schema)
+            {
+                var args = new GXDeleteArgs(schema.Parent ?? throw new ArgumentException("Column requires a parent table.", nameof(item)));
+                return args;
+            }
             if (item == null)
             {
                 throw new ArgumentNullException("Deleted item can't be null.");
@@ -228,7 +255,7 @@ namespace Gurux.Service.Orm
                 arg = Delete(GXInternal.GetPropertyType(typeof(T)));
                 foreach (var it in e)
                 {
-                    arg.Where.Or<T>(q => it);
+                    arg.Where.OrEntity<T>(q => it);
                 }
                 return arg;
             }
@@ -259,7 +286,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T">Type of the items to delete.</typeparam>
         /// <param name="where">Filter expression.</param>
-        public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where)
+        public static GXDeleteArgs Delete<T>(Expression<Func<T, bool>> where)
         {
             GXDeleteArgs arg = DeleteAll<T>();
             if (where != null)
@@ -275,7 +302,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">Type of the items to delete.</typeparam>
         /// <param name="where">Filter expression.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
-        public static GXDeleteArgs Delete<T>(Expression<Func<T, object>> where, GXQueryCache queryCache)
+        public static GXDeleteArgs Delete<T>(Expression<Func<T, bool>> where, GXQueryCache queryCache)
         {
             return Delete(where).UseQueryCache(queryCache);
         }
@@ -285,12 +312,19 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="value">The entity whose values are used by this operation.</param>
-        /// <param name="schema">Column metadata accepted for API compatibility; this implementation does not inspect it.</param>
+        /// <param name="schema">Physical column metadata when value is a LINQ predicate; mapped entities retain their existing key-based behavior.</param>
         /// <returns>The delete arguments built from the supplied entity or collection.</returns>
         /// <exception cref="ArgumentNullException">The value is null.</exception>
         /// <exception cref="ArgumentException">A non-collection entity has no mapped unique key.</exception>
         public static GXDeleteArgs Delete<T>(T value, params IEnumerable<GXColumnSchema> schema)
         {
+            ArgumentNullException.ThrowIfNull(schema);
+            if (value is Expression predicate && schema.Any())
+            {
+                var table = schema.First().Parent ?? throw new ArgumentException("Column metadata requires a parent table.");
+                if (schema.Any(c => !ReferenceEquals(c.Parent, table))) throw new ArgumentException("Delete columns must belong to one table.");
+                return Delete(table, predicate);
+            }
             if (value == null)
             {
                 throw new ArgumentNullException("Deleted item can't be null.");
@@ -305,7 +339,7 @@ namespace Gurux.Service.Orm
                 arg = Delete(GXInternal.GetPropertyType(typeof(T)));
                 foreach (var it in e)
                 {
-                    arg.Where.Or<T>(q => it);
+                    arg.Where.OrEntity<T>(q => it);
                 }
                 return arg;
             }
@@ -320,6 +354,18 @@ namespace Gurux.Service.Orm
             return arg;
         }
 
+        /// <summary>Deletes rows from the specified table matching the predicate.</summary>
+        /// <param name="schema">The target table metadata.</param>
+        /// <param name="predicate">The predicate identifying rows to delete.</param>
+        public static GXDeleteArgs Delete(GXTableSchema schema, Expression predicate)
+        {
+            ArgumentNullException.ThrowIfNull(schema);
+            ArgumentNullException.ThrowIfNull(predicate);
+            var args = new GXDeleteArgs(schema);
+            args.Where.List.Add(new(WhereType.And, Expression.Lambda(predicate)));
+            return args;
+        }
+
         /// <summary>
         /// Delete a range of items.
         /// </summary>
@@ -332,7 +378,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentOutOfRangeException("DeleteRange failed. Collection is empty.");
             }
             GXDeleteArgs args = Delete(typeof(T));
-            args.Where.Or<T>(q => collection);
+            args.Where.OrEntity<T>(q => collection);
             return args;
         }
 

@@ -723,7 +723,7 @@ namespace Gurux.Service.Orm.Model
         /// <param name="type">Type of the table.</param>
         /// <param name="relations">Are relation tables created also.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
-        public void CreateTable(IDbTransaction? transaction, Type type, bool relations, bool overwrite)
+        public int CreateTable(IDbTransaction? transaction, Type type, bool relations, bool overwrite)
         {
             Dictionary<Type, GXSerializedItem> tables = [];
             if (relations)
@@ -734,6 +734,7 @@ namespace Gurux.Service.Orm.Model
             {
                 tables.Add(type, null);
             }
+            int count = 0;
             if (relations && !overwrite)
             {
                 //Existing tables are not created.
@@ -788,11 +789,11 @@ namespace Gurux.Service.Orm.Model
                     //If table do not have relations.
                     if (it.Value == null)
                     {
-                        DropTable(connection, transaction, type, dropTables);
+                        count += DropTable(connection, transaction, type, dropTables);
                     }
                     else
                     {
-                        DropTable(connection, transaction, it.Key, dropTables);
+                        count += DropTable(connection, transaction, it.Key, dropTables);
                     }
                 }
 
@@ -802,6 +803,7 @@ namespace Gurux.Service.Orm.Model
             {
                 throw;
             }
+            return count;
         }
 
         private void CreateTable(IDbConnection connection,
@@ -852,18 +854,21 @@ namespace Gurux.Service.Orm.Model
             }
         }
 
-        private void DropTable(IDbConnection connection,
+        private int DropTable(IDbConnection connection,
             IDbTransaction? transaction,
             Type type,
             Dictionary<Type, GXSerializedItem> tables)
         {
+            int count = 0;
             Dictionary<Type, GXTableCreateQuery> tablesCreationQueries = new Dictionary<Type, GXTableCreateQuery>();
             GetCreateTableQueries(false, type, null, tables, tablesCreationQueries, true);
             List<Type> created = new List<Type>();
             foreach (var it in tablesCreationQueries)
             {
                 TableCreation(connection, false, transaction, it.Value, created);
+                ++count;
             }
+            return count;
         }
 
         private string GetIndexName(string table, string column)
@@ -2342,9 +2347,9 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <typeparam name="T">Table type to drop.</typeparam>
         /// <param name="relations">Are relation tables dropped also.</param>
-        public void DropTable<T>(bool relations)
+        public int DropTable<T>(bool relations)
         {
-            DropTable(typeof(T), relations);
+            return DropTable(typeof(T), relations);
         }
 
         /// <summary>
@@ -2353,18 +2358,18 @@ namespace Gurux.Service.Orm.Model
         /// <typeparam name="T">Table type to drop.</typeparam>
         /// <param name="transaction">DB transaction.</param>
         /// <param name="relations">Are relation tables dropped also.</param>
-        public void DropTable<T>(IDbTransaction? transaction, bool relations)
+        public int DropTable<T>(IDbTransaction? transaction, bool relations)
         {
-            DropTable(transaction, typeof(T), relations);
+            return DropTable(transaction, typeof(T), relations);
         }
 
         /// <summary>
         /// Drop database.
         /// </summary>
         /// <param name="databaseName">Database name.</param>
-        public void DropDatabase(string databaseName)
+        public int DropDatabase(string databaseName)
         {
-            DropDatabase(null, databaseName);
+            return DropDatabase(null, databaseName);
         }
 
         /// <summary>
@@ -2395,14 +2400,14 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <param name="transaction">Transaction.</param>
         /// <param name="databaseName">Database name.</param>
-        public void DropDatabase(IDbTransaction? transaction, string databaseName)
+        public int DropDatabase(IDbTransaction? transaction, string databaseName)
         {
             if (Builder.Settings.Type == DatabaseType.SqLite)
             {
                 Connection.Close();
                 Connection.Dispose();
                 File.Delete(databaseName + ".db");
-                return;
+                return 0;
             }
             string query;
             databaseName = Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, databaseName);
@@ -2427,9 +2432,8 @@ namespace Gurux.Service.Orm.Model
                     Builder.ChangeDatabase(Connection, "postgres");
                 }
                 string db = databaseName.Replace("'", "''");
-                ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted,
+                return ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted,
                     $"SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db}' AND pid <> pg_backend_pid()");
-                query = "DROP DATABASE " + databaseName;
             }
             else
             {
@@ -2439,7 +2443,7 @@ namespace Gurux.Service.Orm.Model
                     Builder.ChangeDatabase(Connection, GetDatabases().First());
                 }
             }
-            ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted, query);
+            return ExecuteNonQuery(this, Connection, transaction, OnSqlExecuted, query);
         }
 
         /// <summary>
@@ -2545,24 +2549,25 @@ namespace Gurux.Service.Orm.Model
         /// Force to drop all relation tables.
         /// </summary>
         /// <typeparam name="T">The mapped entity type.</typeparam>
-        public void ForceDropTable<T>(IDbTransaction? transaction = null)
+        public int ForceDropTable<T>(IDbTransaction? transaction = null)
         {
-            ForceDropTable(transaction, typeof(T));
+            return ForceDropTable(transaction, typeof(T));
         }
 
         /// <summary>
         /// Force to drop all relation tables.
         /// </summary>
-        public void ForceDropTable(Type type)
+        public int ForceDropTable(Type type)
         {
-            ForceDropTable(null, type);
+            return ForceDropTable(null, type);
         }
 
         /// <summary>
         /// Force to drop all relation tables.
         /// </summary>
-        public void ForceDropTable(IDbTransaction? transaction, Type type)
+        public int ForceDropTable(IDbTransaction? transaction, Type type)
         {
+            int count = 0;
             List<Type> failed = new List<Type>();
             Type[] list = GetRelationTables(transaction, type);
             list = list.Reverse().ToArray();
@@ -2587,7 +2592,7 @@ namespace Gurux.Service.Orm.Model
                     {
                         //It's OK if this fails.
                     }
-                    DropTable(transaction, it, false);
+                    count += DropTable(transaction, it, false);
                 }
                 catch (Exception)
                 {
@@ -2600,7 +2605,7 @@ namespace Gurux.Service.Orm.Model
             {
                 try
                 {
-                    DropTable(transaction, it, false);
+                    count += DropTable(transaction, it, false);
                 }
                 catch (Exception)
                 {
@@ -2611,8 +2616,9 @@ namespace Gurux.Service.Orm.Model
             //Try to drop failed tables again.
             if (failed.Count != 0 && list.Length != failed.Count)
             {
-                ForceDropTable(transaction, type);
+                count += ForceDropTable(transaction, type);
             }
+            return count;
         }
 
         /// <summary>
@@ -2620,18 +2626,18 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <param name="type">Type of the table to drop.</param>
         /// <param name="relations">Are relation tables dropped also.</param>
-        public void DropTable(Type type, bool relations)
+        public int DropTable(Type type, bool relations)
         {
-            DropTable(null, type, relations);
+            return DropTable(null, type, relations);
         }
 
         /// <summary>
         /// Drop selected table.
         /// </summary>
         /// <param name="tableName">Table name to drop.</param>
-        public void DropTable(string tableName)
+        public int DropTable(string tableName)
         {
-            DropTable(null, tableName);
+            return DropTable(null, tableName);
         }
 
         /// <summary>
@@ -2639,7 +2645,7 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <param name="transaction">DB transaction.</param>
         /// <param name="tableName">Table name to drop.</param>
-        public void DropTable(IDbTransaction? transaction, string tableName)
+        public int DropTable(IDbTransaction? transaction, string tableName)
         {
             IDbConnection connection = transaction?.Connection ?? Connection;
             try
@@ -2647,8 +2653,11 @@ namespace Gurux.Service.Orm.Model
                 if (TableExist(transaction, tableName))
                 {
                     string query = "DROP TABLE " + tableName;
-                    ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                    int ret = ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                    SchemaCache.Invalidate(transaction);
+                    return ret;
                 }
+                return 0;
             }
             catch (Exception)
             {
@@ -2657,15 +2666,31 @@ namespace Gurux.Service.Orm.Model
         }
 
         /// <summary>
+        /// Drops exactly the specified physical table, preserving schema and identifier case.
+        /// </summary>
+        public int DropTable(GXTableSchema table)
+        {
+            return DropTable(null, table);
+        }
+
+        /// <summary>Drops exactly the specified physical table, preserving schema and identifier case.</summary>
+        public int DropTable(IDbTransaction transaction, GXTableSchema table)
+        {
+            string name = GXDbHelpers.ConvertToString(Builder.Settings, TargetType.Table, null, table.Name, null);
+            return DropTable(transaction, name);
+        }
+
+        /// <summary>
         /// Drop selected table.
         /// </summary>
         /// <param name="transaction">DB transaction.</param>
         /// <param name="type">Table type to drop.</param>
         /// <param name="relations">Are relation tables dropped also.</param>
-        public void DropTable(IDbTransaction? transaction, Type type, bool relations)
+        public int DropTable(IDbTransaction? transaction, Type type, bool relations)
         {
             string table = Builder.GetTableName(type, false);
             table = GetTableName(table);
+            int count = 0;
             IDbConnection connection = transaction?.Connection ?? Connection;
             try
             {
@@ -2691,7 +2716,7 @@ namespace Gurux.Service.Orm.Model
                             --pos;
                         }
                     }
-                    DropTable(connection, transaction, type, tables);
+                    count += DropTable(connection, transaction, type, tables);
 
                     //Drop auto increments that are not supported by DB.
                     foreach (var it in GXSqlBuilder.GetProperties(type))
@@ -2715,6 +2740,8 @@ namespace Gurux.Service.Orm.Model
             {
                 throw;
             }
+            SchemaCache.Invalidate(transaction);
+            return count;
         }
 
         /// <summary>
@@ -2951,7 +2978,7 @@ namespace Gurux.Service.Orm.Model
         /// source without Markdown fences.
         /// </remarks>
         /// <returns>Mermaid erDiagram source.</returns>
-        public string ExportMermaid()
+        public string ExportMermaid(IDbTransaction? transaction = default)
         {
             var tables = GetTables().OrderBy(it => it, StringComparer.Ordinal)
                 .Select(it => Describe(it)).ToList();
@@ -3099,7 +3126,7 @@ namespace Gurux.Service.Orm.Model
         /// <typeparam name="T">Table type.</typeparam>
         /// <returns>Table description.</returns>
         /// <remarks>Uses <see cref="SchemaCache"/> and returns an independently editable schema.</remarks>
-        public GXTableSchema Describe<T>()
+        public GXTableSchema Describe<T>(IDbTransaction? transaction = default)
         {
             return Describe(typeof(T));
         }
@@ -3113,7 +3140,20 @@ namespace Gurux.Service.Orm.Model
         public GXTableSchema Describe(Type table)
         {
             string name = Builder.GetTableName(table, false);
-            return Describe(name);
+            return Describe(null, name);
+        }
+
+        /// <summary>
+        /// Returns the schema information for the specified table type.    
+        /// </summary>
+        /// <param name="transaction">The transaction to use for the operation.</param>
+        /// <param name="table">The type representing the table to describe.</param>
+        /// <returns>A GXTableSchema instance containing the schema of the specified table.</returns>
+        /// <remarks>Uses <see cref="SchemaCache"/> and returns an independently editable schema.</remarks>
+        public GXTableSchema Describe(IDbTransaction transaction, Type table)
+        {
+            string name = Builder.GetTableName(table, false);
+            return Describe(transaction, name);
         }
 
         /// <summary>
@@ -3124,19 +3164,35 @@ namespace Gurux.Service.Orm.Model
         /// <remarks>
         /// Uses the connection's <see cref="SchemaCache"/>. Each result has independent columns,
         /// indexes, and foreign keys. Schema-manager DDL invalidates the cache; call
-        /// <see cref="Gurux.Service.DB.GXSchemaCache.Clear"/> after external schema changes.
+        /// <see cref="DB.GXSchemaCache.Clear"/> after external schema changes.
         /// </remarks>
         public GXTableSchema Describe(string tableName)
+        {
+            return Describe(null, tableName);
+        }
+
+        /// <summary>
+        /// Describe table.
+        /// </summary>
+        /// <param name="transaction">The transaction to use for the operation.</param>
+        /// <param name="tableName">The name of the table.</param>
+        /// <returns>Table description.</returns>
+        /// <remarks>
+        /// Uses the connection's <see cref="SchemaCache"/>. Each result has independent columns,
+        /// indexes, and foreign keys. Schema-manager DDL invalidates the cache; call
+        /// <see cref="Gurux.Service.DB.GXSchemaCache.Clear"/> after external schema changes.
+        /// </remarks>
+        public GXTableSchema Describe(IDbTransaction? transaction, string tableName)
         {
             tableName = GetTableName(tableName);
             // Length prefixes keep catalog/schema/table combinations unambiguous.
             string database = Connection.Database ?? string.Empty;
             string builderDatabase = Builder.Database ?? string.Empty;
             string key = database.Length + ":" + database + builderDatabase.Length + ":" + builderDatabase + tableName;
-            return SchemaCache.GetOrAdd(key, () => DescribeCore(tableName));
+            return SchemaCache.GetOrAdd(key, () => DescribeCore(transaction, tableName));
         }
 
-        private GXTableSchema DescribeCore(string tableName)
+        private GXTableSchema DescribeCore(IDbTransaction? transaction, string tableName)
         {
             GXTableSchema table = new GXTableSchema()
             {
@@ -3148,7 +3204,7 @@ namespace Gurux.Service.Orm.Model
                 throw new ArgumentException("Table '" + tableName + "' does not exist.");
             }
 
-            table.Comment = GetDescription(Connection, tableName, null);
+            table.Comment = GetDescription(Connection, transaction, tableName, null);
             StringBuilder header = new StringBuilder();
             int len;
             var cols = Builder.GetColumns(this, tableName, Connection, null, OnSqlExecuted);
@@ -3160,17 +3216,17 @@ namespace Gurux.Service.Orm.Model
                 };
                 table.Columns.Add(column);
                 column.Parent = table;
-                column.Type = GetColumnType(tableName, column.Name, Connection, out len);
-                column.IsAutoIncrement = IsAutoIncrement(tableName, column.Name, Connection);
-                column.IsUnique = IsUnique(tableName, column.Name, Connection);
-                column.IsPrimaryKey = GetPrimaryKey(tableName, column.Name, Connection);
-                column.IsIdentity = IsIdentity(tableName, column.Name, Connection);
-                GetColumnDefaultValueQuery(tableName, column, Connection);
+                column.Type = GetColumnType(tableName, column.Name, Connection, transaction, out len);
+                column.IsAutoIncrement = IsAutoIncrement(tableName, column.Name, Connection, transaction);
+                column.IsUnique = IsUnique(tableName, column.Name, Connection, transaction);
+                column.IsPrimaryKey = GetPrimaryKey(tableName, column.Name, Connection, transaction);
+                column.IsIdentity = IsIdentity(tableName, column.Name, Connection, transaction);
+                GetColumnDefaultValueQuery(tableName, column, Connection, transaction);
                 column.MaxLength = len;
-                column.IsNullable = GetColumnNullableQuery(tableName, column.Name, Connection);
-                column.Comment = GetDescription(Connection, tableName, column.Name);
-                column.Ordinal = GetOrdinal(Connection, tableName, column.Name);
-                if (GetPrimaryKeyQuery(tableName, column.Name, Connection))
+                column.IsNullable = GetColumnNullableQuery(tableName, column.Name, Connection, transaction);
+                column.Comment = GetDescription(Connection, transaction, tableName, column.Name);
+                column.Ordinal = GetOrdinal(Connection, transaction, tableName, column.Name);
+                if (GetPrimaryKeyQuery(tableName, column.Name, Connection, transaction))
                 {
                     //TODO: Is this needed because IsUnique is already set above?
                     //Check if this is redundant. 
@@ -3179,20 +3235,22 @@ namespace Gurux.Service.Orm.Model
             }
             //Arrange columns by ordinal.
             table.Columns.Sort(static (left, right) => left.Ordinal.CompareTo(right.Ordinal));
-            GetTableIndexes(table, Connection);
-            GetTableForeignKeys(table, Connection);
+            GetTableIndexes(table, Connection, transaction);
+            GetTableForeignKeys(table, Connection, transaction);
             return table;
         }
 
         private void GetColumnDefaultValueQuery(string tableName,
             GXColumnSchema column,
-            IDbConnection connection)
+            IDbConnection connection,
+            IDbTransaction? transaction)
         {
             string query = Builder.Settings.GetColumnDefaultValueQuery(Builder.Database, tableName, column.Name);
             try
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     if (Builder.Settings.Type == DatabaseType.Oracle)
@@ -3325,6 +3383,7 @@ namespace Gurux.Service.Orm.Model
         }
 
         private string? GetDescription(IDbConnection connection,
+            IDbTransaction? transaction,
             string tableName,
             string? columnName)
         {
@@ -3337,6 +3396,7 @@ namespace Gurux.Service.Orm.Model
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3360,7 +3420,7 @@ namespace Gurux.Service.Orm.Model
             return null;
         }
 
-        private int GetOrdinal(IDbConnection connection, string tableName, string columnName)
+        private int GetOrdinal(IDbConnection connection, IDbTransaction? transaction, string tableName, string columnName)
         {
             string query = Builder.Settings.GetOrdinalQuery(Builder.Database, tableName, columnName);
             if (string.IsNullOrEmpty(query))
@@ -3371,6 +3431,7 @@ namespace Gurux.Service.Orm.Model
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3400,14 +3461,16 @@ namespace Gurux.Service.Orm.Model
         /// <param name="tableName">The database table name.</param>
         /// <param name="columnName">The database column name.</param>
         /// <param name="connection">The database connection used to query metadata.</param>
+        /// <param name="transaction">The database transaction used to query metadata.</param>
         /// <returns>True when the column participates in the primary key; otherwise, false.</returns>
-        private bool GetPrimaryKeyQuery(string tableName, string columnName, IDbConnection connection)
+        private bool GetPrimaryKeyQuery(string tableName, string columnName, IDbConnection connection, IDbTransaction? transaction)
         {
             bool ret = false;
             string query = Builder.Settings.GetPrimaryKeyQuery(Builder.Database, tableName, columnName);
             try
             {
                 using IDbCommand com = connection.CreateCommand();
+                com.Transaction = transaction;
                 com.CommandType = CommandType.Text;
                 com.CommandText = query;
                 using IDataReader reader = com.ExecuteReader();
@@ -3428,7 +3491,7 @@ namespace Gurux.Service.Orm.Model
             return ret;
         }
 
-        private bool GetColumnNullableQuery(string tableName, string columnName, IDbConnection connection)
+        private bool GetColumnNullableQuery(string tableName, string columnName, IDbConnection connection, IDbTransaction? transaction)
         {
             bool ret = false;
             string query = Builder.Settings.GetColumnNullableQuery(Builder.Database, tableName, columnName);
@@ -3436,6 +3499,7 @@ namespace Gurux.Service.Orm.Model
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3457,19 +3521,21 @@ namespace Gurux.Service.Orm.Model
         private Type GetColumnType(string tableName,
             string columnName,
             IDbConnection connection,
+            IDbTransaction? transaction,
             out int len)
         {
             return Builder.GetColumnType(this, tableName, columnName, connection,
-                null, OnSqlExecuted, out len, out _);
+                transaction, OnSqlExecuted, out len, out _);
         }
 
-        private bool IsAutoIncrement(string tableName, string columnName, IDbConnection connection)
+        private bool IsAutoIncrement(string tableName, string columnName, IDbConnection connection, IDbTransaction? transaction)
         {
             string query = Builder.Settings.GetAutoIncrementQuery(Builder.Database, tableName, columnName);
             try
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3579,7 +3645,7 @@ namespace Gurux.Service.Orm.Model
             };
         }
 
-        private void GetTableIndexes(GXTableSchema schema, IDbConnection connection)
+        private void GetTableIndexes(GXTableSchema schema, IDbConnection connection, IDbTransaction? transaction)
         {
             string query = Builder.Settings.TableIndexesQuery(Builder.Database, schema.Name);
             try
@@ -3587,6 +3653,7 @@ namespace Gurux.Service.Orm.Model
                 List<object[]> indexes = new List<object[]>();
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3614,13 +3681,14 @@ namespace Gurux.Service.Orm.Model
             }
         }
 
-        private bool IsUnique(string tableName, string columnName, IDbConnection connection)
+        private bool IsUnique(string tableName, string columnName, IDbConnection connection, IDbTransaction? transaction)
         {
             string query = Builder.Settings.UniqueQuery(Builder.Database, tableName, columnName);
             try
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3644,13 +3712,14 @@ namespace Gurux.Service.Orm.Model
             return false;
         }
 
-        private bool IsIdentity(string tableName, string columnName, IDbConnection connection)
+        private bool IsIdentity(string tableName, string columnName, IDbConnection connection, IDbTransaction? transaction)
         {
             string query = Builder.Settings.IsIdentityQuery(Builder.Database, tableName, columnName);
             try
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
@@ -3675,13 +3744,14 @@ namespace Gurux.Service.Orm.Model
         }
 
 
-        private bool GetPrimaryKey(string tableName, string columnName, IDbConnection connection)
+        private bool GetPrimaryKey(string tableName, string columnName, IDbConnection connection, IDbTransaction? transaction)
         {
             string query = Builder.Settings.GetPrimaryKeyQuery(Builder.Database, tableName, columnName);
             try
             {
                 using (IDbCommand com = connection.CreateCommand())
                 {
+                    com.Transaction = transaction;
                     com.CommandType = CommandType.Text;
                     com.CommandText = query;
                     using (IDataReader reader = com.ExecuteReader())
