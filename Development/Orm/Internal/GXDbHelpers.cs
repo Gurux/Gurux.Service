@@ -58,7 +58,7 @@ namespace Gurux.Service.Orm.Internal
         /// For example in insert when columns are defined with new operator. 
         /// In that case list separator is used to separate column names and values.
         /// </summary>
-        internal string ListSeparator = ", ";
+        internal string ListSeparator = ", "; 
         /// <summary>
         /// Keep list of amount of the operations.
         /// </summary>
