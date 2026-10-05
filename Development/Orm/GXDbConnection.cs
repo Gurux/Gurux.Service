@@ -353,7 +353,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get the current connected user.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <returns>Name of the current user.</returns>
         public string GetCurrentUser(IDbTransaction? transaction = null)
         {
@@ -374,7 +374,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get list of users.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>   
         /// <returns>Array of user names.</returns>
         public string[] GetUsers(IDbTransaction? transaction, string? databaseName = null)
@@ -422,7 +422,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Remove users from the database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="users">Array of users to remove.</param>   
         public void RemoveDatabaseUsers(IDbTransaction? transaction,
             params IEnumerable<string> users)
@@ -456,7 +456,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get list of databases.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <returns>Array of database names.</returns>
         public string[] GetDatabases(IDbTransaction? transaction = null)
         {
@@ -476,7 +476,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Check if database exists.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <returns>True if the database exists, otherwise false.</returns>
         public bool DatabaseExists(IDbTransaction? transaction, string databaseName)
@@ -499,7 +499,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Returns the permissions of the given user for the given database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <param name="userName">User name to get permissions for.</param>
         public DatabasePermission GetUserPermission(IDbTransaction? transaction,
@@ -587,7 +587,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Add users to the database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <param name="permissions">Database permissions.</param>
         /// <param name="users">Array of user names to add.</param>
@@ -641,7 +641,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Remove users from the database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <param name="users">Array of user names to remove.</param>
         public void RemoveUsersFromDatabase(IDbTransaction? transaction,
@@ -730,7 +730,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get table row count.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Table name.</param>
         /// <returns>Number of rows in the table.</returns>
         public T GetTableRowCount<T>(IDbTransaction? transaction, string tableName)
@@ -754,7 +754,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Get table row count.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Table name.</param>
         /// <returns>Number of rows in the table.</returns>
         public async Task<T> GetTableRowCountAsync<T>(IDbTransaction? transaction, string tableName)
@@ -794,7 +794,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Delete arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<int> DeleteAsync(IDbTransaction? transaction,
@@ -820,7 +820,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>  
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>  
         /// <param name="arg">Delete arguments.</param>
         public int Delete(IDbTransaction? transaction, GXDeleteArgs arg)
         {
@@ -862,7 +862,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Name of the table to delete items from.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<int> DeleteAsync(IDbTransaction? transaction, string tableName, CancellationToken cancellationToken = default)
@@ -896,7 +896,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Delete items from the DB.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Name of the table to delete items from.</param>
         public int Delete(IDbTransaction? transaction, string tableName)
         {
@@ -1190,7 +1190,7 @@ namespace Gurux.Service.Orm
         /// because it can cause performance issues.
         /// </summary>
         /// <typeparam name="T">Type of the database object.</typeparam>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <returns>List of all items.</returns>
         public List<T> SelectAll<T>(IDbTransaction? transaction = default)
         {
@@ -1202,7 +1202,7 @@ namespace Gurux.Service.Orm
         /// because it can cause performance issues.
         /// </summary>
         /// <typeparam name="T">Type of the database object.</typeparam>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of all items.</returns>
         public async Task<List<T>> SelectAllAsync<T>(IDbTransaction? transaction = default,
@@ -1345,7 +1345,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select object by ID and create empty object if it's not found from the database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
         public T? SingleOrDefault<T>(IDbTransaction transaction, GXSelectArgs arg)
@@ -1404,7 +1404,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select object by ID and create empty object if it's not found from the database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
         public async Task<T?> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
@@ -1415,7 +1415,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Select object by ID and create empty object if it's not found from the database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Database object.</returns>
@@ -1453,7 +1453,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Insert arguments.</param>
         public int Insert(IDbTransaction? transaction,
             GXInsertArgs arg)
@@ -1536,7 +1536,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object as async.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Insert argument.</param>
         public Task<int> InsertAsync(IDbTransaction? transaction, GXInsertArgs arg)
         {
@@ -1557,7 +1557,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Insert new object as async.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Insert argument.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         public async Task<int> InsertAsync(IDbTransaction? transaction,
@@ -1579,7 +1579,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Update object.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Update arguments.</param>
         public int Update(IDbTransaction? transaction, GXUpdateArgs arg)
         {
@@ -1792,7 +1792,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Check if table exists.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Table name.</param>
         /// <returns>Returns true if table exists.</returns>
         public bool TableExist(IDbTransaction? transaction, string tableName)

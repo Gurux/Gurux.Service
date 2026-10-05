@@ -495,7 +495,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="connection">Database connection.</param>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="eventHandler">Event handler for executed SQL.</param>
         /// <param name="databaseName">Database name.</param>
         /// <returns>Database table names.</returns>
@@ -1105,7 +1105,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="connection">DB connection.</param>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="eventHandler">Event handler for executed SQL.</param>
         /// <returns>Array of database names.</returns>
         internal string[] GetDatabases(object sender,
@@ -1319,7 +1319,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="sender">The source of the event.</param>
         /// <param name="connection">Database connection.</param>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="eventHandler">Event handler for executed SQL.</param>
         /// <param name="databaseName">Database name.</param>
         /// <returns>Database table names.</returns>

@@ -732,6 +732,44 @@ namespace Gurux.Service.Orm.Internal
                     return null;
                 }
             }
+            if (args.MethodCallExpression.Method.DeclaringType == typeof(string)
+                && args.MethodCallExpression.Method.Name == nameof(string.IsNullOrWhiteSpace))
+            {
+                var operand = new GXGetMembersArgs(args.Settings, args.TargetType)
+                {
+                    Expression = args.MethodCallExpression.Arguments[0],
+                    SingleTable = args.SingleTable,
+                    StringBuilder = new StringBuilder()
+                };
+                GetMembers(operand);
+                string column = operand.StringBuilder.ToString();
+                string stripped = column;
+                // Match Char.IsWhiteSpace, including mixed Unicode whitespace.
+                const string whitespace = "\t\n\v\f\r \u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000";
+                foreach (char character in whitespace)
+                {
+                    string literal = ConvertToString(args.Settings, TargetType.Value, null,
+                        character.ToString(), null);
+                    if (args.Settings.Type == DatabaseType.MSSQL)
+                    {
+                        literal = "N" + literal;
+                    }
+                    stripped = "REPLACE(" + stripped + ", " + literal + ", '')";
+                }
+                bool negated = args.UnaryExpression?.NodeType == ExpressionType.Not;
+                args.UnaryExpression = null;
+                if (args.Settings.Type == DatabaseType.Oracle)
+                {
+                    args.StringBuilder.Append("(" + stripped + (negated ? " IS NOT NULL)" : " IS NULL)"));
+                }
+                else
+                {
+                    args.StringBuilder.Append(negated
+                        ? "(" + column + " IS NOT NULL AND " + stripped + " <> '')"
+                        : "(" + column + " IS NULL OR " + stripped + " = '')");
+                }
+                return null;
+            }
             if (args.MethodCallExpression.Method.DeclaringType == typeof(string) && args.MethodCallExpression.Method.Name == "IsNullOrEmpty")
             {
                 var mce = args.MethodCallExpression;

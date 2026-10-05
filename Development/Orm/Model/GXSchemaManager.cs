@@ -32,6 +32,7 @@
 
 using Gurux.Common.Internal;
 using Gurux.Orm.Internal.Enums;
+using Gurux.Service.DB;
 using Gurux.Service.Orm.Common;
 using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Common.Model;
@@ -66,7 +67,7 @@ namespace Gurux.Service.Orm.Model
 
         /// <summary>Gets the table-description cache shared by managers on this connection.</summary>
         /// <remarks>Set its CacheTime to zero to disable caching. Clear it after external schema changes.</remarks>
-        public Gurux.Service.DB.GXSchemaCache SchemaCache => Gurux.Service.DB.GXSchemaCache.ForConnection(Connection);
+        public GXSchemaCache SchemaCache => GXSchemaCache.ForConnection(Connection);
 
         /// <summary>
         /// Constructor.
@@ -159,7 +160,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Create database with given name.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         public void CreateDatabase(IDbTransaction? transaction, string databaseName)
         {
@@ -188,7 +189,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Returns table names in the current database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <returns>Database table names.</returns>
         public string[] GetTables(IDbTransaction? transaction = null)
         {
@@ -198,7 +199,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Returns table names in the current database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <returns>Database table names.</returns>
         public string[] GetTables(IDbTransaction? transaction, string databaseName)
@@ -238,7 +239,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Create new table.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         public void CreateTable<T>(IDbTransaction? transaction)
         {
             CreateTable(transaction, typeof(T), true, true);
@@ -248,7 +249,7 @@ namespace Gurux.Service.Orm.Model
         /// Create new table.
         /// </summary>
         /// <typeparam name="T">The mapped entity type.</typeparam>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="relations">Are relation tables created also.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
         public void CreateTable<T>(IDbTransaction? transaction, bool relations, bool overwrite)
@@ -586,7 +587,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Check if table exists.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Table name.</param>
         /// <returns>Returns true if table exists.</returns>
         public bool TableExist(IDbTransaction? transaction, string tableName)
@@ -719,7 +720,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Create new table.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="type">Type of the table.</param>
         /// <param name="relations">Are relation tables created also.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
@@ -824,7 +825,7 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <param name="connection">Database connection.</param>
         /// <param name="create">Indicates whether to create or drop the table.</param>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="table">Table creation query.</param>
         /// <param name="created">List of created tables.</param>
         private void TableCreation(IDbConnection connection, bool create,
@@ -924,7 +925,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Update table.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="type">Table type.</param>
         /// <remarks>Invalidates cached descriptions so the next Describe call reads the current schema, including after partial updates.</remarks>
         public void UpdateTable(IDbTransaction? transaction, Type type)
@@ -1089,12 +1090,36 @@ namespace Gurux.Service.Orm.Model
                     $"CALL SYSPROC.ADMIN_CMD('REORG TABLE {table.Replace("'", "''")}')");
         }
 
-        /// <summary>Returns missing and removed columns, column type changes and foreign key changes without modifying the database.</summary>
-        /// <param name="type">The table model to compare with the database.</param>
-        /// <returns>Descriptions of pending model changes, or an empty array when no update is required.</returns>
+        /// <summary>
+        /// Returns missing and removed columns, 
+        /// column type changes and foreign key changes without modifying the database.</summary>
+        /// <param name="type">
+        /// The table model to compare with the database.
+        /// </param>
+        /// <returns>
+        /// Descriptions of pending model changes, or an empty array when no update is required.
+        /// </returns>
         public string[] GetTableChanges(Type type)
         {
-            if (!TableExist(type)) return new[] { "Table is missing" };
+            return GetTableChanges(null, type);
+        }
+
+        /// <summary>
+        /// Returns missing and removed columns, 
+        /// column type changes and foreign key changes without modifying the database.</summary>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
+        /// <param name="type">
+        /// The table model to compare with the database.
+        /// </param>
+        /// <returns>
+        /// Descriptions of pending model changes, or an empty array when no update is required.
+        /// </returns>
+        public string[] GetTableChanges(IDbTransaction? transaction, Type type)
+        {
+            if (!TableExist(type))
+            {
+                return new[] { "Table is missing" };
+            }
             string tableName = Builder.GetTableName(type, true);
             var columns = GetColumns(type);
             var changes = new List<string>();
@@ -2385,7 +2410,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Check if database exists.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         /// <returns>True if the database exists, otherwise false.</returns>
         public bool DatabaseExists(IDbTransaction? transaction, string databaseName)
@@ -2398,7 +2423,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Drop database.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="databaseName">Database name.</param>
         public int DropDatabase(IDbTransaction? transaction, string databaseName)
         {
@@ -2449,7 +2474,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Get list of databases.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <returns>Array of database names.</returns>
         public string[] GetDatabases(IDbTransaction? transaction = null)
         {
@@ -2760,6 +2785,14 @@ namespace Gurux.Service.Orm.Model
             return TableExist(Builder.GetTableName(type, true));
         }
 
+        /// <summary>
+        /// Return true if table exists in the database.
+        /// </summary>
+        public bool TableExist(IDbTransaction? transaction, Type type)
+        {
+            return TableExist(transaction, Builder.GetTableName(type, true));
+        }
+
         private string GetTableName(string table)
         {
             return Builder.Settings.EscapeIdentifier(Builder.Settings.TablePrefix, table);
@@ -2792,7 +2825,20 @@ namespace Gurux.Service.Orm.Model
         public string[] GetColumns(Type type)
         {
             string tableName = Builder.GetTableName(type, false);
-            return GetColumns(tableName);
+            return GetColumns(null, tableName);
+        }
+
+        /// <summary>
+        /// Returns list of table columns. 
+        /// </summary>
+        /// <returns>The list of table columns.</returns>
+        /// <remarks>
+        /// Column names are returned as they are in the database, so they may be different than property names.
+        /// </remarks>
+        public string[] GetColumns(IDbTransaction? transaction, Type type)
+        {
+            string tableName = Builder.GetTableName(type, false);
+            return GetColumns(transaction, tableName);
         }
 
         /// <summary>
@@ -2805,9 +2851,24 @@ namespace Gurux.Service.Orm.Model
         /// </remarks>
         public string[] GetColumns(string tableName)
         {
-            tableName = GetTableName(tableName);
-            return Builder.GetColumns(this, tableName, Connection, null, OnSqlExecuted);
+            return GetColumns(null, tableName);
         }
+
+        /// <summary>
+        /// Returns list of table columns. 
+        /// </summary>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
+        /// <param name="tableName">Name of the table.</param>
+        /// <returns>The list of table columns.</returns>
+        /// <remarks>
+        /// Column names are returned as they are in the database, so they may be different than property names.
+        /// </remarks>
+        public string[] GetColumns(IDbTransaction? transaction, string tableName)
+        {
+            tableName = GetTableName(tableName);
+            return Builder.GetColumns(this, tableName, Connection, transaction, OnSqlExecuted);
+        }
+
 
         /// <summary>
         /// Get available permissions for the current database.
@@ -2831,7 +2892,7 @@ namespace Gurux.Service.Orm.Model
         /// Rename table.
         /// </summary>
         /// <typeparam name="T">Table type.</typeparam>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="newName">New table name.</param>
         public void RenameTable<T>(IDbTransaction? transaction, string newName)
         {
@@ -2851,7 +2912,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Rename table.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="type">Table type.</param>
         /// <param name="newName">New table name.</param>
         public void RenameTable(IDbTransaction? transaction, Type type, string newName)
@@ -2863,7 +2924,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Rename table.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="oldName">Old table name.</param>
         /// <param name="newName">New table name.</param>
         public void RenameTable(IDbTransaction? transaction, string oldName, string newName)
@@ -2912,7 +2973,7 @@ namespace Gurux.Service.Orm.Model
         /// Rename table.
         /// </summary>
         /// <typeparam name="T">Table type.</typeparam>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="oldName">Old column name.</param>
         /// <param name="newName">New table name.</param>
         public void RenameTableColumn<T>(IDbTransaction? transaction, string oldName, string newName)
@@ -2934,7 +2995,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Rename table.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="type">Table type.</param>
         /// <param name="oldName">Old column name.</param>
         /// <param name="newName">New column name.</param>
@@ -2958,7 +3019,7 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Rename table column.
         /// </summary>
-        /// <param name="transaction">Transaction.</param>
+        /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="tableName">Table name.</param>
         /// <param name="oldName">Old column name.</param>
         /// <param name="newName">New column name.</param>
@@ -3199,7 +3260,7 @@ namespace Gurux.Service.Orm.Model
                 Name = tableName
             };
 
-            if (!TableExist(tableName))
+            if (!TableExist(transaction, tableName))
             {
                 throw new ArgumentException("Table '" + tableName + "' does not exist.");
             }
@@ -3207,7 +3268,7 @@ namespace Gurux.Service.Orm.Model
             table.Comment = GetDescription(Connection, transaction, tableName, null);
             StringBuilder header = new StringBuilder();
             int len;
-            var cols = Builder.GetColumns(this, tableName, Connection, null, OnSqlExecuted);
+            var cols = Builder.GetColumns(this, tableName, Connection, transaction, OnSqlExecuted);
             foreach (string col in cols)
             {
                 GXColumnSchema column = new GXColumnSchema()
