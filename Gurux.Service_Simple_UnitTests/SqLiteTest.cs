@@ -68,6 +68,13 @@ namespace Gurux.Service_Simple_Unit_Test
             base.WhereByReferenceTest(expected);
         }
 
+        [TestMethod]
+        [DataRow("SELECT ID FROM TestClass WHERE BooleanTest = 1")]
+        public override void WherePlainBooleanTest(string expected)
+        {
+            base.WherePlainBooleanTest(expected);
+        }
+
         /// <summary>
         /// Count test.
         /// </summary>

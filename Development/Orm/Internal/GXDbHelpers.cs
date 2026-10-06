@@ -1196,14 +1196,14 @@ namespace Gurux.Service.Orm.Internal
                     var lambda = Expression.Lambda<Func<object>>(member);
                     var getter = lambda.Compile();
                     object value = getter();
-                    args.StringBuilder.Append(args.Settings.ConvertToString(value, ConvertOption.Quete));
+                    args.StringBuilder!.Append(args.Settings.ConvertToString(value, ConvertOption.Quete));
                     return null;
                 }
                 //Get member name.
                 if (e.NodeType == ExpressionType.Parameter)
                 {
                     //If column name.
-                    string tableName = null;
+                    string? tableName = null;
                     TargetType type = TargetType.Column;
                     if (!args.SingleTable && (args.TargetType & TargetType.Plain) == 0)
                     {
@@ -1225,6 +1225,12 @@ namespace Gurux.Service.Orm.Internal
                         return [name];
                     }
                     args.StringBuilder.Append(name);
+                    if (args.TargetType == TargetType.Where && memberExpression.Type == typeof(bool))
+                    {
+                        //If this is a boolean property, add " = 1" to the where clause.
+                        args.StringBuilder.Append(" = ");
+                        args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Value, tableName, true, null));
+                    }
                     return null;
                 }
                 //Get property value.

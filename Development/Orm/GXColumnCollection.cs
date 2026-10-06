@@ -32,6 +32,7 @@
 
 using Gurux.Common.Internal;
 using Gurux.Orm.Internal.Enums;
+using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Common.Model;
 using Gurux.Service.Orm.Enums;
 using Gurux.Service.Orm.Internal;
@@ -332,6 +333,7 @@ namespace Gurux.Service.Orm
                                     {
                                         name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, p.Key, null);
                                         args.StringBuilder.Append(name);
+                                        AppendColumnAlias(args.StringBuilder, e.Key.Parameters[0].Type, p.Key);
                                     }
                                 }
                             }
@@ -360,6 +362,7 @@ namespace Gurux.Service.Orm
                                 {
                                     name = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, p.Key, null);
                                     args.StringBuilder.Append(name);
+                                    AppendColumnAlias(args.StringBuilder, e.Key.Parameters[0].Type, p.Key);
                                 }
                             }
                         }
@@ -412,6 +415,10 @@ namespace Gurux.Service.Orm
                 {
                     Type tmp = List.First().Key.Parameters[0].Type;
                     args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, tmp, null));
+                    if (GXDbHelpers.IsAliasName(tmp))
+                    {
+                        args.StringBuilder.Append(' ').Append(Parent.Settings.EscapeIdentifier(null, GXDbHelpers.OriginalTableName(tmp)));
+                    }
                 }
             }
             else if (joinList.Any())
@@ -554,6 +561,16 @@ namespace Gurux.Service.Orm
         public void Add<T>(Expression<Func<T, object>> expression, Expression<Func<T, object>> target)
         {
             List?.Add(new KeyValuePair<LambdaExpression, LambdaExpression>(expression, target));
+        }
+
+        private void AppendColumnAlias(StringBuilder sql, Type tableType, string columnName)
+        {
+            if (Parent.Settings.Type != DatabaseType.MSSQL && GXDbHelpers.IsAliasName(tableType))
+            {
+                string alias = GXDbHelpers.OriginalTableName(tableType) + "." + columnName;
+                sql.Append(" AS ").Append(GXDbHelpers.AddQuotes(
+                    Parent.Settings.EscapeIdentifier(null, alias), null, Parent.Settings.ColumnNameQuoteCharacter));
+            }
         }
 
         /// <summary>

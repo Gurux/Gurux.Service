@@ -55,26 +55,6 @@ namespace Gurux.Service_Simple_Unit_Test
             _cache = new GXQueryCache(TimeSpan.FromMinutes(5), databaseType);
             InitializeSqlLog();
         }
-        private string GetDateTimeFormat(DateTime value)
-        {
-            switch (_cache.DatabaseType)
-            {
-                case DatabaseType.MySQL:
-                    return "MySQL";
-                case DatabaseType.MSSQL:
-                    return "yyyyMMddTHH:mm:ss.fff";
-                case DatabaseType.PostgreSQL:
-                    return "PostgreSQL";
-                case DatabaseType.Oracle:
-                    return "Oracle";
-                case DatabaseType.DB2:
-                    return "DB2";
-                case DatabaseType.SapHana:
-                    return "SapHana";
-                default:
-                    throw new NotSupportedException("Database type not supported: " + _cache.DatabaseType);
-            }
-        }
 
         private string DateTimeToString(DateTime? value)
         {
@@ -362,7 +342,18 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             GXSelectArgs arg = GXSelectArgs.Select<DeviceGroup3>(q => q.Id, _cache);
             arg.Where.And<DeviceGroup3>(q => q.Id == 1);
-            //TODO: AssertSqlEqual(expected, arg.ToString(false));
+            AssertSqlEqual(expected, arg.ToString(false));
+        }
+
+        /// <summary>
+        /// Relation where test.
+        /// </summary>
+        [TestMethod]
+        public virtual void WherePlainBooleanTest(string expected)
+        {
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(q => q.Id, _cache);
+            arg.Where.And<TestClass>(q => q.BooleanTest);
+            AssertSqlEqual(expected, arg.ToString(false));
         }
 
         /// <summary>

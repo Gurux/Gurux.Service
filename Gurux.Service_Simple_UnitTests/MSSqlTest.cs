@@ -62,10 +62,17 @@ namespace Gurux.Service_Simple_Unit_Test
         /// Relation where test.
         /// </summary>
         [TestMethod]
-        [DataRow("SELECT Id FROM DeviceGroup3 [DG] WHERE Id = 1")]
+        [DataRow("SELECT Id FROM DeviceGroup3 DG WHERE Id = 1")]
         public override void WhereByReferenceTest(string expected)
         {
             base.WhereByReferenceTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT ID FROM TestClass WHERE BooleanTest = 1")]
+        public override void WherePlainBooleanTest(string expected)
+        {
+            base.WherePlainBooleanTest(expected);
         }
 
         /// <summary>
