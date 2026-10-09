@@ -60,11 +60,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// Database type.
         /// </summary>
-        public DatabaseType Type
-        {
-            get;
-            private set;
-        }
+        public DatabaseType Type { get; private set; }
 
         internal abstract DatabasePermission[] AvailablePermissions();
 
@@ -77,39 +73,23 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// Table prefix.
         /// </summary>
-        public string? TablePrefix
-        {
-            get;
-            internal set;
-        }
+        public string? TablePrefix { get; internal set; }
 
         /// <summary>
         /// Is Unix date format used.
         /// </summary>
         [DefaultValue(false)]
-        public bool UseEpochTimeFormat
-        {
-            get;
-            set;
-        }
+        public bool UseEpochTimeFormat { get; set; }
 
         /// <summary>
         /// Enum values are saved by integer value as default. If string values are used set this to true.
         /// </summary>
-        public bool UseEnumStringValue
-        {
-            get;
-            set;
-        }
+        public bool UseEnumStringValue { get; set; }
 
         /// <summary>
         /// SQL server version. This is used to determine if some features are supported or not.
         /// </summary>
-        public string ServerVersion
-        {
-            get;
-            internal set;
-        }
+        public string ServerVersion { get; internal set; }
 
         /// <summary>
         /// Maximum length of an index name.

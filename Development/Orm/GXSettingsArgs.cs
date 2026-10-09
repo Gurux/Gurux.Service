@@ -41,10 +41,6 @@ namespace Gurux.Service.Orm
     {
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         GXDBSettings settings;
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        UInt32 index, count;
-        [DebuggerBrowsable(DebuggerBrowsableState.Never)]
-        internal bool distinct, descending;
 
         /// <summary>
         /// Constructor.
@@ -56,11 +52,7 @@ namespace Gurux.Service.Orm
             QueryCache = queryCache ?? new GXQueryCache(TimeSpan.FromMinutes(10), GXDbConnection.DefaultDatabaseType);
         }
 
-        internal GXQueryCache QueryCache
-        {
-            get;
-            set;
-        }
+        internal GXQueryCache QueryCache { get; set; }
 
         internal GXDBSettings Settings
         {
@@ -83,8 +75,8 @@ namespace Gurux.Service.Orm
         /// </summary>
         public void Clear()
         {
-            index = count = 0;
-            distinct = descending = false;
+            Index = Count = 0;
+            Distinct = Descending = false;
             if (QueryCache != null)
             {
                 QueryCache.Clear();
@@ -94,17 +86,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Start index.
         /// </summary>
-        public UInt32 Index
-        {
-            get
-            {
-                return index;
-            }
-            set
-            {
-                index = value;
-            }
-        }
+        internal long Index { get; set; }
 
         /// <summary>
         /// How many items are retreaved.
@@ -112,46 +94,16 @@ namespace Gurux.Service.Orm
         /// <remarks>
         /// If value is zero there are no limitations.
         /// </remarks>
-        public UInt32 Count
-        {
-            get
-            {
-                return count;
-            }
-            set
-            {
-                count = value;
-            }
-        }
+        internal long Count { get; set; }
 
         /// <summary>
         /// Is select distinct.
         /// </summary>
-        public bool Distinct
-        {
-            get
-            {
-                return distinct;
-            }
-            set
-            {
-                distinct = value;
-            }
-        }
+        internal bool Distinct { get; set; }
 
         /// <summary>
         /// Is select made by Ascending (default) or Descending.
         /// </summary>
-        public bool Descending
-        {
-            get
-            {
-                return descending;
-            }
-            set
-            {
-                descending = value;
-            }
-        }
+        internal bool Descending { get; set; }
     }
 }

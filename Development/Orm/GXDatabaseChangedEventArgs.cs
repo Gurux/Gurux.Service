@@ -42,7 +42,10 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Table name of the changed table.
         /// </summary>
-        public string? Table { get; init; }
+        public string? Table
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Change type of the database change.

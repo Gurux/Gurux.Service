@@ -8,7 +8,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class MSSqlTest : BaseTest
     {
-        public MSSqlTest() : base(DatabaseType.MSSQL) { }
+        public MSSqlTest() : base(DatabaseType.MSSQL)
+        {
+        }
 
         /// <inheritdoc/>
         [TestMethod]
@@ -439,6 +441,21 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Text IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
+        }
+
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Guid IN ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
         }
 
         /// <summary>

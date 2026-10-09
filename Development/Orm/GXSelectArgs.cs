@@ -106,6 +106,11 @@ namespace Gurux.Service.Orm
         /// <returns>Selection clause as a string.</returns>
         public string ToString(bool addGenerationTime)
         {
+            if (Settings.LimitType == LimitType.Fetch &&
+                (Index != 0 || Count != 0) && OrderBy.List.Count == 0)
+            {
+                throw new ArgumentException("OFFSET/FETCH requires OrderBy. Add an ordering before setting Index or Count.");
+            }
             var sw = Stopwatch.StartNew();
             StringBuilder sb = new StringBuilder();
             string? post = null;
@@ -134,9 +139,12 @@ namespace Gurux.Service.Orm
                 sb.Append(" OFFSET ");
                 sb.Append(Index);
                 sb.Append(" ROWS");
-                sb.Append(" FETCH NEXT ");
-                sb.Append(Count);
-                sb.Append(" ROWS ONLY");
+                if (Count != 0)
+                {
+                    sb.Append(" FETCH NEXT ");
+                    sb.Append(Count);
+                    sb.Append(" ROWS ONLY");
+                }
             }
 
             str = Having.ToString();
@@ -681,7 +689,11 @@ namespace Gurux.Service.Orm
         {
             ArgumentNullException.ThrowIfNull(columns);
             var selected = columns.ToArray();
-            if (selected.Length == 0) throw new ArgumentException("No columns are selected.", nameof(columns));
+            if (selected.Length == 0)
+            {
+                throw new ArgumentException("No columns are selected.", nameof(columns));
+            }
+
             var args = new GXSelectArgs();
             args.Columns.Add<T>(_ => selected);
             return args;
@@ -710,65 +722,37 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Selected columns.
         /// </summary>
-        public GXColumnCollection Columns
-        {
-            get;
-            private set;
-        }
+        public GXColumnCollection Columns { get; private set; }
 
         /// <summary>
         /// SQL generation time in ms.
         /// </summary>
-        public int GenerationTime
-        {
-            get;
-            internal set;
-        }
+        public int GenerationTime { get; internal set; }
 
         /// <summary>
         /// Order items.
         /// </summary>
-        public GXOrderByCollection OrderBy
-        {
-            get;
-            private set;
-        }
+        public GXOrderByCollection OrderBy { get; private set; }
 
         /// <summary>
         /// Group items.
         /// </summary>
-        public GXGroupByCollection GroupBy
-        {
-            get;
-            private set;
-        }
+        public GXGroupByCollection GroupBy { get; private set; }
 
         /// <summary>
         /// Get rows that have the same value on a column.
         /// </summary>
-        public GXHavingCollection Having
-        {
-            get;
-            private set;
-        }
+        public GXHavingCollection Having { get; private set; }
 
         /// <summary>
         /// Where expression.
         /// </summary>
-        public GXWhereCollection Where
-        {
-            get;
-            private set;
-        }
+        public GXWhereCollection Where { get; private set; }
 
         /// <summary>
         /// Where expression.
         /// </summary>
-        public GXJoinCollection Joins
-        {
-            get;
-            private set;
-        }
+        public GXJoinCollection Joins { get; private set; }
 
         /// <summary>
         /// Is select distinct.
@@ -803,7 +787,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Start index.
         /// </summary>
-        public UInt32 Index
+        public long Index
         {
             get
             {
@@ -821,7 +805,7 @@ namespace Gurux.Service.Orm
         /// <remarks>
         /// If value is zero there are no limitations.
         /// </remarks>
-        public UInt32 Count
+        public long Count
         {
             get
             {

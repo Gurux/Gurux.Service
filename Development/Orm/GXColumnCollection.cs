@@ -187,7 +187,6 @@ namespace Gurux.Service.Orm
                 Insert, sourceSql, MetadataTable == null ? null : GetSchemaTableName(MetadataTable));
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
-                Debug.WriteLine("Cache SQL: " + cachedSql);
                 return cachedSql!;
             }
             List<GXJoin> joinList = new List<GXJoin>();
@@ -205,7 +204,7 @@ namespace Gurux.Service.Orm
             }
             if (Parent.Index != 0 || Parent.Count != 0)
             {
-                if (Parent.Index != 0 && Parent.Count == 0)
+                if (Parent.Index != 0 && Parent.Count == 0 && Parent.Settings.LimitType != LimitType.Fetch)
                 {
                     throw new ArgumentOutOfRangeException("Count can't be zero if index is given.");
                 }
@@ -250,11 +249,18 @@ namespace Gurux.Service.Orm
                 Expression body = e.Key.Body;
                 while (body is UnaryExpression conversion &&
                     conversion.NodeType is ExpressionType.Convert or ExpressionType.ConvertChecked)
-                    body = conversion.Operand;
-                if (body is MethodCallExpression call && call.Method.DeclaringType == typeof(GXSql) &&
-                    call.Method.Name == nameof(GXSql.RowNumber))
                 {
-                    if (!first) args.StringBuilder.Append(", ");
+                    body = conversion.Operand;
+                }
+
+                if (body is MethodCallExpression call && call.Method.DeclaringType == typeof(GXSql) &&
+                                    call.Method.Name == nameof(GXSql.RowNumber))
+                {
+                    if (!first)
+                    {
+                        args.StringBuilder.Append(", ");
+                    }
+
                     first = false;
                     var windowArgs = new GXGetMembersArgs(Parent.Settings, TargetType.Column | TargetType.Plain)
                     {
@@ -274,7 +280,11 @@ namespace Gurux.Service.Orm
                 {
                     // Dynamic metadata projections have no CLR properties to map.
                     args.TargetType = TargetType.Column | TargetType.Plain;
-                    if (!first) args.StringBuilder.Append(", ");
+                    if (!first)
+                    {
+                        args.StringBuilder.Append(", ");
+                    }
+
                     GXDbHelpers.GetMembers(args);
                     if (e.Value != null)
                     {
@@ -286,10 +296,18 @@ namespace Gurux.Service.Orm
                     continue;
                 }
                 Expression selected = e.Key.Body;
-                while (selected is UnaryExpression conversion) selected = conversion.Operand;
+                while (selected is UnaryExpression conversion)
+                {
+                    selected = conversion.Operand;
+                }
+
                 if (selected is MemberExpression member && GXDbHelpers.GetTableAlias(Parent.Settings, member.Expression) != null)
                 {
-                    if (!first) args.StringBuilder.Append(", ");
+                    if (!first)
+                    {
+                        args.StringBuilder.Append(", ");
+                    }
+
                     first = false;
                     args.Expression = selected;
                     GXDbHelpers.GetMembers(args);
@@ -410,7 +428,9 @@ namespace Gurux.Service.Orm
             if (SourceExpression == null && !joinList.Any())
             {
                 if (MetadataTable != null)
+                {
                     args.StringBuilder.Append(GetSchemaTableName(MetadataTable));
+                }
                 else
                 {
                     Type tmp = List.First().Key.Parameters[0].Type;
@@ -431,7 +451,9 @@ namespace Gurux.Service.Orm
                         first = false;
                         args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null));
                         if (it.Alias1 != null)
+                        {
                             args.StringBuilder.Append(" AS ").Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias1, null));
+                        }
                     }
                     switch (it.Type)
                     {
@@ -462,7 +484,11 @@ namespace Gurux.Service.Orm
                     {
                         args.StringBuilder.Append(" ON ");
                         table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table1, null);
-                        if (it.Alias1 != null) table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias1, null);
+                        if (it.Alias1 != null)
+                        {
+                            table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, it.Alias1, null);
+                        }
+
                         args.StringBuilder.Append(GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, table, it.Column1, null));
                         args.StringBuilder.Append(" = ");
                         table = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, it.Table2, null);
@@ -485,7 +511,6 @@ namespace Gurux.Service.Orm
             if (!string.IsNullOrEmpty(sql))
             {
                 Parent.QueryCache.Set(cacheKey, sql, 0);
-                Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
         }

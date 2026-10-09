@@ -40,31 +40,43 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Called before this entity is added to the database. The default implementation does nothing.
         /// </summary>
-        public virtual void BeforeAdd() { }
+        public virtual void BeforeAdd()
+        {
+        }
 
         /// <summary>
         /// Called after this entity is added to the database. The default implementation does nothing.
         /// </summary>
-        public virtual void AfterAdd() { }
+        public virtual void AfterAdd()
+        {
+        }
 
         /// <summary>
         /// Called before this entity is updated in the database. The default implementation does nothing.
         /// </summary>
-        public virtual void BeforeUpdate() { }
+        public virtual void BeforeUpdate()
+        {
+        }
 
         /// <summary>
         /// Called after this entity is updated in the database. The default implementation does nothing.
         /// </summary>
-        public virtual void AfterUpdate() { }
+        public virtual void AfterUpdate()
+        {
+        }
 
         /// <summary>
         /// Called before this entity is removed from the database. The default implementation does nothing.
         /// </summary>
-        public virtual void BeforeRemove() { }
+        public virtual void BeforeRemove()
+        {
+        }
 
         /// <summary>
         /// Called after this entity is removed from the database. The default implementation does nothing.
         /// </summary>
-        public virtual void AfterRemove() { }
+        public virtual void AfterRemove()
+        {
+        }
     }
 }

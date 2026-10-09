@@ -72,19 +72,11 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Table 1 name.
         /// </summary>
-        public string Table1
-        {
-            get;
-            private set;
-        }
+        public string Table1 { get; private set; }
         /// <summary>
         /// Table 2 name.
         /// </summary>
-        public string Table2
-        {
-            get;
-            private set;
-        }
+        public string Table2 { get; private set; }
         /// <summary>
         /// Column 1 name.
         /// </summary>       

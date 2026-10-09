@@ -46,11 +46,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets or sets the related entity type.
         /// </summary>
-        public Type? Target
-        {
-            get;
-            set;
-        }
+        public Type? Target { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RelationAttribute"/> class.

@@ -41,20 +41,12 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DatabaseGeneratedAttribute(DatabaseGeneratedOption.None)]
         [DataMember(Name = "ID"), Index]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         /// <summary>
         /// MySql , PostgreSQL, DB2, Oracle, MariaDB, SqLite and SapHana reserved word.
         /// </summary>
         [DataMember(Name = "ALL")]
-        public string All
-        {
-            get;
-            set;
-        } = default!;
+        public string All { get; set; } = default!;
     }
 }

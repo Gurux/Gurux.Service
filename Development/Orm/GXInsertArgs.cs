@@ -156,7 +156,6 @@ namespace Gurux.Service.Orm
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
                 GenerationTime = generationTime;
-                Debug.WriteLine($"Cached SQL: {GenerationTime} ms {cachedSql}");
                 sql = cachedSql!;
             }
             else
@@ -553,7 +552,6 @@ namespace Gurux.Service.Orm
                         cacheKey = Parent.QueryCache.BuildKey(Parent.Settings.Type, Values, Excluded);
                     }
                     Parent.QueryCache.Set(cacheKey, sql, GenerationTime);
-                    Debug.WriteLine($"New SQL: {GenerationTime} ms {sql}");
                 }
             }
             if (addGenerationTime)
@@ -584,11 +582,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// SQL generation time in ms.
         /// </summary>
-        public int GenerationTime
-        {
-            get;
-            internal set;
-        }
+        public int GenerationTime { get; internal set; }
 
         /// <summary>
         /// Insert a value into the table.
@@ -880,6 +874,14 @@ namespace Gurux.Service.Orm
                     }
                 }
             }
+            // Populate a generated storage key even when IUnique.Id is a separate public identifier.
+            var generated = GXSqlBuilder.GetProperties(type).FirstOrDefault(member =>
+                (member.Value.Attributes & Attributes.AutoIncrement) != 0);
+            if (generated.Value != null && (generated.Value.Attributes & Attributes.Id) == 0)
+            {
+                args.Id = new GXInsertItem(type, generated);
+            }
+
             return args;
         }
 
@@ -1083,6 +1085,14 @@ namespace Gurux.Service.Orm
                 }
                 args.Values.Add(new KeyValuePair<object?, LambdaExpression?>(it, columns));
             }
+            // Populate a generated storage key even when IUnique.Id is a separate public identifier.
+            var generated = GXSqlBuilder.GetProperties(type).FirstOrDefault(member =>
+                (member.Value.Attributes & Attributes.AutoIncrement) != 0);
+            if (generated.Value != null && (generated.Value.Attributes & Attributes.Id) == 0)
+            {
+                args.Id = new GXInsertItem(type, generated);
+            }
+
             return args;
         }
 

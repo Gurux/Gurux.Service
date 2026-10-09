@@ -44,7 +44,10 @@ namespace Gurux.Service.Orm.Model
         }
 
         /// <summary>Gets the name of the table being processed.</summary>
-        public string TableName { get; }
+        public string TableName
+        {
+            get;
+        }
 
         /// <summary>Gets or sets whether to update the table. Defaults to true.</summary>
         public bool Update { get; set; } = true;

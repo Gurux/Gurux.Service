@@ -189,11 +189,19 @@ namespace Gurux.Service.Orm.Enums
             IEnumerable<DatabaseMonitor>? monitors,
             CancellationToken cancellationToken)
         {
-            if (monitors == null) return;
+            if (monitors == null)
+            {
+                return;
+            }
+
             foreach (var monitor in monitors)
             {
                 string[] columns = monitor.Columns.ToArray();
-                if (columns.Length == 0) continue;
+                if (columns.Length == 0)
+                {
+                    continue;
+                }
+
                 using var command = _connection.Connection.CreateCommand();
                 command.CommandText = GetChangeTokenQuery(monitor.Table, columns);
                 using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -211,7 +219,9 @@ namespace Gurux.Service.Orm.Enums
                 bool changed = _tokens.TryGetValue(key, out string? previous) && previous != token;
                 _tokens[key] = token;
                 if (changed)
+                {
                     Changed?.Invoke(_connection, new GXDatabaseChangedEventArgs { Table = monitor.Table, ChangeType = type });
+                }
             }
         }
         private async Task CheckAsync(

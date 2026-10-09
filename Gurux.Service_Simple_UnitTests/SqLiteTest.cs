@@ -9,7 +9,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class SqLiteTest : BaseTest
     {
-        public SqLiteTest() : base(DatabaseType.SqLite) { }
+        public SqLiteTest() : base(DatabaseType.SqLite)
+        {
+        }
         /// <inheritdoc/>
         [TestMethod]
         [DataRow("SELECT ID, Guid, Time, Text, SimpleText, Text3, Text4, BooleanTest, IntTest, DoubleTest, FloatTest, Span, Object, Status FROM TestClass")]
@@ -440,6 +442,20 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Text IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Guid IN ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000')")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
         }
 
         /// <summary>
@@ -1748,7 +1764,7 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void ScalarTest(string expected)
         {
             base.ScalarTest(expected);
-        }        
+        }
     }
 }
 

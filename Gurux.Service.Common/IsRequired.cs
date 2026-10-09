@@ -43,11 +43,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets or sets whether null values are prohibited.
         /// </summary>
-        public bool IsRequired
-        {
-            get;
-            set;
-        }
+        public bool IsRequired { get; set; }
 
         /// <summary>
         /// Initializes an attribute that prohibits null column values.

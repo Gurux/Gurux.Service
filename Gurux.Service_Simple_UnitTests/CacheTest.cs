@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -170,15 +170,15 @@ namespace Gurux.Service_Simple_Unit_Test
             t2.Time = DateTime.MaxValue;
             t2.Text2 = "Second";
             arg = GXUpdateArgs.UpdateRange([t, t2], u => new { u.Time, u.Text2 }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000', SimpleText = 'First' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "' UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499', SimpleText = 'Second' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000', SimpleText = 'First' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'; UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499', SimpleText = 'Second' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
 
             arg = GXUpdateArgs.UpdateRange([t, t2], u => new { u.Time }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "' UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'; UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
             //Cached value.
             arg = GXUpdateArgs.UpdateRange([t, t2], u => new { u.Time }, _cache);
-            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "' UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
+            Assert.AreEqual("UPDATE GuidTestClass SET Time = '0001-01-01 00:00:00.000' WHERE Id = X'" + Convert.ToHexString(t.Id.ToByteArray()) + "'; UPDATE GuidTestClass SET Time = '9999-12-31 23:59:59.499' WHERE Id = X'" + Convert.ToHexString(t2.Id.ToByteArray()) + "'", arg.ToString(false));
             Debug.WriteLine("GenerationTime: " + arg.GenerationTime);
         }
 

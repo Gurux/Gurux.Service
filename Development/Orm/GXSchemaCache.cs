@@ -30,7 +30,9 @@ namespace Gurux.Service.DB
         /// <summary>
         /// Initializes a cache with a lifetime of ten minutes.
         /// </summary>
-        public GXSchemaCache() { }
+        public GXSchemaCache()
+        {
+        }
 
         /// <summary>
         /// Initializes a cache with the specified lifetime.
@@ -43,10 +45,20 @@ namespace Gurux.Service.DB
         /// <exception cref="ArgumentOutOfRangeException">The lifetime is negative.</exception>
         public TimeSpan CacheTime
         {
-            get { lock (_gate) return _cacheTime; }
+            get
+            {
+                lock (_gate)
+                {
+                    return _cacheTime;
+                }
+            }
             set
             {
-                if (value < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(value));
+                if (value < TimeSpan.Zero)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
                 lock (_gate)
                 {
                     _cacheTime = value;
@@ -60,7 +72,10 @@ namespace Gurux.Service.DB
         /// </summary>
         public void Clear()
         {
-            lock (_gate) items.Clear();
+            lock (_gate)
+            {
+                items.Clear();
+            }
         }
 
 
@@ -77,7 +92,10 @@ namespace Gurux.Service.DB
             lock (_gate)
             {
                 items.Clear();
-                if (transaction != null) _transactions.Add(transaction);
+                if (transaction != null)
+                {
+                    _transactions.Add(transaction);
+                }
             }
         }
 
@@ -90,18 +108,31 @@ namespace Gurux.Service.DB
                 {
                     items.Clear();
                     _transactions.RemoveWhere(transaction => transaction.Connection == null);
-                    if (_transactions.Count != 0) return describe();
+                    if (_transactions.Count != 0)
+                    {
+                        return describe();
+                    }
                 }
-                if (_cacheTime == TimeSpan.Zero) return describe();
+                if (_cacheTime == TimeSpan.Zero)
+                {
+                    return describe();
+                }
+
                 long now = Stopwatch.GetTimestamp();
                 bool Expired(long created) => (now - created) / (double)Stopwatch.Frequency >= _cacheTime.TotalSeconds;
                 if (++_operations >= 200)
                 {
                     _operations = 0;
                     foreach (string expired in items.Where(item => Expired(item.Value.Created)).Select(item => item.Key).ToArray())
+                    {
                         items.Remove(expired);
+                    }
                 }
-                if (items.TryGetValue(key, out var entry) && !Expired(entry.Created)) return Copy(entry.Schema);
+                if (items.TryGetValue(key, out var entry) && !Expired(entry.Created))
+                {
+                    return Copy(entry.Schema);
+                }
+
                 items.Remove(key);
                 GXTableSchema schema = describe();
                 items[key] = (Copy(schema), Stopwatch.GetTimestamp());

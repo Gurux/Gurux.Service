@@ -328,20 +328,27 @@ namespace Gurux.Service.Orm.Model
             foreach (var key in schema.ForeignKeys)
             {
                 if (key.Columns.Count == 0 || string.IsNullOrWhiteSpace(key.ReferencedTable))
+                {
                     throw new ArgumentException("Foreign keys require columns and a referenced table.");
+                }
+
                 sb.Append(", ");
-                if (!string.IsNullOrEmpty(key.Name)) sb.Append("CONSTRAINT ").Append(QuoteSchemaIdentifier(key.Name)).Append(' ');
+                if (!string.IsNullOrEmpty(key.Name))
+                {
+                    sb.Append("CONSTRAINT ").Append(QuoteSchemaIdentifier(key.Name)).Append(' ');
+                }
+
                 sb.Append("FOREIGN KEY (")
-                    .Append(string.Join(", ", key.Columns.OrderBy(c => c.Position).Select(c => QuoteSchemaIdentifier(c.Column))))
-                    .Append(") REFERENCES ")
-                    .Append(GetSchemaTableName(new GXTableSchema
-                    {
-                        Name = key.ReferencedTable,
-                        Schema = Builder.Settings.Type == DatabaseType.SqLite ? null : key.ReferencedSchema
-                    }))
-                    .Append(" (")
-                    .Append(string.Join(", ", key.Columns.OrderBy(c => c.Position).Select(c => QuoteSchemaIdentifier(c.ReferencedColumn))))
-                    .Append(')');
+                                    .Append(string.Join(", ", key.Columns.OrderBy(c => c.Position).Select(c => QuoteSchemaIdentifier(c.Column))))
+                                    .Append(") REFERENCES ")
+                                    .Append(GetSchemaTableName(new GXTableSchema
+                                    {
+                                        Name = key.ReferencedTable,
+                                        Schema = Builder.Settings.Type == DatabaseType.SqLite ? null : key.ReferencedSchema
+                                    }))
+                                    .Append(" (")
+                                    .Append(string.Join(", ", key.Columns.OrderBy(c => c.Position).Select(c => QuoteSchemaIdentifier(c.ReferencedColumn))))
+                                    .Append(')');
                 AppendSchemaForeignKeyAction(sb, "DELETE", key.OnDelete);
                 AppendSchemaForeignKeyAction(sb, "UPDATE", key.OnUpdate);
             }
@@ -352,13 +359,19 @@ namespace Gurux.Service.Orm.Model
             foreach (var index in schema.Indexes)
             {
                 if (index.Columns.Count == 0 || string.IsNullOrWhiteSpace(index.Name))
+                {
                     throw new ArgumentException("Indexes require a name and columns.");
+                }
                 // These constraints were already emitted in the table definition.
                 if (index.Unique && (primaryKeyNames.SetEquals(index.Columns.Select(c => c.Name)) ||
                     (index.Columns.Count == 1 && schema.Columns.Any(c => c.IsUnique &&
-                        string.Equals(c.Name, index.Columns[0].Name, StringComparison.OrdinalIgnoreCase))))) continue;
+                        string.Equals(c.Name, index.Columns[0].Name, StringComparison.OrdinalIgnoreCase)))))
+                {
+                    continue;
+                }
+
                 string columns = string.Join(", ", index.Columns.OrderBy(c => c.Position).Select(c =>
-                    QuoteSchemaIdentifier(c.Name) + (c.Order == Gurux.Service.Orm.Common.Enums.IndexOrder.Descending ? " DESC" : " ASC")));
+                                    QuoteSchemaIdentifier(c.Name) + (c.Order == Gurux.Service.Orm.Common.Enums.IndexOrder.Descending ? " DESC" : " ASC")));
                 string indexName = QuoteSchemaIdentifier(index.Name);
                 string indexTable = tableName;
                 if (Builder.Settings.Type == DatabaseType.SqLite && !string.IsNullOrEmpty(schema.Schema))
@@ -389,17 +402,32 @@ namespace Gurux.Service.Orm.Model
         private string QuoteSchemaIdentifier(string name)
         {
             char open = Builder.Settings.ColumnNameQuoteCharacter;
-            if (open == '\0') open = '"';
+            if (open == '\0')
+            {
+                open = '"';
+            }
+
             char close = open == '[' ? ']' : open;
-            if (Builder.Settings.UpperCase) name = name.ToUpperInvariant();
+            if (Builder.Settings.UpperCase)
+            {
+                name = name.ToUpperInvariant();
+            }
+
             return open + name.Replace(close.ToString(), new string(close, 2)) + close;
         }
 
         private void AppendSchemaForeignKeyAction(StringBuilder sql, string operation, Gurux.Service.Orm.Common.Enums.ForeignKeyAction action)
         {
-            if (action is Gurux.Service.Orm.Common.Enums.ForeignKeyAction.None or Gurux.Service.Orm.Common.Enums.ForeignKeyAction.NoAction) return;
+            if (action is Gurux.Service.Orm.Common.Enums.ForeignKeyAction.None or Gurux.Service.Orm.Common.Enums.ForeignKeyAction.NoAction)
+            {
+                return;
+            }
+
             if (Builder.Settings.Type == DatabaseType.Oracle && operation == "UPDATE")
+            {
                 throw new ArgumentException("Oracle does not support ON UPDATE foreign key actions.");
+            }
+
             string value = action switch
             {
                 Gurux.Service.Orm.Common.Enums.ForeignKeyAction.Restrict => Builder.Settings.Type == DatabaseType.MSSQL ? "NO ACTION" : "RESTRICT",
@@ -1024,14 +1052,19 @@ namespace Gurux.Service.Orm.Model
                             oldType, newType, it.Value);
                     }
                 }
-                if (updateForeignKeys) UpdateForeignKeys(transaction, type);
+                if (updateForeignKeys)
+                {
+                    UpdateForeignKeys(transaction, type);
+                }
             }
             finally
             {
                 // Refresh even when the database already matches the model or an update partially fails.
                 SchemaCache.Invalidate(transaction);
                 if (connection is DbConnection schemaConnection && !ReferenceEquals(schemaConnection, Connection))
-                    Gurux.Service.DB.GXSchemaCache.ForConnection(schemaConnection).Invalidate(transaction);
+                {
+                    GXSchemaCache.ForConnection(schemaConnection).Invalidate(transaction);
+                }
             }
         }
 
@@ -1045,20 +1078,29 @@ namespace Gurux.Service.Orm.Model
         {
             var expected = GetModelColumnNames(type);
             var removed = columns.Where(c => !expected.Contains(c)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (removed.Count == 0) return;
+            if (removed.Count == 0)
+            {
+                return;
+            }
+
             var connection = transaction?.Connection ?? Connection;
             string table = Builder.GetTableName(type, true);
             var keys = ReadForeignKeys(type, transaction);
             var obsoleteKeys = keys.Where(k => k.Columns.Any(c => removed.Contains(c.Column))).ToList();
             if (Builder.Settings.Type == DatabaseType.SqLite && obsoleteKeys.Count != 0)
+            {
                 UpdateSqliteForeignKeys(transaction, type, keys.Except(obsoleteKeys).ToList());
+            }
             else
+            {
                 foreach (var key in obsoleteKeys)
                 {
                     string drop = Builder.Settings.Type is DatabaseType.MySQL or DatabaseType.MariaDB ? "DROP FOREIGN KEY " : "DROP CONSTRAINT ";
                     ExecuteNonQuery(this, connection, transaction, OnSqlExecuted,
                         $"ALTER TABLE {table} {drop}{QuoteSchemaIdentifier(key.Name)}");
                 }
+            }
+
             foreach (string column in removed)
             {
                 // SQL Server default constraints must be removed explicitly first.
@@ -1076,8 +1118,10 @@ namespace Gurux.Service.Orm.Model
                     columnParameter.Value = column;
                     command.Parameters.Add(columnParameter);
                     if (command.ExecuteScalar() is string constraint)
+                    {
                         ExecuteNonQuery(this, connection, transaction, OnSqlExecuted,
-                            $"ALTER TABLE {table} DROP CONSTRAINT {QuoteSchemaIdentifier(constraint)}");
+                        $"ALTER TABLE {table} DROP CONSTRAINT {QuoteSchemaIdentifier(constraint)}");
+                    }
                 }
                 string quoted = QuoteSchemaIdentifier(column);
                 string sql = Builder.Settings.Type == DatabaseType.SapHana
@@ -1086,8 +1130,10 @@ namespace Gurux.Service.Orm.Model
                 ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, sql);
             }
             if (Builder.Settings.Type == DatabaseType.DB2)
+            {
                 ExecuteNonQuery(this, connection, transaction, OnSqlExecuted,
-                    $"CALL SYSPROC.ADMIN_CMD('REORG TABLE {table.Replace("'", "''")}')");
+                $"CALL SYSPROC.ADMIN_CMD('REORG TABLE {table.Replace("'", "''")}')");
+            }
         }
 
         /// <summary>
@@ -1116,54 +1162,68 @@ namespace Gurux.Service.Orm.Model
         /// </returns>
         public string[] GetTableChanges(IDbTransaction? transaction, Type type)
         {
-            if (!TableExist(type))
+            if (!TableExist(transaction, type))
             {
                 return new[] { "Table is missing" };
             }
             string tableName = Builder.GetTableName(type, true);
-            var columns = GetColumns(type);
+            var columns = GetColumns(transaction, type);
             var changes = new List<string>();
             var modelColumns = GetModelColumnNames(type);
             changes.AddRange(columns.Where(c => !modelColumns.Contains(c)).Select(c => "Column removed from model: " + c));
             foreach (var item in GXSqlBuilder.GetProperties(type))
             {
                 if (item.Value.Relation != null && item.Value.Relation.ForeignTable != type &&
-                    (item.Value.Relation.RelationType == RelationType.OneToMany || item.Value.Relation.RelationType == RelationType.ManyToMany)) continue;
+                    (item.Value.Relation.RelationType == RelationType.OneToMany || item.Value.Relation.RelationType == RelationType.ManyToMany))
+                {
+                    continue;
+                }
+
                 if (!columns.Contains(item.Key, StringComparer.OrdinalIgnoreCase))
                 {
                     changes.Add("Missing column: " + item.Key);
                     continue;
                 }
                 Type expected = GetColumnDataType(type, item.Value);
-                Type actual = Builder.GetColumnType(this, tableName, item.Key, Connection, null, OnSqlExecuted, out int length, out string databaseType);
+                Type actual = Builder.GetColumnType(this, tableName, item.Key, Connection, transaction, OnSqlExecuted, out int length, out string databaseType);
                 object target = item.Value.Relation != null && item.Value.Relation.RelationType == RelationType.OneToOne ? item.Value.Relation : item.Value.Target;
                 if (actual != expected && !IsSameDatabaseType(databaseType, length, Builder.GetDataBaseType(expected, target), Builder.Settings.Type))
+                {
                     changes.Add("Column type changed: " + item.Key);
+                }
             }
-            changes.AddRange(GetForeignKeyChanges(type));
+            changes.AddRange(GetForeignKeyChanges(type, transaction));
             return changes.ToArray();
         }
 
-        private IEnumerable<string> GetForeignKeyChanges(Type type)
+        private IEnumerable<string> GetForeignKeyChanges(Type type, IDbTransaction? transaction)
         {
-            var actual = ReadForeignKeys(type, null);
+            var actual = ReadForeignKeys(type, transaction);
             var properties = GXSqlBuilder.GetProperties(type);
             var expectedColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var expected in GetExpectedForeignKeys(type))
+            foreach (var expected in GetExpectedForeignKeys(type, transaction))
             {
                 string column = expected.Columns[0].Column;
                 expectedColumns.Add(column);
                 var keys = actual.Where(k => k.Columns.Any(c =>
                     string.Equals(c.Column, column, StringComparison.OrdinalIgnoreCase))).ToList();
                 if (keys.Count == 0)
+                {
                     yield return "Foreign key missing: " + column;
+                }
                 else if (keys.Count != 1 || !SameForeignKey(keys[0], expected))
+                {
                     yield return "Foreign key changed: " + column;
+                }
             }
             foreach (var key in actual)
+            {
                 if (key.Columns.Count != 0 && key.Columns.All(c => properties.Keys.Contains(c.Column, StringComparer.OrdinalIgnoreCase)) &&
-                    !key.Columns.Any(c => expectedColumns.Contains(c.Column)))
+                !key.Columns.Any(c => expectedColumns.Contains(c.Column)))
+                {
                     yield return "Foreign key removed from model: " + string.Join(", ", key.Columns.Select(c => c.Column));
+                }
+            }
         }
 
         private List<GXForeignKeySchema> ReadForeignKeys(Type type, IDbTransaction? transaction)
@@ -1180,7 +1240,11 @@ namespace Gurux.Service.Orm.Model
             {
                 var relation = item.Value.Relation;
                 var attribute = (item.Value.Target as PropertyInfo)?.GetCustomAttribute<ForeignKeyAttribute>(true);
-                if (attribute == null || relation == null || relation.RelationType != RelationType.OneToOne) continue;
+                if (attribute == null || relation == null || relation.RelationType != RelationType.OneToOne)
+                {
+                    continue;
+                }
+
                 string targetTable = GXSqlBuilder.UnescapeIdentifier(Builder.GetTableName(relation.ForeignTable, true));
                 string targetColumn = GXSqlBuilder.GetProperties(relation.ForeignTable)
                     .First(p => Equals(p.Value.Target, relation.ForeignId.Target)).Key;
@@ -1255,7 +1319,10 @@ namespace Gurux.Service.Orm.Model
         private string BuildForeignKeyClause(GXForeignKeySchema key)
         {
             if (Builder.Settings.Type == DatabaseType.Oracle && key.OnDelete == ForeignKeyAction.Restrict)
+            {
                 throw new ArgumentException("Oracle does not support ON DELETE RESTRICT; use the default NO ACTION behavior.");
+            }
+
             var sql = new StringBuilder("FOREIGN KEY (");
             sql.Append(string.Join(", ", key.Columns.OrderBy(c => c.Position).Select(c => QuoteSchemaIdentifier(c.Column))))
                 .Append(") REFERENCES ").Append(QuoteForeignKeyTable(key))
@@ -1280,7 +1347,11 @@ namespace Gurux.Service.Orm.Model
                 k.Columns.All(c => properties.Keys.Contains(c.Column, StringComparer.OrdinalIgnoreCase)) &&
                 !expected.Any(e => SameForeignKey(k, e))).ToList();
             var added = expected.Where(e => !actual.Any(k => SameForeignKey(k, e))).ToList();
-            if (removed.Count == 0 && added.Count == 0) return;
+            if (removed.Count == 0 && added.Count == 0)
+            {
+                return;
+            }
+
             if (Builder.Settings.Type == DatabaseType.SqLite)
             {
                 UpdateSqliteForeignKeys(transaction, type, actual.Except(removed).Concat(added).ToList());
@@ -1303,7 +1374,9 @@ namespace Gurux.Service.Orm.Model
                 string present = string.Join(" AND ", key.Columns.Select(c => $"c.{QuoteSchemaIdentifier(c.Column)} IS NOT NULL"));
                 string query = $"SELECT COUNT(*) FROM {table} c LEFT JOIN {parent} p ON {joins} WHERE {present} AND p.{QuoteSchemaIdentifier(key.Columns[0].ReferencedColumn)} IS NULL";
                 if (Convert.ToInt64(ExecuteScalarInternal(connection, transaction, query, typeof(long))) != 0)
+                {
                     throw new InvalidOperationException($"Cannot add foreign key on {table}: existing rows reference missing {key.ReferencedTable} records.");
+                }
             }
             foreach (var key in removed)
             {
@@ -1311,17 +1384,26 @@ namespace Gurux.Service.Orm.Model
                 ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, $"ALTER TABLE {table} {drop}{QuoteSchemaIdentifier(key.Name)}");
             }
             foreach (var clause in clauses)
+            {
                 ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, $"ALTER TABLE {table} ADD {clause}");
+            }
+
             owned?.Commit();
         }
 
         private ForeignKeyAction NormalizeForeignKeyAction(ForeignKeyAction action)
         {
-            if (action == ForeignKeyAction.None) return ForeignKeyAction.NoAction;
+            if (action == ForeignKeyAction.None)
+            {
+                return ForeignKeyAction.NoAction;
+            }
             // These providers report the default NO ACTION behavior as RESTRICT.
             if (action == ForeignKeyAction.Restrict &&
                 Builder.Settings.Type is DatabaseType.MySQL or DatabaseType.MariaDB or DatabaseType.MSSQL or DatabaseType.SapHana)
+            {
                 return ForeignKeyAction.NoAction;
+            }
+
             return action;
         }
 
@@ -1405,8 +1487,7 @@ namespace Gurux.Service.Orm.Model
             }
             if (Builder.Settings.Type != DatabaseType.Oracle)
             {
-                IndexCollectionAttribute coll = GXInternal.GetAttribute<IndexCollectionAttribute>(type);
-                if (coll != null)
+                foreach (var coll in type.GetCustomAttributes(typeof(IndexCollectionAttribute), false).Cast<IndexCollectionAttribute>())
                 {
                     bool first = true;
                     sb.Length = 0;
@@ -1688,7 +1769,16 @@ namespace Gurux.Service.Orm.Model
                                         }
                                         else
                                         {
-                                            tp = typeof(int);
+                                            // Foreign keys must use the storage type of the referenced identity.
+                                            // SQLite requires INTEGER for all auto-increment primary keys.
+                                            tp = Builder.Settings.Type == DatabaseType.SqLite
+                                                ? typeof(int)
+                                                : it.Value.Relation.ForeignId.Type;
+                                            tp = Nullable.GetUnderlyingType(tp) ?? tp;
+                                            if (Builder.Settings.Type == DatabaseType.PostgreSQL && tp == typeof(ulong))
+                                            {
+                                                tp = typeof(long);
+                                            }
                                         }
                                     }
 #endif //!NETCOREAPP2_0 && !NETCOREAPP2_1
@@ -1865,8 +1955,8 @@ namespace Gurux.Service.Orm.Model
                                         //Emit will cause this.
                                         break;
                                     case ForeignKeyDelete.Restrict:
-                                        //ON DELETE NO ACTION will also work.
-                                        fkStr.Append(" ON DELETE RESTRICT");
+                                        //ON DELETE RESTRICT doesn't work with MSSSQL.
+                                        fkStr.Append(" ON DELETE NO ACTION");
                                         break;
                                     default:
                                         break;
@@ -2250,7 +2340,9 @@ namespace Gurux.Service.Orm.Model
                     com.CommandText = query;
                     count = com.ExecuteNonQuery();
                     if (sender is GXSchemaManager && connection is DbConnection schemaConnection)
-                        Gurux.Service.DB.GXSchemaCache.ForConnection(schemaConnection).Invalidate(transaction);
+                    {
+                        GXSchemaCache.ForConnection(schemaConnection).Invalidate(transaction);
+                    }
                 }
             }
             catch (Exception ex)
@@ -3089,22 +3181,62 @@ namespace Gurux.Service.Orm.Model
                         uniqueName = name + "_" + (suffix++).ToString(CultureInfo.InvariantCulture);
                     }
                     var comments = new List<string>();
-                    if (uniqueName != column.Name) comments.Add("Column: " + column.Name);
-                    if (MermaidIdentifier(type) != type) comments.Add("Type: " + type);
+                    if (uniqueName != column.Name)
+                    {
+                        comments.Add("Column: " + column.Name);
+                    }
+
+                    if (MermaidIdentifier(type) != type)
+                    {
+                        comments.Add("Type: " + type);
+                    }
+
                     comments.Add(column.IsNullable && !column.IsPrimaryKey ? "NULL" : "NOT NULL");
-                    if (column.IsAutoIncrement) comments.Add("AUTO_INCREMENT");
-                    if (column.IsIdentity) comments.Add("IDENTITY");
-                    if (column.IsGenerated) comments.Add("GENERATED");
-                    if (column.IsComputed) comments.Add("COMPUTED " + column.ComputedExpression);
+                    if (column.IsAutoIncrement)
+                    {
+                        comments.Add("AUTO_INCREMENT");
+                    }
+
+                    if (column.IsIdentity)
+                    {
+                        comments.Add("IDENTITY");
+                    }
+
+                    if (column.IsGenerated)
+                    {
+                        comments.Add("GENERATED");
+                    }
+
+                    if (column.IsComputed)
+                    {
+                        comments.Add("COMPUTED " + column.ComputedExpression);
+                    }
+
                     if (column.MaxLength.HasValue && column.MaxLength.Value > 0)
+                    {
                         comments.Add("Length: " + column.MaxLength.Value.ToString(CultureInfo.InvariantCulture));
+                    }
+
                     if (column.Precision.HasValue)
+                    {
                         comments.Add("Precision: " + column.Precision.Value.ToString(CultureInfo.InvariantCulture));
+                    }
+
                     if (column.Scale.HasValue)
+                    {
                         comments.Add("Scale: " + column.Scale.Value.ToString(CultureInfo.InvariantCulture));
+                    }
+
                     if (column.DefaultValue != null)
+                    {
                         comments.Add("DEFAULT " + Convert.ToString(column.DefaultValue, CultureInfo.InvariantCulture));
-                    if (!string.IsNullOrEmpty(column.Comment)) comments.Add(column.Comment);
+                    }
+
+                    if (!string.IsNullOrEmpty(column.Comment))
+                    {
+                        comments.Add(column.Comment);
+                    }
+
                     foreach (GXIndex index in table.Indexes.OrderBy(it => it.Name, StringComparer.Ordinal))
                     {
                         if (index.Columns.Any(it => it.Name == column.Name))
@@ -3115,7 +3247,11 @@ namespace Gurux.Service.Orm.Model
                         }
                     }
                     sb.Append("        ").Append(MermaidIdentifier(type)).Append(' ').Append(uniqueName);
-                    if (keys.Count != 0) sb.Append(' ').Append(string.Join(", ", keys));
+                    if (keys.Count != 0)
+                    {
+                        sb.Append(' ').Append(string.Join(", ", keys));
+                    }
+
                     sb.Append(" \"").Append(MermaidText(string.Join("; ", comments))).Append("\"\n");
                 }
                 sb.Append("    }\n");
@@ -3132,7 +3268,10 @@ namespace Gurux.Service.Orm.Model
                         var matches = tables.Where(it => it.Name == key.ReferencedTable &&
                             (string.IsNullOrEmpty(key.ReferencedSchema) || string.IsNullOrEmpty(it.Schema) ||
                              it.Schema == key.ReferencedSchema)).ToList();
-                        if (matches.Count == 1) referencedName = matches[0].ToString();
+                        if (matches.Count == 1)
+                        {
+                            referencedName = matches[0].ToString();
+                        }
                     }
                     string parent = Entity(referencedName);
                     var columns = table.Columns.Where(it => key.Columns.Any(c => c.Column == it.Name)).ToList();
@@ -3173,7 +3312,11 @@ namespace Gurux.Service.Orm.Model
         private static string MermaidIdentifier(string value)
         {
             StringBuilder sb = new StringBuilder();
-            if (string.IsNullOrEmpty(value) || !char.IsLetter(value[0])) sb.Append('c');
+            if (string.IsNullOrEmpty(value) || !char.IsLetter(value[0]))
+            {
+                sb.Append('c');
+            }
+
             foreach (char ch in value)
             {
                 sb.Append(char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_');
@@ -3241,7 +3384,7 @@ namespace Gurux.Service.Orm.Model
         /// <remarks>
         /// Uses the connection's <see cref="SchemaCache"/>. Each result has independent columns,
         /// indexes, and foreign keys. Schema-manager DDL invalidates the cache; call
-        /// <see cref="Gurux.Service.DB.GXSchemaCache.Clear"/> after external schema changes.
+        /// <see cref="GXSchemaCache.Clear"/> after external schema changes.
         /// </remarks>
         public GXTableSchema Describe(IDbTransaction? transaction, string tableName)
         {

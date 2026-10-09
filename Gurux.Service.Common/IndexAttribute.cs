@@ -47,47 +47,27 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets or sets whether the index requires unique values.
         /// </summary>
-        public bool Unique
-        {
-            get;
-            set;
-        }
+        public bool Unique { get; set; }
 
         /// <summary>
         /// Gets or sets whether index values are sorted in descending order.
         /// </summary>
-        public bool Descend
-        {
-            get;
-            set;
-        }
+        public bool Descend { get; set; }
 
         /// <summary>
         /// Gets or sets whether the index includes only null values.
         /// </summary>
-        public bool IncludeOnlyNull
-        {
-            get;
-            set;
-        }
+        public bool IncludeOnlyNull { get; set; }
 
         /// <summary>
         /// Gets or sets whether null values are excluded from the index.
         /// </summary>
-        public bool ExcludeNull
-        {
-            get;
-            set;
-        }
+        public bool ExcludeNull { get; set; }
 
         /// <summary>
         /// Gets or sets whether the index is clustered.
         /// </summary>
-        public bool Clustered
-        {
-            get;
-            set;
-        }
+        public bool Clustered { get; set; }
 
         /// <summary>
         /// Initializes a unique index with ascending sort order.

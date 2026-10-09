@@ -49,11 +49,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets the referenced entity type, or null if no type was supplied.
         /// </summary>
-        public Type? Type
-        {
-            get;
-            private set;
-        }
+        public Type? Type { get; private set; }
 
         /// <summary>
         /// Gets the mapping table type, or null if no mapping table was supplied.
@@ -97,20 +93,12 @@ namespace Gurux.Service.Orm.Common
         /// Gets or sets the action applied to referencing rows when a referenced row is deleted.
         /// </summary>
         [DefaultValue(ForeignKeyDelete.None)]
-        public ForeignKeyDelete OnDelete
-        {
-            get;
-            set;
-        }
+        public ForeignKeyDelete OnDelete { get; set; }
 
         /// <summary>
         /// Gets or sets the action applied to referencing rows when a referenced key is updated.
         /// </summary>
         [DefaultValue(ForeignKeyDelete.None)]
-        public ForeignKeyUpdate OnUpdate
-        {
-            get;
-            set;
-        }
+        public ForeignKeyUpdate OnUpdate { get; set; }
     }
 }

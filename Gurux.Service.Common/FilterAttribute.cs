@@ -44,20 +44,12 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets or sets the comparison used by the filter.
         /// </summary>
-        public FilterType FilterType
-        {
-            get;
-            set;
-        }
+        public FilterType FilterType { get; set; }
 
         /// <summary>
         /// Gets or sets the value for which the filter is omitted.
         /// </summary>
-        public object? DefaultValue
-        {
-            get;
-            set;
-        }
+        public object? DefaultValue { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FilterAttribute"/> class.

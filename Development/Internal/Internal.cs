@@ -253,7 +253,9 @@ namespace Gurux.Common.Internal
             il.Emit(OpCodes.Newobj, ctor);
 
             if (type.IsValueType)
+            {
                 il.Emit(OpCodes.Box, type);
+            }
 
             il.Emit(OpCodes.Ret);
 

@@ -44,11 +44,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets or sets whether the combination of indexed values must be unique.
         /// </summary>
-        public bool Unique
-        {
-            get;
-            set;
-        }
+        public bool Unique { get; set; }
 
         /// <summary>
         /// Gets or sets the index name.
@@ -58,20 +54,12 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets the column names in index order.
         /// </summary>
-        public string[] Columns
-        {
-            get;
-            private set;
-        }
+        public string[] Columns { get; private set; }
 
         /// <summary>
         /// Gets or sets whether the index is clustered.
         /// </summary>
-        public bool Clustered
-        {
-            get;
-            set;
-        }
+        public bool Clustered { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="IndexCollectionAttribute"/> class.

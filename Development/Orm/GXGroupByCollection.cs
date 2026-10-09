@@ -69,7 +69,6 @@ namespace Gurux.Service.Orm
                 Parent.Count);
             if (Parent.Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
-                Debug.WriteLine("Cached SQL: " + cached);
                 return cached!;
             }
             List<GXJoin> joinList = new List<GXJoin>();
@@ -85,7 +84,6 @@ namespace Gurux.Service.Orm
             if (sql != string.Empty)
             {
                 Parent.Parent.QueryCache.Set(cacheKey, sql, 0);
-                Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
         }

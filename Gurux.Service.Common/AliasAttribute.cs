@@ -43,11 +43,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets the database table alias.
         /// </summary>
-        public string Name
-        {
-            get;
-            private set;
-        }
+        public string Name { get; private set; }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AliasAttribute"/> class.

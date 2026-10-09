@@ -44,11 +44,7 @@ namespace Gurux.Service.Orm.Common
         /// <summary>
         /// Gets the operations from which the member is excluded.
         /// </summary>
-        public IgnoreType IgnoreType
-        {
-            get;
-            private set;
-        }
+        public IgnoreType IgnoreType { get; private set; }
 
         /// <summary>
         /// Initializes an attribute that excludes the member from all supported operations.

@@ -8,7 +8,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class OracleSqlTest : BaseTest
     {
-        public OracleSqlTest() : base(DatabaseType.Oracle) { }
+        public OracleSqlTest() : base(DatabaseType.Oracle)
+        {
+        }
 
         /// <inheritdoc/>
         [TestMethod]
@@ -441,6 +443,21 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT GUID FROM TESTCLASS WHERE TEXT IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
+        }
+
+
+        [TestMethod]
+        [DataRow("SELECT GUID FROM TESTCLASS WHERE GUID IN (HEXTORAW('00000000000000000000000000000000'), HEXTORAW('00000000000000000000000000000000'))")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
         }
 
         /// <summary>
@@ -972,7 +989,7 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void EpochTimeFormatTest(string expected)
         {
             base.EpochTimeFormatTest(expected);
-        }       
+        }
 
         /// <summary>
         /// Update test.

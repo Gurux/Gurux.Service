@@ -306,7 +306,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="value">The identifier to escape.</param>
         /// <returns>The escaped identifier if it is a reserved word; otherwise, the original identifier.</returns>
         public static string EscapeIdentifier(string? tablePrefix, string value)
-        {            
+        {
             if (IsReservedWord(value))
             {
                 return $"`{tablePrefix}{value}`";

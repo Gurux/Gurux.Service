@@ -48,10 +48,16 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Class name of the generated class.
         /// </summary>
-        public string ClassName { get; }
+        public string ClassName
+        {
+            get;
+        }
         /// <summary>
         /// Generated source code of the class.
         /// </summary>
-        public string Source { get; }
+        public string Source
+        {
+            get;
+        }
     }
 }

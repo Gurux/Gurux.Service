@@ -9,7 +9,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class DB2SqlTest : BaseTest
     {
-        public DB2SqlTest() : base(DatabaseType.DB2) { }
+        public DB2SqlTest() : base(DatabaseType.DB2)
+        {
+        }
 
         [TestMethod]
         [DataRow("BLOB", 1048576)]
@@ -86,7 +88,7 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WherePlainBooleanTest(string expected)
         {
             base.WherePlainBooleanTest(expected);
-        }        
+        }
 
         /// <summary>
         /// Count test.
@@ -452,6 +454,20 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT GUID FROM TESTCLASS WHERE GUID IN (HEXTORAW('00000000000000000000000000000000'), HEXTORAW('00000000000000000000000000000000'))")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT GUID FROM TESTCLASS WHERE TEXT IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
         }
 
         /// <summary>
@@ -981,7 +997,7 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void EpochTimeFormatTest(string expected)
         {
             base.EpochTimeFormatTest(expected);
-        }       
+        }
 
         /// <summary>
         /// Update test.
@@ -1739,7 +1755,7 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             base.InnerSchemaJoin(expected);
         }
-        
+
         [TestMethod]
         [DataRow("SELECT COUNT(1) FROM SUPPLIER INNER JOIN PRODUCT ON SUPPLIER.ID = PRODUCT.SUPPLIERID")]
         public override void InnerSchemaJoinCount(string expected)

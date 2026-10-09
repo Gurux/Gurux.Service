@@ -40,17 +40,9 @@ namespace Gurux.Service_Simple_Unit_Test
 {
     class TestItem
     {
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
-        public string Address
-        {
-            get;
-            set;
-        } = default!;
+        public string Address { get; set; } = default!;
     }
 
     public enum State
@@ -63,202 +55,98 @@ namespace Gurux.Service_Simple_Unit_Test
     class IndexTestClass : IUnique<int>
     {
         [DataMember(Name = "ID"), Index]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
     }
 
     [DataContract]
     class UniqueIndexTestClass : IUnique<int>
     {
         [DataMember, Index(Unique = true)]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
     }
 
     [DataContract]
     class AutoIncreamentTestClass : IUnique<int>
     {
         [DataMember(Name = "ID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember()]
-        public string? Text
-        {
-            get;
-            set;
-        }
+        public string? Text { get; set; }
     }
 
     [DataContract(Name = "GuruxName")]
     class NameTestClass : IUnique<int>
     {
         [DataMember(), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
     }
 
     [DataContract]
     class NullableTest : IUnique<int>
     {
         [DataMember()]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember()]
-        public sbyte? SignedByte
-        {
-            get;
-            set;
-        }
+        public sbyte? SignedByte { get; set; }
 
         [DataMember()]
-        public Int16? Int16
-        {
-            get;
-            set;
-        }
+        public Int16? Int16 { get; set; }
 
         [DataMember()]
-        public Int32? Int32
-        {
-            get;
-            set;
-        }
+        public Int32? Int32 { get; set; }
 
         [DataMember()]
-        public Int64? Int64
-        {
-            get;
-            set;
-        }
+        public Int64? Int64 { get; set; }
 
         [DataMember()]
-        public byte? Byte
-        {
-            get;
-            set;
-        }
+        public byte? Byte { get; set; }
 
         [DataMember()]
-        public UInt16? UInt16
-        {
-            get;
-            set;
-        }
+        public UInt16? UInt16 { get; set; }
 
         [DataMember()]
-        public UInt32? UInt32
-        {
-            get;
-            set;
-        }
+        public UInt32? UInt32 { get; set; }
 
         [DataMember()]
-        public UInt64? UInt64
-        {
-            get;
-            set;
-        }
+        public UInt64? UInt64 { get; set; }
 
         [DataMember()]
-        public Guid? Guid
-        {
-            get;
-            set;
-        }
+        public Guid? Guid { get; set; }
 
         [DataMember()]
-        public DateTime? DateTime
-        {
-            get;
-            set;
-        }
+        public DateTime? DateTime { get; set; }
 
         [DataMember()]
-        public TimeSpan? TimeSpan
-        {
-            get;
-            set;
-        }
+        public TimeSpan? TimeSpan { get; set; }
 
         [DataMember()]
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public string Text { get; set; } = default!;
 
         [DataMember()]
-        public float? Float
-        {
-            get;
-            set;
-        }
+        public float? Float { get; set; }
 
         [DataMember()]
-        public double? Double
-        {
-            get;
-            set;
-        }
+        public double? Double { get; set; }
 
         [DataMember()]
-        public char? Char
-        {
-            get;
-            set;
-        }
+        public char? Char { get; set; }
 
         [DataMember()]
-        public bool? Bool
-        {
-            get;
-            set;
-        }
+        public bool? Bool { get; set; }
 
         [DataMember()]
-        public DateTimeOffset? DateTimeOffset
-        {
-            get;
-            set;
-        }
+        public DateTimeOffset? DateTimeOffset { get; set; }
 
         [DataMember()]
-        public decimal? Decimal
-        {
-            get;
-            set;
-        }
+        public decimal? Decimal { get; set; }
 
         [DataMember()]
-        public byte[] ByteArray
-        {
-            get;
-            set;
-        } = default!;
+        public byte[] ByteArray { get; set; } = default!;
 
         [DataMember()]
-        public char[] CharArray
-        {
-            get;
-            set;
-        } = default!;
+        public char[] CharArray { get; set; } = default!;
     }
 
     [DataContract]
@@ -266,86 +154,46 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember(Name = "ID"), AutoIncrement]
 
-        public long Id
-        {
-            get;
-            set;
-        }
+        public long Id { get; set; }
 
         [DataMember]
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public string Text { get; set; } = default!;
     }
 
     [DataContract]
     class CollectionTestClass : IUnique<long>
     {
         [DataMember(Name = "ID"), AutoIncrement]
-        public long Id
-        {
-            get;
-            set;
-        } = default!;
+        public long Id { get; set; } = default!;
 
         [DataMember]
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public string Text { get; set; } = default!;
 
         [DataMember(Name = "TestClassID"), ForeignKey]
-        public TestClass[] Items
-        {
-            get;
-            set;
-        } = default!;
+        public TestClass[] Items { get; set; } = default!;
 
         [DataMember(Name = "Items2ID"), ForeignKey]
-        public List<TestIDClass> Items2
-        {
-            get;
-            set;
-        } = default!;
+        public List<TestIDClass> Items2 { get; set; } = default!;
     }
 
     [DataContract]
     class CircularRelation1 : IUnique<int>
     {
         [DataMember(Name = "ID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember, ForeignKey]
-        public CircularRelation2? Target
-        {
-            get;
-            set;
-        }
+        public CircularRelation2? Target { get; set; }
     }
 
     [DataContract]
     class CircularRelation2 : IUnique<int>
     {
         [DataMember(Name = "ID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember, ForeignKey]
-        public CircularRelation1? Target
-        {
-            get;
-            set;
-        }
+        public CircularRelation1? Target { get; set; }
 
     }
 
@@ -400,148 +248,72 @@ namespace Gurux.Service_Simple_Unit_Test
         }
 
         [DataMember(Name = "ID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember()]
         [DefaultValue(null)]
-        public Guid Guid
-        {
-            get;
-            set;
-        }
+        public Guid Guid { get; set; }
 
         [DataMember()]
         [Filter(FilterType.GreaterOrEqual)]
-        public DateTime Time
-        {
-            get;
-            set;
-        }
+        public DateTime Time { get; set; }
 
         [DataMember(Name = "Text")]
-        public String Text
-        {
-            get;
-            set;
-        } = default!;
+        public String Text { get; set; } = default!;
 
         [DataMember(Name = "SimpleText")]
         [Filter(FilterType.Exact)]
-        public String Text2
-        {
-            get;
-            set;
-        } = default!;
+        public String Text2 { get; set; } = default!;
 
         [DataMember()]
         [DefaultValue(null)]
         [Filter(FilterType.Exact)]
-        public String Text3
-        {
-            get;
-            set;
-        } = default!;
+        public String Text3 { get; set; } = default!;
 
         [DataMember()]
-        public String Text4
-        {
-            get;
-            set;
-        } = default!;
+        public String Text4 { get; set; } = default!;
 
         [DataMember()]
-        public bool BooleanTest
-        {
-            get;
-            set;
-        }
+        public bool BooleanTest { get; set; }
 
         [DataMember()]
-        public int IntTest
-        {
-            get;
-            set;
-        }
+        public int IntTest { get; set; }
 
         [DataMember()]
-        public double DoubleTest
-        {
-            get;
-            set;
-        }
+        public double DoubleTest { get; set; }
 
         [DataMember()]
-        public float FloatTest
-        {
-            get;
-            set;
-        }
+        public float FloatTest { get; set; }
 
         [DataMember()]
-        public TimeSpan Span
-        {
-            get;
-            set;
-        }
+        public TimeSpan Span { get; set; }
 
         [DataMember()]
-        public object? Object
-        {
-            get;
-            set;
-        }
+        public object? Object { get; set; }
 
         [DataMember(), Gurux.Service.Orm.Common.Ignore]
-        public TestItem[]? Items
-        {
-            get;
-            set;
-        }
+        public TestItem[]? Items { get; set; }
 
         [DataMember()]
         [DefaultValue(State.OK)]
         [Filter(FilterType.Exact, State.OK)]
-        public State Status
-        {
-            get;
-            set;
-        }
+        public State Status { get; set; }
     }
 
     [DataContract]
     public class Supplier : IUnique<int>
     {
         [DataMember(Name = "SupplierID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public string Text { get; set; } = default!;
 
         [DataMember()]
-        public List<Product> Items
-        {
-            get;
-            set;
-        }
+        public List<Product> Items { get; set; }
 
         [DataMember()]
-        public List<Product2> NewProducts
-        {
-            get;
-            set;
-        }
+        public List<Product2> NewProducts { get; set; }
 
         public Supplier()
         {
@@ -554,97 +326,53 @@ namespace Gurux.Service_Simple_Unit_Test
     public class Product : IUnique<int>
     {
         [DataMember(Name = "ProductID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public string Text { get; set; } = default!;
 
         [DataMember(Name = "TargetID"), ForeignKey(typeof(Supplier))]
-        public int SupplierID
-        {
-            get;
-            set;
-        }
+        public int SupplierID { get; set; }
     }
 
     [DataContract]
     public class Product2 : IUnique<int>
     {
         [DataMember(Name = "Product2ID"), AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public string Text { get; set; } = default!;
 
         [DataMember(Name = "Target2ID"), ForeignKey]
-        public Supplier? Supplier
-        {
-            get;
-            set;
-        }
+        public Supplier? Supplier { get; set; }
     }
 
     [DataContract]
     public class TestClass2 : IUnique<int>
     {
         [DataMember]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember(Name = "ParentID"), ForeignKey(typeof(TestClass))]
-        public int Parent
-        {
-            get;
-            set;
-        }
+        public int Parent { get; set; }
 
         [DataMember()]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
     }
 
     [DataContract]
     public class GXEchoRequest : IGXRequest<GXEchoResponse>
     {
         [DataMember]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
     }
 
     [DataContract]
     public class GXEchoResponse
     {
         [DataMember]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
     }
 
     [DataContract]
@@ -652,25 +380,13 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [AutoIncrement]
         [DataMember]
-        public long Id
-        {
-            get;
-            set;
-        }
+        public long Id { get; set; }
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember(Name = "CountryID")]
         [ForeignKey]
-        public Country? Country
-        {
-            get;
-            set;
-        }
+        public Country? Country { get; set; }
     }
 
     [DataContract]
@@ -678,32 +394,16 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [AutoIncrement]
         [DataMember]
-        public long Id
-        {
-            get;
-            set;
-        }
+        public long Id { get; set; }
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember(Name = "CountryID")]
         [ForeignKey]
-        public Country Country
-        {
-            get;
-            set;
-        } = default!;
+        public Country Country { get; set; } = default!;
 
         [DataMember]
-        public string ExtraField
-        {
-            get;
-            set;
-        } = default!;
+        public string ExtraField { get; set; } = default!;
     }
 
 
@@ -712,17 +412,9 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember(Name = "ID")]
         [AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
         [DataMember(Name = "CountryName")]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
     }
 
 
@@ -731,25 +423,13 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [AutoIncrement]
         [DataMember]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
         [DataMember(Name = "ParentName")]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember]
         [ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
-        public Child[] Childrens
-        {
-            get;
-            set;
-        } = default!;
+        public Child[] Childrens { get; set; } = default!;
     }
 
     [DataContract]
@@ -757,25 +437,13 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public long Id
-        {
-            get;
-            set;
-        }
+        public long Id { get; set; }
 
         [DataMember, ForeignKey(typeof(Parent), OnDelete = ForeignKeyDelete.Cascade)]
-        public int ParentId
-        {
-            get;
-            set;
-        }
+        public int ParentId { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
     }
 
     [DataContract]
@@ -783,25 +451,13 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [AutoIncrement]
         [DataMember]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
         [DataMember(Name = "ParentName")]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember]
         [ForeignKey]
-        public Child2[]? Childrens
-        {
-            get;
-            set;
-        }
+        public Child2[]? Childrens { get; set; }
     }
 
 
@@ -810,26 +466,14 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public long Id
-        {
-            get;
-            set;
-        }
+        public long Id { get; set; }
 
         [DataMember, ForeignKey(typeof(Parent2),
             OnDelete = ForeignKeyDelete.Cascade)]
-        public Parent2? Parent
-        {
-            get;
-            set;
-        }
+        public Parent2? Parent { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
     }
 
     [DataContract]
@@ -837,25 +481,13 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [AutoIncrement]
         [DataMember]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember]
         [ForeignKey(typeof(UserGroup2), typeof(UserToUserGroup))]
-        public UserGroup2[] Groups
-        {
-            get;
-            set;
-        } = default!;
+        public UserGroup2[] Groups { get; set; } = default!;
     }
 
     [DataContract]
@@ -863,19 +495,11 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [ForeignKey(typeof(User2), OnDelete = ForeignKeyDelete.Cascade)]
-        public int UserId
-        {
-            get;
-            set;
-        }
+        public int UserId { get; set; }
 
         [DataMember]
         [ForeignKey(typeof(UserGroup2), OnDelete = ForeignKeyDelete.Cascade)]
-        public int GroupId
-        {
-            get;
-            set;
-        }
+        public int GroupId { get; set; }
     }
 
     [DataContract]
@@ -883,26 +507,14 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember]
         [ForeignKey(typeof(User2), typeof(UserToUserGroup))]
-        public User2[]? Users
-        {
-            get;
-            set;
-        }
+        public User2[]? Users { get; set; }
     }
 
     [DataContract]
@@ -910,32 +522,16 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember]
-        public string Value
-        {
-            get;
-            set;
-        } = default!;
+        public string Value { get; set; } = default!;
 
         [DataMember, ForeignKey(typeof(Device2))]
-        public int DeviceID
-        {
-            get;
-            set;
-        }
+        public int DeviceID { get; set; }
     }
 
     [DataContract]
@@ -943,25 +539,13 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember(Name = "DeviceID"), ForeignKey]
-        public Parameter2[]? Parameters
-        {
-            get;
-            set;
-        }
+        public Parameter2[]? Parameters { get; set; }
     }
 
     [DataContract(Name = "Property3"), Alias("P")]
@@ -969,29 +553,17 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
     }
 
     [DataContract, Alias("DP")]
     class DeviceProperty : Property3
     {
         [DataMember, ForeignKey(typeof(Device3))]
-        public int Device
-        {
-            get;
-            set;
-        }
+        public int Device { get; set; }
 
     }
 
@@ -999,11 +571,7 @@ namespace Gurux.Service_Simple_Unit_Test
     class DeviceGroupProperty : Property3
     {
         [DataMember, ForeignKey]
-        public DeviceGroup3 DeviceGroup
-        {
-            get;
-            set;
-        } = default!;
+        public DeviceGroup3 DeviceGroup { get; set; } = default!;
     }
 
     [DataContract, Alias("D")]
@@ -1011,33 +579,17 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         //[AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
 
         [DataMember, ForeignKey]
-        public DeviceProperty[]? Properties
-        {
-            get;
-            set;
-        }
+        public DeviceProperty[]? Properties { get; set; }
 
         [DataMember, ForeignKey(typeof(DeviceGroup3))]
-        public int DeviceGroup
-        {
-            get;
-            set;
-        }
+        public int DeviceGroup { get; set; }
 
     }
 
@@ -1046,32 +598,16 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DataMember]
         [AutoIncrement]
-        public int Id
-        {
-            get;
-            set;
-        }
+        public int Id { get; set; }
 
         [DataMember]
-        public string Name
-        {
-            get;
-            set;
-        } = default!;
+        public string Name { get; set; } = default!;
 
         [DataMember, ForeignKey]
-        public Device3[] Devices
-        {
-            get;
-            set;
-        } = default!;
+        public Device3[] Devices { get; set; } = default!;
 
         [DataMember, ForeignKey]
-        public DeviceGroupProperty[] Properties
-        {
-            get;
-            set;
-        } = default!;
+        public DeviceGroupProperty[] Properties { get; set; } = default!;
 
     }
 
@@ -1080,77 +616,37 @@ namespace Gurux.Service_Simple_Unit_Test
     {
         [DefaultValue(DefaultValueKind.NewGuid)]
         [DataMember()]
-        public Guid Id
-        {
-            get;
-            set;
-        }
+        public Guid Id { get; set; }
 
         [DataMember()]
         [DefaultValue(null)]
-        public DateTime Time
-        {
-            get;
-            set;
-        }
+        public DateTime Time { get; set; }
 
         [DataMember()]
-        public String Text
-        {
-            get;
-            set;
-        } = default!;
+        public String Text { get; set; } = default!;
 
         [DataMember(Name = "SimpleText")]
         [DefaultValue("")]
-        public String Text2
-        {
-            get;
-            set;
-        } = default!;
+        public String Text2 { get; set; } = default!;
 
         [DataMember()]
         [DefaultValue(null)]
-        public String Text3
-        {
-            get;
-            set;
-        } = default!;
+        public String Text3 { get; set; } = default!;
 
         [DataMember()]
-        public String Text4
-        {
-            get;
-            set;
-        } = default!;
+        public String Text4 { get; set; } = default!;
 
         [DataMember()]
-        public bool BooleanTest
-        {
-            get;
-            set;
-        }
+        public bool BooleanTest { get; set; }
     }
 
     class NullableTestClass : IUnique<Guid>
     {
-        public Guid Id
-        {
-            get;
-            set;
-        }
+        public Guid Id { get; set; }
 
         [IsRequired]
         [DefaultValue(true)]
-        public bool? Active
-        {
-            get;
-            set;
-        }
-        public string Text
-        {
-            get;
-            set;
-        } = default!;
+        public bool? Active { get; set; }
+        public string Text { get; set; } = default!;
     }
 }

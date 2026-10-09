@@ -37,8 +37,14 @@ namespace Gurux.Service.Orm.Internal
 {
     sealed class TreeNode
     {
-        public object Id { get; init; }
-        public object Target { get; init; }
+        public object Id
+        {
+            get; init;
+        }
+        public object Target
+        {
+            get; init;
+        }
         public List<GXSerializedItem> Setters { get; } = [];
         public List<TreeNode> Childrens { get; } = [];
     }

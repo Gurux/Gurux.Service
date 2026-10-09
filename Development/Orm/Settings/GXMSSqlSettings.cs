@@ -142,18 +142,65 @@ ORDER BY fk.name, fkc.constraint_column_id", schema, tableName.Replace("'", "''"
                 return $"ALTER ROLE db_owner ADD MEMBER [{user}];";
             }
             var list = new List<string>();
-            if (value.HasFlag(DatabasePermission.Connect)) list.Add($"GRANT CONNECT TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Select)) list.Add($"GRANT SELECT TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Insert)) list.Add($"GRANT INSERT TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Update)) list.Add($"GRANT UPDATE TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Delete)) list.Add($"GRANT DELETE TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Execute)) list.Add($"GRANT EXECUTE TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Create)) list.Add($"GRANT CREATE TABLE TO [{user}];");
-            if (value.HasFlag(DatabasePermission.Alter)) list.Add($"GRANT ALTER TO [{user}];");
-            if (value.HasFlag(DatabasePermission.References)) list.Add($"GRANT REFERENCES TO [{user}];");
-            if (value.HasFlag(DatabasePermission.CreateView)) list.Add($"GRANT CREATE VIEW TO [{user}];");
-            if (value.HasFlag(DatabasePermission.CreateProcedure)) list.Add($"GRANT CREATE PROCEDURE TO [{user}];");
-            if (value.HasFlag(DatabasePermission.CreateFunction)) list.Add($"GRANT CREATE FUNCTION TO [{user}];");
+            if (value.HasFlag(DatabasePermission.Connect))
+            {
+                list.Add($"GRANT CONNECT TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Select))
+            {
+                list.Add($"GRANT SELECT TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Insert))
+            {
+                list.Add($"GRANT INSERT TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Update))
+            {
+                list.Add($"GRANT UPDATE TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Delete))
+            {
+                list.Add($"GRANT DELETE TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Execute))
+            {
+                list.Add($"GRANT EXECUTE TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Create))
+            {
+                list.Add($"GRANT CREATE TABLE TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.Alter))
+            {
+                list.Add($"GRANT ALTER TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.References))
+            {
+                list.Add($"GRANT REFERENCES TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.CreateView))
+            {
+                list.Add($"GRANT CREATE VIEW TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.CreateProcedure))
+            {
+                list.Add($"GRANT CREATE PROCEDURE TO [{user}];");
+            }
+
+            if (value.HasFlag(DatabasePermission.CreateFunction))
+            {
+                list.Add($"GRANT CREATE FUNCTION TO [{user}];");
+            }
 
             if (!list.Any())
             {

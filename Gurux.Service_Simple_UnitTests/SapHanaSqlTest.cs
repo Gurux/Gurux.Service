@@ -9,7 +9,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class SapHanaSqlTest : BaseTest
     {
-        public SapHanaSqlTest() : base(DatabaseType.SapHana) { }
+        public SapHanaSqlTest() : base(DatabaseType.SapHana)
+        {
+        }
 
         /// <inheritdoc/>
         [TestMethod]
@@ -441,6 +443,20 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT GUID FROM TESTCLASS WHERE TEXT IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT GUID FROM TESTCLASS WHERE GUID IN (X'00000000000000000000000000000000', X'00000000000000000000000000000000')")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
         }
 
         /// <summary>

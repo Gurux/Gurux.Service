@@ -93,11 +93,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// SQL generation time in ms.
         /// </summary>
-        public int GenerationTime
-        {
-            get;
-            internal set;
-        }
+        public int GenerationTime { get; internal set; }
 
         /// <inheritdoc/>
         public override string ToString()
@@ -122,7 +118,6 @@ namespace Gurux.Service.Orm
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
                 GenerationTime = generationTime;
-                Debug.WriteLine($"Cached SQL: {GenerationTime} ms {cachedSql}");
                 sql = cachedSql!;
             }
             else
@@ -161,7 +156,6 @@ namespace Gurux.Service.Orm
                 if (!string.IsNullOrEmpty(sql))
                 {
                     Parent.QueryCache.Set(cacheKey, sql, GenerationTime);
-                    Debug.WriteLine($"New SQL: {GenerationTime} ms {sql}");
                 }
             }
             if (addGenerationTime)
@@ -195,11 +189,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Where expression.
         /// </summary>
-        public GXWhereCollection Where
-        {
-            get;
-            private set;
-        }
+        public GXWhereCollection Where { get; private set; }
 
         /// <summary>
         /// Delete all items from the table and use the specified query cache.
@@ -322,7 +312,11 @@ namespace Gurux.Service.Orm
             if (value is Expression predicate && schema.Any())
             {
                 var table = schema.First().Parent ?? throw new ArgumentException("Column metadata requires a parent table.");
-                if (schema.Any(c => !ReferenceEquals(c.Parent, table))) throw new ArgumentException("Delete columns must belong to one table.");
+                if (schema.Any(c => !ReferenceEquals(c.Parent, table)))
+                {
+                    throw new ArgumentException("Delete columns must belong to one table.");
+                }
+
                 return Delete(table, predicate);
             }
             if (value == null)
@@ -509,7 +503,7 @@ namespace Gurux.Service.Orm
         /// <remarks>
         /// If value is zero there are no limitations.
         /// </remarks>
-        public UInt32 Count
+        public long Count
         {
             get
             {

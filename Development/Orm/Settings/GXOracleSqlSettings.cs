@@ -126,14 +126,31 @@ ORDER BY child.CONSTRAINT_NAME, childColumn.POSITION";
         private static string GetPermissions(DatabasePermission value)
         {
             if (value.HasFlag(DatabasePermission.Admin))
+            {
                 return "DBA";
+            }
 
             var list = new List<string>();
 
-            if (value.HasFlag(DatabasePermission.Create)) list.Add("CREATE TABLE");
-            if (value.HasFlag(DatabasePermission.Create)) list.Add("CREATE VIEW");
-            if (value.HasFlag(DatabasePermission.Create)) list.Add("CREATE PROCEDURE");
-            if (value.HasFlag(DatabasePermission.Execute)) list.Add("CREATE PROCEDURE");
+            if (value.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CREATE TABLE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CREATE VIEW");
+            }
+
+            if (value.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CREATE PROCEDURE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Execute))
+            {
+                list.Add("CREATE PROCEDURE");
+            }
 
             if (!list.Any())
             {

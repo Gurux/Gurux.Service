@@ -347,11 +347,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// DB settings.
         /// </summary>
-        public GXDBSettings Settings
-        {
-            get;
-            private set;
-        }
+        public GXDBSettings Settings { get; private set; }
 
         /// <summary>
         /// Change database.
@@ -854,7 +850,17 @@ namespace Gurux.Service.Orm
                 {
                     if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IUnique<>))
                     {
-                        value |= (int)(Attributes.Id | Attributes.PrimaryKey);
+                        // An explicit storage key can coexist with the public IUnique identifier.
+                        // Keep Id for lookups and foreign keys, but infer its primary key only when none is declared.
+                        value |= (int)Attributes.Id;
+                        if (!type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Any(member =>
+                            member.IsDefined(typeof(PrimaryKeyAttribute), true)) &&
+                            !type.GetFields(BindingFlags.Public | BindingFlags.Instance).Any(member =>
+                            member.IsDefined(typeof(PrimaryKeyAttribute), true)))
+                        {
+                            value |= (int)Attributes.PrimaryKey;
+                        }
+
                         break;
                     }
                 }
@@ -1045,18 +1051,14 @@ namespace Gurux.Service.Orm
         {
             foreach (var it in GetProperties(type))
             {
-                if ((it.Value.Attributes & (Attributes.Id | Attributes.PrimaryKey)) != 0)
+                if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                 {
-                    if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
-                    {
-                        return it.Value;
-                    }
-                    break;
+                    return it.Value;
                 }
             }
+
             return null;
         }
-
         internal static Dictionary<string, GXSerializedItem> GetProperties<T>()
         {
             return GetProperties(typeof(T));
@@ -1310,7 +1312,7 @@ namespace Gurux.Service.Orm
                     tables[it.Key].indexes.Add(index, it.Value);
                     ++index;
                 }
-            }          
+            }
             return TreeBuilder.BuildTree<T>(Settings, list, tables.Values);
         }
 

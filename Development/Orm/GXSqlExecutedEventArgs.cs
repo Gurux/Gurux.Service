@@ -41,11 +41,17 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Gets the executed SQL statement.
         /// </summary>
-        public required string Sql { get; init; }
+        public required string Sql
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Gets the elapsed execution time.
         /// </summary>
-        public TimeSpan Elapsed { get; init; }
+        public TimeSpan Elapsed
+        {
+            get; init;
+        }
     }
 }

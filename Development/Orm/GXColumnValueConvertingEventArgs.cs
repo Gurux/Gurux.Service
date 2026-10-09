@@ -42,20 +42,32 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Table name where column is located.
         /// </summary>
-        public required string TableName { get; init; }
+        public required string TableName
+        {
+            get; init;
+        }
         /// <summary>
         /// Column name where value is located.
         /// </summary>
-        public required string ColumnName { get; init; }
+        public required string ColumnName
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Old column type. This is used to convert value to new type.
         /// </summary>
-        public required Type OldType { get; init; }
+        public required Type OldType
+        {
+            get; init;
+        }
         /// <summary>
         /// New column type. This is used to convert value to new type.
         /// </summary>
-        public required Type NewType { get; init; }
+        public required Type NewType
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Current column value. This can be changed to new value.

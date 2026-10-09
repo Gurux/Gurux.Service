@@ -40,16 +40,25 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Gets the property that has changed.
         /// </summary>
-        public required string Name { get; init; }
+        public required string Name
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Gets the original property value.
         /// </summary>
-        public object? OldValue { get; init; }
+        public object? OldValue
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Gets the new property value.
         /// </summary>
-        public object? NewValue { get; init; }
+        public object? NewValue
+        {
+            get; init;
+        }
     }
 }

@@ -203,7 +203,10 @@ namespace Gurux.Service.DB
         /// <summary>
         /// Database type for which the cache is used. 
         /// </summary>
-        public DatabaseType DatabaseType { get; init; }
+        public DatabaseType DatabaseType
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Attempts to retrieve a cached value for the specified key.
@@ -334,10 +337,28 @@ namespace Gurux.Service.DB
         /// </summary>
         private void AppendSignature(StringBuilder sb, object value, HashSet<object> visited, int depth)
         {
-            if (value == null) { sb.Append("null"); return; }
-            if (depth > 64) { sb.Append("max-depth"); return; }
-            if (value is string s) { sb.Append("s:"); sb.Append(s); return; }
-            if (value is Type type) { sb.Append("t:"); sb.Append(type.FullName); return; }
+            if (value == null)
+            {
+                sb.Append("null");
+                return;
+            }
+            if (depth > 64)
+            {
+                sb.Append("max-depth");
+                return;
+            }
+            if (value is string s)
+            {
+                sb.Append("s:");
+                sb.Append(s);
+                return;
+            }
+            if (value is Type type)
+            {
+                sb.Append("t:");
+                sb.Append(type.FullName);
+                return;
+            }
             if (value is MemberInfo member)
             {
                 sb.Append("m:");
@@ -420,7 +441,11 @@ namespace Gurux.Service.DB
                 sb.Append("d:[");
                 for (int i = 0; i < entries.Count; i++)
                 {
-                    if (i > 0) sb.Append(';');
+                    if (i > 0)
+                    {
+                        sb.Append(';');
+                    }
+
                     sb.Append(entries[i]);
                 }
                 sb.Append(']');
@@ -432,7 +457,11 @@ namespace Gurux.Service.DB
                 bool first = true;
                 foreach (object it in enumerable)
                 {
-                    if (!first) sb.Append(';');
+                    if (!first)
+                    {
+                        sb.Append(';');
+                    }
+
                     first = false;
                     AppendSignature(sb, it, visited, depth + 1);
                 }

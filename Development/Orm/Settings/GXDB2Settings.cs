@@ -132,13 +132,26 @@ ORDER BY r.CONSTNAME, child.COLSEQ", schema, tableName.ToUpperInvariant());
         private static string GetPermissions(DatabasePermission p)
         {
             if (p.HasFlag(DatabasePermission.Admin))
+            {
                 return "DBADM";
+            }
 
             var list = new List<string>();
 
-            if (p.HasFlag(DatabasePermission.Create)) list.Add("CREATETAB");
-            if (p.HasFlag(DatabasePermission.Create)) list.Add("CONNECT");
-            if (p.HasFlag(DatabasePermission.Select)) list.Add("DATAACCESS");
+            if (p.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CREATETAB");
+            }
+
+            if (p.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CONNECT");
+            }
+
+            if (p.HasFlag(DatabasePermission.Select))
+            {
+                list.Add("DATAACCESS");
+            }
 
             return list.Count == 0 ? "CONNECT" : string.Join(", ", list);
         }

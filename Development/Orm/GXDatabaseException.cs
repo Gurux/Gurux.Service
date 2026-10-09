@@ -49,28 +49,43 @@ namespace Gurux.Service.Orm
         /// Executed SQL query that caused the exception. 
         /// This property may be null if the SQL query is not available or applicable to the exception.
         /// </summary>
-        public string Sql { get; init; }
+        public string Sql
+        {
+            get; init;
+        }
 
         /// <summary>
         /// Type of the database error.
         /// </summary>
-        public DatabaseErrorType ErrorType { get; }
+        public DatabaseErrorType ErrorType
+        {
+            get;
+        }
 
         /// <summary>
         /// Indicates whether the error is transient and may be retried.
         /// </summary>  
-        public bool IsTransient { get; }
+        public bool IsTransient
+        {
+            get;
+        }
 
         /// <summary>
         /// Gets the SQL state associated with the operation.
         /// </summary>
-        public string SqlState { get; }
+        public string SqlState
+        {
+            get;
+        }
 
         /// <summary>
         /// Gets the database-specific error code associated with the exception. 
         /// This property may be null if the error code is not available or applicable to the exception.
         /// </summary>
-        public int? ErrorCode { get; }
+        public int? ErrorCode
+        {
+            get;
+        }
 
         /// <summary>
         /// Initializes a new instance of the GXDatabaseException class with a specified error type, 

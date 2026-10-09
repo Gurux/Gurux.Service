@@ -128,20 +128,12 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Database connection.
         /// </summary>
-        public DbConnection Connection
-        {
-            get;
-            private set;
-        }
+        public DbConnection Connection { get; private set; }
 
         /// <summary>
         /// Command timeout.
         /// </summary>
-        public int CommandTimeout
-        {
-            get;
-            set;
-        }
+        public int CommandTimeout { get; set; }
 
         /// <summary>
         /// Change database.
@@ -168,11 +160,7 @@ namespace Gurux.Service.Orm
         /// NULL string is saved as empty string or convert to empty string when null string is read from the DB.
         /// </remarks>
         [DefaultValue(false)]
-        public bool UseEmptyString
-        {
-            get;
-            set;
-        }
+        public bool UseEmptyString { get; set; }
 
 
         /// <summary>
@@ -203,11 +191,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Is transaction used automatically.
         /// </summary>
-        public bool AutoTransaction
-        {
-            get;
-            set;
-        }
+        public bool AutoTransaction { get; set; }
 
         internal readonly object sync = new();
 

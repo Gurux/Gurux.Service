@@ -8,7 +8,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class PostgreSqlTest : BaseTest
     {
-        public PostgreSqlTest() : base(DatabaseType.PostgreSQL) { }
+        public PostgreSqlTest() : base(DatabaseType.PostgreSQL)
+        {
+        }
 
         /// <inheritdoc/>
         [TestMethod]
@@ -440,6 +442,20 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT guid FROM testclass WHERE text IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT guid FROM testclass WHERE guid IN ('00000000-0000-0000-0000-000000000000'::uuid, '00000000-0000-0000-0000-000000000000'::uuid)")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
         }
 
         /// <summary>
@@ -971,7 +987,7 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void EpochTimeFormatTest(string expected)
         {
             base.EpochTimeFormatTest(expected);
-        }       
+        }
 
         /// <summary>
         /// Update test.

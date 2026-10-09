@@ -153,10 +153,6 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Map columns.
         /// </summary>
-        public GXMapCollection Maps
-        {
-            get;
-            private set;
-        }
+        public GXMapCollection Maps { get; private set; }
     }
 }

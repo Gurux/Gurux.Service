@@ -70,7 +70,6 @@ namespace Gurux.Service.Orm
                 Parent.Descending);
             if (Parent.Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
-                Debug.WriteLine("Cached SQL: " + cached);
                 return cached!;
             }
             List<GXJoin> joinList = new List<GXJoin>();
@@ -78,7 +77,7 @@ namespace Gurux.Service.Orm
             UpdateJoins(Parent.Settings, Parent.Joins, joinList);
             foreach (var it in List)
             {
-                OrderBy(Parent.Settings, it.Expression, joinList, orderList);
+                OrderBy(Parent.Settings, it.Expression, joinList, orderList, it.Descending);
             }
             StringBuilder sb = new StringBuilder();
             OrderByToString(Parent, sb, orderList, joinList);
@@ -86,7 +85,6 @@ namespace Gurux.Service.Orm
             if (sql != string.Empty)
             {
                 Parent.Parent.QueryCache.Set(cacheKey, sql, 0);
-                Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
         }
@@ -105,7 +103,7 @@ namespace Gurux.Service.Orm
         /// <param name="OrderList">Order list.</param>
         internal static void OrderBy(GXDBSettings settings, LambdaExpression sourceColumn,
             List<GXJoin> joinList,
-            List<GXOrder> OrderList)
+            List<GXOrder> OrderList, bool? descending = null)
         {
             GXGetMembersArgs args = new GXGetMembersArgs(settings, TargetType.Column | TargetType.Plain)
             {
@@ -125,6 +123,7 @@ namespace Gurux.Service.Orm
                     o.Table = sourceColumn.Parameters[0].Type;
                 }
                 o.Column = it;
+                o.Descending = descending;
                 OrderList.Add(o);
             }
         }
@@ -170,14 +169,22 @@ namespace Gurux.Service.Orm
             {
                 if (expression is UnaryExpression conversion &&
                     (conversion.NodeType == ExpressionType.Convert || conversion.NodeType == ExpressionType.ConvertChecked))
+                {
                     expression = conversion.Operand;
+                }
                 else if (expression is ConstantExpression wrapper && wrapper.Value is Expression inner)
+                {
                     expression = inner;
+                }
                 else
+                {
                     break;
+                }
             }
             if (expression is ConstantExpression constant && constant.Value is GXColumnSchema column)
+            {
                 return (column, null);
+            }
 
             Expression? collection = null;
             Expression? index = null;
@@ -212,7 +219,10 @@ namespace Gurux.Service.Orm
             foreach (var it in list.List)
             {
                 if (it.Source != null || it.On is not BinaryExpression predicate)
+                {
                     throw new NotSupportedException("Query-source joins require a schema SELECT.");
+                }
+
                 GXJoin join = new GXJoin();
                 join.Type = it.Type;
                 var source = GetSchemaJoinColumn(settings, predicate.Left);
@@ -272,10 +282,10 @@ namespace Gurux.Service.Orm
                         tableName = it.Table.Name;
                     }
                     sb.Append(GXDbHelpers.ConvertToString(parent.Settings, TargetType.Column, tableName, it.Column, null));
-                }
-                if (parent.Descending)
-                {
-                    sb.Append(" DESC");
+                    if (it.Descending.HasValue || parent.Descending)
+                    {
+                        sb.Append((it.Descending ?? parent.Descending) ? " DESC" : " ASC");
+                    }
                 }
             }
         }
@@ -304,12 +314,31 @@ namespace Gurux.Service.Orm
 
         public void Add(Expression expression, bool descending = false)
         {
-            var lambda = Expression.Lambda(expression);
+            if (expression == null)
+            {
+                throw new ArgumentNullException(nameof(expression));
+            }
+
+            var lambda = expression as LambdaExpression ?? Expression.Lambda(expression);
             List.Add((lambda, descending));
+        }
+
+        /// <summary>Adds an ordering expression with an explicit direction for each selected column.</summary>
+        public void Add<T>(Expression<Func<T, object>> expression, bool descending)
+        {
+            if (expression == null)
+            {
+                throw new ArgumentNullException(nameof(expression));
+            }
+
+            List.Add((expression, descending));
         }
         public void AddRange(IEnumerable<(Expression Expression, bool Descending)> columns)
         {
-            foreach (var column in columns) Add(column.Expression, column.Descending);
+            foreach (var column in columns)
+            {
+                Add(column.Expression, column.Descending);
+            }
         }
 
         private bool Find(Type type, List<string> path, int index)

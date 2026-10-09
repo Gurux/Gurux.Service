@@ -38,5 +38,6 @@ namespace Gurux.Service.Orm.Internal
     {
         public Type Table;
         public string Column;
+        public bool? Descending;
     }
 }

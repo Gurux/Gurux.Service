@@ -163,11 +163,30 @@ ORDER BY tc.constraint_name, kcu.ordinal_position", schema, GetTableFilter(table
                 return "ALL PRIVILEGES";
             }
             var list = new List<string>();
-            if (value.HasFlag(DatabasePermission.Insert)) list.Add("INSERT");
-            if (value.HasFlag(DatabasePermission.Update)) list.Add("UPDATE");
-            if (value.HasFlag(DatabasePermission.Delete)) list.Add("DELETE");
-            if (value.HasFlag(DatabasePermission.Select)) list.Add("SELECT");
-            if (value.HasFlag(DatabasePermission.References)) list.Add("REFERENCES");
+            if (value.HasFlag(DatabasePermission.Insert))
+            {
+                list.Add("INSERT");
+            }
+
+            if (value.HasFlag(DatabasePermission.Update))
+            {
+                list.Add("UPDATE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Delete))
+            {
+                list.Add("DELETE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Select))
+            {
+                list.Add("SELECT");
+            }
+
+            if (value.HasFlag(DatabasePermission.References))
+            {
+                list.Add("REFERENCES");
+            }
 
             if (!list.Any())
             {
@@ -250,7 +269,8 @@ ORDER BY rolname";
         /// <inheritdoc />
         public override string RemoveUserQuery(string? databaseName, string userName)
         {
-            userName = "\"" + userName.Replace("\"", "\"\"") + "\""; ;
+            userName = "\"" + userName.Replace("\"", "\"\"") + "\"";
+            ;
             if (!string.IsNullOrEmpty(databaseName))
             {
                 string db = "\"" + databaseName + "\"";

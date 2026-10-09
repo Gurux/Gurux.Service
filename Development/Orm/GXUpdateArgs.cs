@@ -127,7 +127,6 @@ namespace Gurux.Service.Orm
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
                 GenerationTime = generationTime;
-                Debug.WriteLine($"Cached SQL: {GenerationTime} ms {cachedSql}");
                 sql = cachedSql!;
             }
             else
@@ -180,8 +179,8 @@ namespace Gurux.Service.Orm
                     tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, table, null);
                     if (args.StringBuilder.Length != 0)
                     {
-                        //Add space after the first row.
-                        args.StringBuilder.Append(' ');
+                        // Separate statements in a range update.
+                        args.StringBuilder.Append("; ");
                     }
                     args.StringBuilder.Append("UPDATE ");
                     args.StringBuilder.Append(tmp);
@@ -209,6 +208,7 @@ namespace Gurux.Service.Orm
                         //Primary key is not updated.
                         if ((p.Attributes & (Attributes.PrimaryKey | Attributes.AutoIncrement | Attributes.NewGuid | Attributes.CurrentTimestamp)) == 0 &&
                             p.Relation?.RelationType != RelationType.OneToMany &&
+                            p.Relation?.RelationType != RelationType.ManyToMany &&
                             excluded!.Contains(name) != true)
                         {
                             GXSelectArgs? a = it.Key as GXSelectArgs;
@@ -302,7 +302,6 @@ namespace Gurux.Service.Orm
                 if (!string.IsNullOrEmpty(sql))
                 {
                     Parent.QueryCache.Set(cacheKey, sql, GenerationTime);
-                    Debug.WriteLine($"New SQL: {GenerationTime} ms {sql}");
                 }
             }
             if (addGenerationTime)
@@ -333,11 +332,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// SQL generation time in ms.
         /// </summary>
-        public int GenerationTime
-        {
-            get;
-            internal set;
-        }
+        public int GenerationTime { get; internal set; }
 
         private static List<GXColumnSchema> GetSchemaUpdateColumns(Type type,
             IEnumerable<GXColumnSchema> schema)
@@ -510,6 +505,39 @@ namespace Gurux.Service.Orm
             return args;
         }
 
+
+        /// <summary>
+        /// Create new update expression.
+        /// </summary>
+        /// <param name="value">Updated value.</param>
+        /// <param name="columns">Updated columns.</param>
+        /// <param name="where">Where condition.</param>
+        /// <returns>Created update attribute.</returns>
+        public static GXUpdateArgs Update<T>(T value,
+            Expression<Func<T, object>>? columns,
+           Expression<Func<T, bool>>? where)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException("Invalid value");
+            }
+            if (value is IEnumerable)
+            {
+                throw new ArgumentException("Use UpdateRange to update a collection.");
+            }
+            if (value is GXTableBase tb)
+            {
+                tb.BeforeUpdate();
+            }
+            GXUpdateArgs args = new GXUpdateArgs();
+            args.Values.Add(new(value, columns));
+            if (where != null)
+            {
+                args.Where.Or(where);
+            }
+            return args;
+        }
+
         /// <summary>
         /// Create new update expression.
         /// </summary>
@@ -673,7 +701,7 @@ namespace Gurux.Service.Orm
         /// <remarks>
         /// If value is zero there are no limitations.
         /// </remarks>
-        public UInt32 Count
+        public long Count
         {
             get
             {

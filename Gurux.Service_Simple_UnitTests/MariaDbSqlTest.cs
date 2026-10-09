@@ -8,7 +8,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class MariaDbSqlTest : BaseTest
     {
-        public MariaDbSqlTest() : base(DatabaseType.MariaDB) { }
+        public MariaDbSqlTest() : base(DatabaseType.MariaDB)
+        {
+        }
 
         /// <inheritdoc/>
         [TestMethod]
@@ -440,6 +442,20 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Guid IN (X'00000000000000000000000000000000', X'00000000000000000000000000000000')")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Text IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
         }
 
         /// <summary>

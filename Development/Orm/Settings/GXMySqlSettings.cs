@@ -137,20 +137,75 @@ ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION", schema, tableName);
                 return "ALL PRIVILEGES";
             }
             var list = new List<string>();
-            if (value.HasFlag(DatabasePermission.Connect)) list.Add("CONNECT");
-            if (value.HasFlag(DatabasePermission.Create)) list.Add("CREATE");
-            if (value.HasFlag(DatabasePermission.Alter)) list.Add("ALTER");
-            if (value.HasFlag(DatabasePermission.Drop)) list.Add("DROP");
-            if (value.HasFlag(DatabasePermission.Insert)) list.Add("INSERT");
-            if (value.HasFlag(DatabasePermission.Update)) list.Add("UPDATE");
-            if (value.HasFlag(DatabasePermission.Delete)) list.Add("DELETE");
-            if (value.HasFlag(DatabasePermission.Select)) list.Add("SELECT");
-            if (value.HasFlag(DatabasePermission.Index)) list.Add("INDEX");
-            if (value.HasFlag(DatabasePermission.References)) list.Add("REFERENCES");
-            if (value.HasFlag(DatabasePermission.Execute)) list.Add("EXECUTE");
-            if (value.HasFlag(DatabasePermission.CreateView)) list.Add("CREATE VIEW");
-            if (value.HasFlag(DatabasePermission.CreateProcedure)) list.Add("CREATE ROUTINE");
-            if (value.HasFlag(DatabasePermission.CreateFunction)) list.Add("CREATE ROUTINE");
+            if (value.HasFlag(DatabasePermission.Connect))
+            {
+                list.Add("CONNECT");
+            }
+
+            if (value.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CREATE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Alter))
+            {
+                list.Add("ALTER");
+            }
+
+            if (value.HasFlag(DatabasePermission.Drop))
+            {
+                list.Add("DROP");
+            }
+
+            if (value.HasFlag(DatabasePermission.Insert))
+            {
+                list.Add("INSERT");
+            }
+
+            if (value.HasFlag(DatabasePermission.Update))
+            {
+                list.Add("UPDATE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Delete))
+            {
+                list.Add("DELETE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Select))
+            {
+                list.Add("SELECT");
+            }
+
+            if (value.HasFlag(DatabasePermission.Index))
+            {
+                list.Add("INDEX");
+            }
+
+            if (value.HasFlag(DatabasePermission.References))
+            {
+                list.Add("REFERENCES");
+            }
+
+            if (value.HasFlag(DatabasePermission.Execute))
+            {
+                list.Add("EXECUTE");
+            }
+
+            if (value.HasFlag(DatabasePermission.CreateView))
+            {
+                list.Add("CREATE VIEW");
+            }
+
+            if (value.HasFlag(DatabasePermission.CreateProcedure))
+            {
+                list.Add("CREATE ROUTINE");
+            }
+
+            if (value.HasFlag(DatabasePermission.CreateFunction))
+            {
+                list.Add("CREATE ROUTINE");
+            }
 
             if (!list.Any())
             {

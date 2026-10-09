@@ -76,7 +76,6 @@ namespace Gurux.Service.Orm
                 Joins != null ? Joins.GetItemHash() : 0);
             if (Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
-                Debug.WriteLine("Cache SQL: " + cached);
                 return cached!;
             }
             string sql = string.Empty;
@@ -93,7 +92,6 @@ namespace Gurux.Service.Orm
             if (sql != string.Empty)
             {
                 Parent.QueryCache.Set(cacheKey, sql, 0);
-                Debug.WriteLine("New SQL: " + sql);
             }
             return sql;
         }
@@ -183,6 +181,109 @@ namespace Gurux.Service.Orm
             List.Add(new(WhereType.Or, expression));
         }
 
+        private sealed class BooleanConstantSimplifier : ExpressionVisitor
+        {
+            protected override Expression VisitBinary(BinaryExpression node)
+            {
+                var visited = (BinaryExpression)base.VisitBinary(node);
+                if (visited.Type != typeof(bool))
+                {
+                    return visited;
+                }
+
+                bool and = visited.NodeType == ExpressionType.AndAlso || visited.NodeType == ExpressionType.And;
+                bool or = visited.NodeType == ExpressionType.OrElse || visited.NodeType == ExpressionType.Or;
+                if (!and && !or)
+                {
+                    return visited;
+                }
+
+                if (visited.Left is ConstantExpression { Value: bool left })
+                {
+                    return and ? left ? visited.Right : Expression.Constant(false)
+                    : left ? Expression.Constant(true) : visited.Right;
+                }
+
+                if (visited.Right is ConstantExpression { Value: bool right })
+                {
+                    return and ? right ? visited.Left : Expression.Constant(false)
+                    : right ? Expression.Constant(true) : visited.Left;
+                }
+
+                return visited;
+            }
+
+            protected override Expression VisitUnary(UnaryExpression node)
+            {
+                var visited = (UnaryExpression)base.VisitUnary(node);
+                return visited.Type == typeof(bool) && visited.NodeType == ExpressionType.Not && visited.Operand is ConstantExpression { Value: bool value }
+                    ? Expression.Constant(!value) : visited;
+            }
+        }
+
+        // SQL AND binds more tightly than OR. Simplify constants within each AND group,
+        // then combine the remaining groups without changing the original precedence.
+        private static List<KeyValuePair<WhereType, LambdaExpression>> NormalizeBooleanConstants(
+            List<KeyValuePair<WhereType, LambdaExpression>> list)
+        {
+            if (list.Count == 0)
+            {
+                return list;
+            }
+
+            var simplifier = new BooleanConstantSimplifier();
+            var normalized = new List<KeyValuePair<WhereType, LambdaExpression>>(list.Count);
+            bool hasConstant = false;
+            foreach (var item in list)
+            {
+                var body = simplifier.Visit(item.Value.Body)!;
+                var lambda = ReferenceEquals(body, item.Value.Body) ? item.Value : Expression.Lambda(body, item.Value.Parameters);
+                hasConstant |= body is ConstantExpression { Value: bool };
+                normalized.Add(new(item.Key, lambda));
+            }
+            if (!hasConstant)
+            {
+                return normalized;
+            }
+
+            var groups = new List<List<LambdaExpression>>();
+            foreach (var item in normalized)
+            {
+                if (groups.Count == 0 || item.Key == WhereType.Or)
+                {
+                    groups.Add(new());
+                }
+
+                groups[groups.Count - 1].Add(item.Value);
+            }
+            var result = new List<KeyValuePair<WhereType, LambdaExpression>>();
+            foreach (var group in groups)
+            {
+                if (group.Any(predicate => predicate.Body is ConstantExpression { Value: false }))
+                {
+                    continue;
+                }
+
+                var predicates = group.Where(predicate => predicate.Body is not ConstantExpression { Value: true }).ToArray();
+                // A true OR group makes the whole WHERE unconditional.
+                if (predicates.Length == 0)
+                {
+                    return new();
+                }
+
+                for (int index = 0; index != predicates.Length; ++index)
+                {
+                    result.Add(new(index == 0 && result.Count != 0 ? WhereType.Or : WhereType.And, predicates[index]));
+                }
+            }
+            if (result.Count == 0)
+            {
+                result.Add(new(WhereType.And, Expression.Lambda(Expression.Constant(false), list[0].Value.Parameters)));
+            }
+
+            return result;
+        }
+
         private static void WhereToString(GXGetMembersArgs args,
             List<KeyValuePair<WhereType, LambdaExpression>> list,
             bool singleTable)
@@ -191,6 +292,7 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("args.StringBuilder");
             }
+            list = NormalizeBooleanConstants(list);
             if (list.Count != 0)
             {
                 bool emptyId = false;
@@ -220,7 +322,15 @@ namespace Gurux.Service.Orm
                         }
                     }
                     args.Expression = it.Value;
-                    GXDbHelpers.GetMembers(args);
+                    if (it.Value.Body is ConstantExpression { Value: false })
+                    {
+                        args.StringBuilder.Append("1 = 0");
+                    }
+                    else
+                    {
+                        GXDbHelpers.GetMembers(args);
+                    }
+
                     if (args.StringBuilder.Length == 0)
                     {
                         first = emptyId = true;
@@ -233,7 +343,7 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static string LimitToString(GXDBSettings settings, UInt32 index, UInt32 count)
+        internal static string LimitToString(GXDBSettings settings, long index, long count)
         {
             StringBuilder sb;
             if ((index != 0 || count != 0))
@@ -285,7 +395,7 @@ namespace Gurux.Service.Orm
         /// <param name="filters">The object whose mapped values provide the filter.</param>
         public void FilterBy(IEnumerable<(GXColumnSchema Column, object? value)> filters)
         {
-            foreach(var it in filters)
+            foreach (var it in filters)
             {
                 if (it.value != null)
                 {

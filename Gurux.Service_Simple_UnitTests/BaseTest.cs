@@ -813,6 +813,31 @@ namespace Gurux.Service_Simple_Unit_Test
             AssertSqlEqual(expected, arg.ToString(false));
         }
 
+
+        /// <summary>
+        /// Select Guid where Guid array is given as parameter.
+        /// </summary>
+        [TestMethod]
+        public virtual void WhereGuidArrayTest(string expected)
+        {
+            Guid[] list = [Guid.Empty, Guid.Empty];
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid }, _cache);
+            arg.Where.And<TestClass>(q => list.Contains(q.Guid));
+            AssertSqlEqual(expected, arg.ToString(false));
+        }
+
+        /// <summary>
+        /// Select Guid where string array is given as parameter.
+        /// </summary>
+        [TestMethod]
+        public virtual void WhereStringArrayTest(string expected)
+        {
+            string[] list = ["Gurux", "Gurux"];
+            GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => new { x.Guid }, _cache);
+            arg.Where.And<TestClass>(q => list.Contains(q.Text));
+            AssertSqlEqual(expected, arg.ToString(false));
+        }
+
         /// <summary>
         /// Select Guid where ID = 1.
         /// </summary>
@@ -1659,17 +1684,9 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             [DataMember(Name = "ID")]
             [AutoIncrement]
-            public int Id
-            {
-                get;
-                set;
-            }
+            public int Id { get; set; }
 
-            public string CountryName
-            {
-                get;
-                set;
-            } = default!;
+            public string CountryName { get; set; } = default!;
         }
 
         /// <summary>
@@ -1692,22 +1709,10 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             [DataMember(Name = "ID")]
             [AutoIncrement]
-            public int Id
-            {
-                get;
-                set;
-            }
-            public string Name
-            {
-                get;
-                set;
-            } = default!;
+            public int Id { get; set; }
+            public string Name { get; set; } = default!;
 
-            public string CountryName
-            {
-                get;
-                set;
-            } = default!;
+            public string CountryName { get; set; } = default!;
         }
 
         /// <summary>
@@ -1730,22 +1735,10 @@ namespace Gurux.Service_Simple_Unit_Test
         {
             [DataMember(Name = "ID")]
             [AutoIncrement]
-            public int Id
-            {
-                get;
-                set;
-            }
-            public string CompanyName
-            {
-                get;
-                set;
-            } = default!;
+            public int Id { get; set; }
+            public string CompanyName { get; set; } = default!;
 
-            public string Name
-            {
-                get;
-                set;
-            } = default!;
+            public string Name { get; set; } = default!;
         }
 
         /// <summary>

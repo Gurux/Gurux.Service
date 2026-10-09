@@ -8,7 +8,9 @@ namespace Gurux.Service_Simple_Unit_Test
     [TestClass]
     public class MySqlTest : BaseTest
     {
-        public MySqlTest() : base(DatabaseType.MySQL) { }
+        public MySqlTest() : base(DatabaseType.MySQL)
+        {
+        }
 
         /// <inheritdoc/>
         [TestMethod]
@@ -252,7 +254,7 @@ namespace Gurux.Service_Simple_Unit_Test
             "550E8400-E29B-41D4-A716-446655440000",
             "6BA7B810-9DAD-11D1-80B4-00C04FD430C8"
             }, "DELETE FROM GuidTestClass WHERE Id IN({0}, {1})")]
-        public override void DeleteByGuidRangeTest(string [] guids, string expected)
+        public override void DeleteByGuidRangeTest(string[] guids, string expected)
         {
             base.DeleteByGuidRangeTest(guids, expected);
         }
@@ -439,6 +441,21 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void WhereClassArrayTest(string expected)
         {
             base.WhereClassArrayTest(expected);
+        }
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Text IN ('Gurux', 'Gurux')")]
+        public override void WhereStringArrayTest(string expected)
+        {
+            base.WhereStringArrayTest(expected);
+        }
+
+
+        [TestMethod]
+        [DataRow("SELECT Guid FROM TestClass WHERE Guid IN (X'00000000000000000000000000000000', X'00000000000000000000000000000000')")]
+        public override void WhereGuidArrayTest(string expected)
+        {
+            base.WhereGuidArrayTest(expected);
         }
 
         /// <summary>
@@ -968,7 +985,7 @@ namespace Gurux.Service_Simple_Unit_Test
         public override void EpochTimeFormatTest(string expected)
         {
             base.EpochTimeFormatTest(expected);
-        }      
+        }
 
         /// <summary>
         /// Update test.

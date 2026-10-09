@@ -67,7 +67,6 @@ namespace Gurux.Service.Orm
                 List);
             if (Parent.QueryCache.TryGet(cacheKey, out string? cached, out int generationTime))
             {
-                Debug.WriteLine("Cached SQL: " + cached);
                 return cached!;
             }
             string sql = HavingToString(Parent.Settings, List, !_joins.List.Any());
@@ -80,7 +79,6 @@ namespace Gurux.Service.Orm
                 if (!string.IsNullOrEmpty(sql))
                 {
                     Parent.QueryCache.Set(cacheKey, sql, 0);
-                    Debug.WriteLine("New SQL: " + sql);
                 }
             }
             return sql;

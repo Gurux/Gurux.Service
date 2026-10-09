@@ -189,18 +189,52 @@ ORDER BY rc.CONSTRAINT_NAME, rc.POSITION", schema, GetTableFilter(tableName, "rc
         private static string GetPermissions(DatabasePermission value)
         {
             if (value.HasFlag(DatabasePermission.Admin))
+            {
                 return "SELECT, INSERT, UPDATE, DELETE, CREATE ANY, DROP, ALTER, EXECUTE";
+            }
 
             var list = new List<string>();
 
-            if (value.HasFlag(DatabasePermission.Select)) list.Add("SELECT");
-            if (value.HasFlag(DatabasePermission.Insert)) list.Add("INSERT");
-            if (value.HasFlag(DatabasePermission.Update)) list.Add("UPDATE");
-            if (value.HasFlag(DatabasePermission.Delete)) list.Add("DELETE");
-            if (value.HasFlag(DatabasePermission.Execute)) list.Add("EXECUTE");
-            if (value.HasFlag(DatabasePermission.Create)) list.Add("CREATE ANY");
-            if (value.HasFlag(DatabasePermission.Alter)) list.Add("ALTER");
-            if (value.HasFlag(DatabasePermission.Drop)) list.Add("DROP");
+            if (value.HasFlag(DatabasePermission.Select))
+            {
+                list.Add("SELECT");
+            }
+
+            if (value.HasFlag(DatabasePermission.Insert))
+            {
+                list.Add("INSERT");
+            }
+
+            if (value.HasFlag(DatabasePermission.Update))
+            {
+                list.Add("UPDATE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Delete))
+            {
+                list.Add("DELETE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Execute))
+            {
+                list.Add("EXECUTE");
+            }
+
+            if (value.HasFlag(DatabasePermission.Create))
+            {
+                list.Add("CREATE ANY");
+            }
+
+            if (value.HasFlag(DatabasePermission.Alter))
+            {
+                list.Add("ALTER");
+            }
+
+            if (value.HasFlag(DatabasePermission.Drop))
+            {
+                list.Add("DROP");
+            }
+
             if (!list.Any())
             {
                 throw new ArgumentOutOfRangeException(nameof(value), "No valid permissions specified.");

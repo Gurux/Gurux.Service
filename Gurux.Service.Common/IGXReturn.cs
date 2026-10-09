@@ -47,6 +47,6 @@ namespace Gurux.Service.Orm.Common
     public interface IGXRequest<T> : IGXRequest
     {
 
-    }   
+    }
 
 }
