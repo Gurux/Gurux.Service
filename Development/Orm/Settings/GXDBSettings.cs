@@ -790,6 +790,8 @@ namespace Gurux.Service.Orm.Settings
             {
                 return null;
             }
+            if (value is string json && GXJsonCollection.IsCollection(type))
+                return GXJsonCollection.Decode(json, type);
             if (value is string str)
             {
                 if (type == typeof(Guid))
@@ -852,6 +854,14 @@ namespace Gurux.Service.Orm.Settings
         /// <returns>Converted string value.</returns>
         internal virtual string? ConvertToString(object value, ConvertOption options = ConvertOption.Quete)
         {
+            if (value is GXJsonCollection.Value collection)
+            {
+                // JSON contains its own escapes. Only MySQL string literals consume backslashes.
+                var json = collection.Json;
+                if (Type == DatabaseType.MySQL || Type == DatabaseType.MariaDB)
+                    json = json.Replace(@"\", @"\\");
+                return (options & ConvertOption.Quete) != 0 ? GetQuetedValue(json) : json;
+            }
             if (value is Guid id)
             {
                 return GetQuetedValue(id.ToString());

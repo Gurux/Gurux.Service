@@ -382,6 +382,7 @@ namespace Gurux.Service.Orm
 
         internal string GetDataBaseType(Type type, object target)
         {
+            if (GXJsonCollection.IsCollection(type)) type = typeof(string);
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
                 type = Nullable.GetUnderlyingType(type);
@@ -871,7 +872,7 @@ namespace Gurux.Service.Orm
                 value |= (int)Attributes.AllowNull;
             }
             else if ((value & (int)(Attributes.Id | Attributes.PrimaryKey)) == 0 &&
-                s.Type.IsClass)
+                (s.Type.IsClass || GXJsonCollection.IsCollection(s.Type)))
             {
                 //If value is nullable.
                 value |= (int)Attributes.AllowNull;

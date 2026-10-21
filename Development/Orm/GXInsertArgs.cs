@@ -448,6 +448,8 @@ namespace Gurux.Service.Orm
                             {
                                 value = a.ToString(false);
                             }
+                            if (a == null && p.Relation == null && GXJsonCollection.IsCollection(p.Type))
+                                value = GXJsonCollection.Encode(value, p.Type);
                             if (multipleRows || value != null)
                             {
                                 bool empty = false;

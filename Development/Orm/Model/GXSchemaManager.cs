@@ -2095,6 +2095,7 @@ namespace Gurux.Service.Orm.Model
         private Type GetColumnDataType(Type tableType, GXSerializedItem item)
         {
             Type valueType = item.Type;
+            if (item.Relation == null && GXJsonCollection.IsCollection(valueType)) return typeof(string);
             if (item.Relation != null &&
                 item.Relation.RelationType == RelationType.OneToOne &&
                 item.Relation.ForeignTable != tableType)

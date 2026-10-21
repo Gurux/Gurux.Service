@@ -230,6 +230,8 @@ namespace Gurux.Service.Orm
                             {
                                 value = a.ToString(false);
                             }
+                            if (a == null && p.Relation == null && GXJsonCollection.IsCollection(p.Type))
+                                value = GXJsonCollection.Encode(value, p.Type);
                             tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, name, null);
                             args.StringBuilder.Append(tmp);
                             args.StringBuilder.Append(" = ");

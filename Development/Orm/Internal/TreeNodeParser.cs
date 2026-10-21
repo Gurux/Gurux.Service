@@ -1,4 +1,4 @@
-﻿//
+//
 // --------------------------------------------------------------------------
 //  Gurux Ltd
 //
@@ -64,6 +64,12 @@ namespace Gurux.Service.Orm.Internal
             };
             foreach (var it in level.indexes)
             {
+                if (it.Value.Relation == null && GXJsonCollection.IsCollection(it.Value.Type))
+                {
+                    var stored = row[it.Key];
+                    it.Value.Set(node.Target, stored is null or DBNull ? null : settings.ChangeType(stored, it.Value.Type));
+                    continue;
+                }
                 if (GXInternal.IsGenericDataType(it.Value.Type))
                 {
                     object? value = row[it.Key];
