@@ -1053,6 +1053,11 @@ namespace Gurux.Service.Orm
                     //Generate new guid for primary key if it is not set and type is guid.
                     foreach (var it in collection)
                     {
+                        object? current = s.Value.Value.Get(it!);
+                        if (!GXDbHelpers.IsZero(current))
+                        {
+                            continue;
+                        }
                         Guid id = Guid.CreateVersion7();
                         if (s.Value.Value.Type == typeof(string))
                         {
