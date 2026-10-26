@@ -59,6 +59,7 @@ namespace Gurux.Service.Orm.Internal
         /// In that case list separator is used to separate column names and values.
         /// </summary>
         internal string ListSeparator = ", ";
+        internal bool AllowEmptyList;
         /// <summary>
         /// Keep list of amount of the operations.
         /// </summary>
@@ -200,6 +201,40 @@ namespace Gurux.Service.Orm.Internal
             args.StringBuilder = old;
             args.TargetType = type;
             return list;
+        }
+
+        private static void HandleCollectionContains(GXGetMembersArgs args, Expression value, Expression collection)
+        {
+            bool negated = args.UnaryExpression?.NodeType == ExpressionType.Not;
+            StringBuilder? output = args.StringBuilder;
+            bool allowEmptyList = args.AllowEmptyList;
+            StringBuilder members = new StringBuilder();
+            try
+            {
+                args.StringBuilder = members;
+                args.AllowEmptyList = true;
+                args.Expression = collection;
+                var values = GetMembers(args, TargetType.Value | TargetType.Plain);
+                if (values != null)
+                {
+                    members.Append(string.Join(args.ListSeparator, values));
+                }
+            }
+            finally
+            {
+                args.StringBuilder = output;
+                args.AllowEmptyList = allowEmptyList;
+            }
+            if (members.Length == 0)
+            {
+                args.Output.Append(negated ? "1 = 1" : "1 = 0");
+                return;
+            }
+            args.Expression = value;
+            GetMembers(args);
+            args.Output.Append(negated ? " NOT IN (" : " IN (");
+            args.Output.Append(members);
+            args.Output.Append(")");
         }
 
         internal static string[]? HandleMethod(GXGetMembersArgs args, TargetType targetType)
@@ -650,47 +685,14 @@ namespace Gurux.Service.Orm.Internal
                 (args.MethodCallExpression.Method.DeclaringType == typeof(Enumerable) ||
                 args.MethodCallExpression.Method.DeclaringType == typeof(System.MemoryExtensions)))
             {
-                var tmp = args.MethodCallExpression;
-                args.Expression = args.MethodCallExpression.Arguments[1];
-                GetMembers(args);
-                if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
-                {
-                    args.Output.Append(" NOT IN (");
-                }
-                else
-                {
-                    args.Output.Append(" IN (");
-                }
-                args.Expression = tmp.Arguments[0];
-                var values = GetMembers(args, TargetType.Value | TargetType.Plain);
-                if (values != null)
-                {
-                    args.Output.Append(string.Join(args.ListSeparator, values));
-                }
-                args.Output.Append(")");
+                HandleCollectionContains(args, args.MethodCallExpression.Arguments[1], args.MethodCallExpression.Arguments[0]);
                 return null;
             }
             if (typeof(IEnumerable).IsAssignableFrom(args.MethodCallExpression.Method.DeclaringType) &&
                 args.MethodCallExpression.Method.DeclaringType != typeof(string) &&
                 args.MethodCallExpression.Method.Name == "Contains")
             {
-                args.Expression = args.MethodCallExpression.Arguments[0];
-                GetMembers(args);
-                if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
-                {
-                    args.Output.Append(" NOT IN (");
-                }
-                else
-                {
-                    args.Output.Append(" IN (");
-                }
-                args.Expression = args.MethodCallExpression.Object;
-                var values = GetMembers(args, TargetType.Value | TargetType.Plain);
-                if (values != null)
-                {
-                    args.Output.Append(string.Join(args.ListSeparator, values));
-                }
-                args.Output.Append(")");
+                HandleCollectionContains(args, args.MethodCallExpression.Arguments[0], args.MethodCallExpression.Object!);
                 return null;
             }
             if (args.MethodCallExpression.Method.DeclaringType == typeof(string))
@@ -1408,7 +1410,7 @@ namespace Gurux.Service.Orm.Internal
                                     args.Output.Append(ConvertToString(args.Settings, (args.TargetType | TargetType.Value) & ~TargetType.Plain, null, it, null));
                                 }
                             }
-                            if (first && args.StringBuilder != null)
+                            if (first && args.StringBuilder != null && !args.AllowEmptyList)
                             {
                                 throw new ArgumentOutOfRangeException("List is empty.");
                             }

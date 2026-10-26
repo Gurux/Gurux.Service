@@ -1899,7 +1899,7 @@ namespace Gurux.Service.Orm.Model
                                     sb.Append("' ");
                                 }
                             }
-                            if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type &&
+                            if (it.Value.Relation != null &&
                                     it.Value.Relation.RelationType == RelationType.OneToOne)
                             {
                                 fkStr.Append(", ");
