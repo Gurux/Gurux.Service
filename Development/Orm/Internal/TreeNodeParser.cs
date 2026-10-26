@@ -78,7 +78,7 @@ namespace Gurux.Service.Orm.Internal
                         Type type = it.Value.Type;
                         if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
                         {
-                            type = Nullable.GetUnderlyingType(type);
+                            type = Nullable.GetUnderlyingType(type) ?? type;
                         }
                         value = settings.ChangeType(value, type);
                     }

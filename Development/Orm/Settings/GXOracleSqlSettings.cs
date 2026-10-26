@@ -83,7 +83,7 @@ ORDER BY child.CONSTRAINT_NAME, childColumn.POSITION";
         }
 
         /// <inheritdoc />
-        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        public override string GetDescriptionQuery(string schema, string tableName, string? columnName)
         {
             tableName = tableName.Replace("'", "''").ToUpperInvariant();
             if (string.IsNullOrEmpty(columnName))
@@ -105,7 +105,7 @@ ORDER BY child.CONSTRAINT_NAME, childColumn.POSITION";
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             comment = comment.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
@@ -475,7 +475,7 @@ WHERE OWNER = {owner} AND TABLE_NAME = UPPER('{tableName}') AND COLUMN_NAME = UP
         }
 
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -636,7 +636,7 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND UPPER(COLUMN_NAME) = '{c
 
         private int GetVersion()
         {
-            return int.Parse(this.ServerVersion.Substring(0, 2));
+            return int.Parse((ServerVersion ?? throw new InvalidOperationException("Server version is not available.")).Substring(0, 2));
         }
 
         /// <inheritdoc />
@@ -874,7 +874,7 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND UPPER(COLUMN_NAME) = '{c
 
 
         /// <inheritdoc/>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             if (type == typeof(Guid) && value is string str)
             {
@@ -911,7 +911,7 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND UPPER(COLUMN_NAME) = '{c
 
 
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             if (value is DateTime dt)
             {
@@ -996,7 +996,7 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND UPPER(COLUMN_NAME) = '{c
         }
 
         /// <inheritdoc/>
-        public override string OnUpdate(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyUpdate updateType)
+        public override string? OnUpdate(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyUpdate updateType)
         {
             return null;
         }

@@ -94,7 +94,7 @@ ORDER BY fk.name, fkc.constraint_column_id", schema, tableName.Replace("'", "''"
         }
 
         /// <inheritdoc />
-        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        public override string GetDescriptionQuery(string schema, string tableName, string? columnName)
         {
             tableName = tableName.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
@@ -115,7 +115,7 @@ ORDER BY fk.name, fkc.constraint_column_id", schema, tableName.Replace("'", "''"
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             comment = comment.Replace("'", "''");
             string query = $"EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'{comment}', @level0type=N'SCHEMA', @level0name=N'dbo', @level1type=N'TABLE', @level1name=N'{tableName}'";
@@ -512,7 +512,7 @@ END");
         }
 
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -850,7 +850,7 @@ END");
         /// </summary>
         private const string DateTimeFormat = "yyyy-MM-ddTHH:mm:ss";
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             if (value is DateTime dt)
             {
@@ -885,7 +885,7 @@ END");
         /// <param name="value">Value to be converted.</param>
         /// <param name="type">Target type.</param>
         /// <returns>Converted value.</returns>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             return base.ChangeType(value, type);
         }

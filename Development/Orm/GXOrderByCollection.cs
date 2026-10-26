@@ -101,6 +101,7 @@ namespace Gurux.Service.Orm
         /// <param name="sourceColumn">Columns order by.</param>
         /// <param name="joinList">Join list.</param>
         /// <param name="OrderList">Order list.</param>
+        /// <param name="descending">Optional ordering direction.</param>
         internal static void OrderBy(GXDBSettings settings, LambdaExpression sourceColumn,
             List<GXJoin> joinList,
             List<GXOrder> OrderList, bool? descending = null)
@@ -110,7 +111,7 @@ namespace Gurux.Service.Orm
                 SingleTable = !joinList.Any(),
                 Expression = sourceColumn.Body,
             };
-            string[] list = GXDbHelpers.GetMemberList(args);
+            string[] list = GXDbHelpers.GetMemberList(args) ?? throw new InvalidOperationException("Column expression did not identify any members.");
             foreach (string it in list)
             {
                 GXOrder o = new GXOrder();
@@ -128,20 +129,20 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static MemberExpression GetMemberExpression(Expression expression, out bool allowNull)
+        internal static MemberExpression GetMemberExpression(Expression? expression, out bool allowNull)
         {
-            if (expression is MemberExpression)
+            if (expression is MemberExpression me)
             {
-                MemberInfo m = (expression as MemberExpression).Member;
-                Type tp = (m as PropertyInfo).PropertyType;
+                MemberInfo m = me.Member;
+                Type tp = m is PropertyInfo property ? property.PropertyType : throw new ArgumentException("Join member must be a property.");
                 allowNull = tp.IsGenericType && tp.GetGenericTypeDefinition() == typeof(Nullable<>);
-                return (expression as MemberExpression);
+                return me;
             }
             if (expression is UnaryExpression ue)
             {
                 MemberExpression e = GetMemberExpression(ue.Operand, out allowNull);
                 //If value is nullable.
-                if (e.Expression.Type.IsGenericType && e.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                if (e.Expression != null && e.Expression.Type.IsGenericType && e.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
                 {
                     e = GetMemberExpression(e.Expression, out allowNull);
                     if (e.NodeType == ExpressionType.MemberAccess)
@@ -212,8 +213,12 @@ namespace Gurux.Service.Orm
             return null;
         }
 
-        internal static void UpdateJoins(GXDBSettings settings, GXJoinCollection list, List<GXJoin> joins)
+        internal static void UpdateJoins(GXDBSettings settings, GXJoinCollection? list, List<GXJoin> joins)
         {
+            if (list == null)
+            {
+                return;
+            }
             bool allowNull;
             MemberExpression me;
             foreach (var it in list.List)
@@ -237,14 +242,14 @@ namespace Gurux.Service.Orm
                     join.AllowNull2 = t.IsNullable;
                     join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, s.Name, null);
                     join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, t.Name, null);
-                    join.UpdateTables(settings, s.Parent, t.Parent);
+                    join.UpdateTables(settings, s.Parent ?? throw new InvalidOperationException("Source column has no table."), t.Parent ?? throw new InvalidOperationException("Destination column has no table."));
                     joins.Add(join);
                 }
                 else
                 {
                     me = GetMemberExpression(predicate.Left, out allowNull);
                     MemberInfo m = me.Member;
-                    Expression e = me.Expression;
+                    Expression e = me.Expression ?? throw new ArgumentException("Join member must have a target.");
                     join.Alias1 = GXDbHelpers.GetTableAlias(settings, e);
                     join.Column1 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
                     join.AllowNull1 = allowNull;
@@ -253,7 +258,7 @@ namespace Gurux.Service.Orm
                     m = rightMember.Member;
                     join.Column2 = GXDbHelpers.ConvertToString(settings, TargetType.Column | TargetType.Plain, null, m, null);
                     join.AllowNull2 = allowNull;
-                    join.UpdateTables(settings, e.Type, m.DeclaringType);
+                    join.UpdateTables(settings, e.Type, m.DeclaringType ?? throw new ArgumentException("Join member has no declaring type."));
                     joins.Add(join);
                 }
             }
@@ -276,7 +281,7 @@ namespace Gurux.Service.Orm
                     {
                         sb.Append(", ");
                     }
-                    string tableName = null;
+                    string? tableName = null;
                     if (joinList.Any())
                     {
                         tableName = it.Table.Name;
@@ -312,6 +317,9 @@ namespace Gurux.Service.Orm
             List.Add((expression, null));
         }
 
+        /// <summary>Add an ordering expression.</summary>
+        /// <param name="expression">The ordering expression.</param>
+        /// <param name="descending">Whether to sort descending.</param>
         public void Add(Expression expression, bool descending = false)
         {
             if (expression == null)
@@ -333,6 +341,8 @@ namespace Gurux.Service.Orm
 
             List.Add((expression, descending));
         }
+        /// <summary>Add ordering expressions and their directions.</summary>
+        /// <param name="columns">The expressions and directions.</param>
         public void AddRange(IEnumerable<(Expression Expression, bool Descending)> columns)
         {
             foreach (var column in columns)
@@ -350,7 +360,7 @@ namespace Gurux.Service.Orm
                 {
                     if (path.Count != 1 + index)
                     {
-                        found = Find((it.Value.Target as PropertyInfo).PropertyType, path, ++index);
+                        found = Find(((PropertyInfo)it.Value.Target).PropertyType, path, ++index);
                     }
                     else
                     {

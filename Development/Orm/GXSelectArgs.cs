@@ -116,7 +116,8 @@ namespace Gurux.Service.Orm
             string? post = null;
             sb.Append(Columns.ToString(ref post));
 
-            string str, where = Where.ToString();
+            string? str;
+            string where = Where.ToString();
             if (!string.IsNullOrEmpty(where))
             {
                 sb.Append(" ");
@@ -282,7 +283,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">Table type to select from.</typeparam>
         public static GXSelectArgs SelectAll<T>()
         {
-            return Select<T>((Expression<Func<T, object>>?)null, (Expression<Func<T, bool>>)null);
+            return Select<T>((Expression<Func<T, object>>?)null, (Expression<Func<T, bool>>?)null);
         }
 
         /// <summary>
@@ -292,7 +293,7 @@ namespace Gurux.Service.Orm
         /// <param name="queryCache">The query cache instance to use.</param>
         public static GXSelectArgs SelectAll<T>(GXQueryCache queryCache)
         {
-            return Select<T>((Expression<Func<T, object>>)null, (Expression<Func<T, bool>>)null, queryCache);
+            return Select<T>((Expression<Func<T, object>>?)null, (Expression<Func<T, bool>>?)null, queryCache);
         }
 
         /// <summary>
@@ -300,7 +301,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <typeparam name="T">Table type to select from.</typeparam>
         /// <param name="where">Filter expression.</param>
-        public static GXSelectArgs SelectAll<T>(Expression<Func<T, bool>> where)
+        public static GXSelectArgs SelectAll<T>(Expression<Func<T, bool>>? where)
         {
             return Select<T>(null, where);
         }
@@ -422,7 +423,7 @@ namespace Gurux.Service.Orm
         /// <param name="columns">Columns to select.</param>
         /// <param name="where">Filter expression.</param>
         public static GXSelectArgs Select<T>(Expression<Func<T, object>>? columns,
-            Expression<Func<T, bool>> where)
+            Expression<Func<T, bool>>? where)
         {
             return Select<T>(columns, where, null);
         }
@@ -435,7 +436,7 @@ namespace Gurux.Service.Orm
         /// <param name="where">Filter expression.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
         public static GXSelectArgs Select<T>(Expression<Func<T, object>>? columns,
-            Expression<Func<T, bool>>? where, GXQueryCache queryCache)
+            Expression<Func<T, bool>>? where, GXQueryCache? queryCache)
         {
             GXSelectArgs arg = new GXSelectArgs(queryCache);
             if (columns != null)
@@ -467,7 +468,7 @@ namespace Gurux.Service.Orm
         public static GXSelectArgs IsEmpty<T>(Expression<Func<T, bool>>? where,
             GXQueryCache? queryCache = null)
         {
-            return Select<T>(q => GXSql.IsEmpty(q), where, queryCache);
+            return Select<T>(q => GXSql.IsEmpty(q!), where, queryCache);
         }
 
         /// <summary>
@@ -683,8 +684,6 @@ namespace Gurux.Service.Orm
         /// Select specific columns from rows matching the where expression and use the query cache.
         /// </summary>
         /// <param name="columns">Columns to select.</param>
-        /// <param name="where">Filter expression.</param>
-        /// <param name="queryCache">The query cache instance to use.</param>
         public static GXSelectArgs Select<T>(IEnumerable<GXColumnSchema> columns)
         {
             ArgumentNullException.ThrowIfNull(columns);
@@ -699,6 +698,11 @@ namespace Gurux.Service.Orm
             return args;
         }
 
+        /// <summary>Select schema columns with an optional filter and query cache.</summary>
+        /// <param name="columns">Columns to select.</param>
+        /// <param name="where">Filter expression.</param>
+        /// <param name="queryCache">The query cache to use.</param>
+        /// <returns>The select arguments.</returns>
         public static GXSelectArgs Select(IEnumerable<GXColumnSchema> columns,
             Expression<Func<GXColumnSchema, bool>>? where = null, GXQueryCache? queryCache = null)
         {

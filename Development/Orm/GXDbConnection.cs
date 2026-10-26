@@ -209,14 +209,14 @@ namespace Gurux.Service.Orm
         /// <inheritdoc />
         public IDbTransaction BeginTransaction()
         {
-            IDbTransaction transaction = Connection.BeginTransaction();
+            IDbTransaction? transaction = Connection.BeginTransaction();
             return transaction;
         }
 
         /// <inheritdoc />
         public IDbTransaction BeginTransaction(System.Data.IsolationLevel isolationLevel)
         {
-            IDbTransaction transaction = Connection.BeginTransaction(isolationLevel);
+            IDbTransaction? transaction = Connection.BeginTransaction(isolationLevel);
             return transaction;
         }
 
@@ -812,7 +812,7 @@ namespace Gurux.Service.Orm
             bool tranactionOnProgress = transaction != null;
             if (tranactionOnProgress)
             {
-                connection = transaction?.Connection;
+                connection = transaction?.Connection ?? throw new InvalidOperationException("Transaction has no active connection.");
             }
             else
             {
@@ -914,7 +914,7 @@ namespace Gurux.Service.Orm
         /// Select item by Id.
         /// </summary>
         /// <param name="id">Item's ID.</param>
-        public T SelectById<T>(string id)
+        public T? SelectById<T>(string id)
         {
             return SelectById<T>(id, null);
         }
@@ -925,7 +925,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public T SelectById<T>(string id, Expression<Func<T, object>>? columns)
+        public T? SelectById<T>(string id, Expression<Func<T, object>>? columns)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
@@ -947,7 +947,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(string id, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(string id, CancellationToken cancellationToken = default)
         {
             return await SelectByIdAsync<T>(id, null, cancellationToken);
         }
@@ -959,7 +959,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(string id, Expression<Func<T, object>>? columns, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(string id, Expression<Func<T, object>>? columns, CancellationToken cancellationToken = default)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
@@ -975,7 +975,7 @@ namespace Gurux.Service.Orm
         /// Select item by Id.
         /// </summary>
         /// <param name="id">Item's ID.</param>
-        public T SelectById<T>(Guid id)
+        public T? SelectById<T>(Guid id)
         {
             return SelectById<T>(id, null);
         }
@@ -986,7 +986,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public T SelectById<T>(Guid id, Expression<Func<T, object>> columns)
+        public T? SelectById<T>(Guid id, Expression<Func<T, object>>? columns)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
@@ -1008,7 +1008,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(Guid id, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(Guid id, CancellationToken cancellationToken = default)
         {
             return await SelectByIdAsync<T>(id, null, cancellationToken);
         }
@@ -1020,7 +1020,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(Guid id, Expression<Func<T, object>> columns, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(Guid id, Expression<Func<T, object>>? columns, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return await Task.Run(() =>
@@ -1034,7 +1034,7 @@ namespace Gurux.Service.Orm
         /// Select item by Id.
         /// </summary>
         /// <param name="id">Item's ID.</param>
-        public T SelectById<T>(long id)
+        public T? SelectById<T>(long id)
         {
             return SelectById<T>(id, null);
         }
@@ -1045,7 +1045,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public T SelectById<T>(long id, Expression<Func<T, object>> columns)
+        public T? SelectById<T>(long id, Expression<Func<T, object>>? columns)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
@@ -1067,7 +1067,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public Task<T> SelectByIdAsync<T>(long id, CancellationToken cancellationToken = default)
+        public Task<T?> SelectByIdAsync<T>(long id, CancellationToken cancellationToken = default)
         {
             return SelectByIdAsync<T>(id, null, cancellationToken);
         }
@@ -1079,7 +1079,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(long id, Expression<Func<T, object>> columns, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(long id, Expression<Func<T, object>>? columns, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return await Task.Run(() =>
@@ -1092,7 +1092,7 @@ namespace Gurux.Service.Orm
         /// Select item by Id.
         /// </summary>
         /// <param name="id">Item's ID.</param>
-        public T SelectById<T>(UInt64 id)
+        public T? SelectById<T>(UInt64 id)
         {
             return SelectById<T>(id, null);
         }
@@ -1103,7 +1103,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public T SelectById<T>(UInt64 id, Expression<Func<T, object>> columns)
+        public T? SelectById<T>(UInt64 id, Expression<Func<T, object>>? columns)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T>(id, columns);
             args.Settings = Builder.Settings;
@@ -1125,7 +1125,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(UInt64 id, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(UInt64 id, CancellationToken cancellationToken = default)
         {
             return await SelectByIdAsync<T>(id, null, cancellationToken);
         }
@@ -1137,7 +1137,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        public async Task<T> SelectByIdAsync<T>(UInt64 id, Expression<Func<T, object>> columns, CancellationToken cancellationToken = default)
+        public async Task<T?> SelectByIdAsync<T>(UInt64 id, Expression<Func<T, object>>? columns, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return await Task.Run(() =>
@@ -1153,7 +1153,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="ID_TYPE">ID type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public T SelectById<T, ID_TYPE>(ID_TYPE id, Expression<Func<T, object>> columns)
+        public T? SelectById<T, ID_TYPE>(ID_TYPE id, Expression<Func<T, object>>? columns)
         {
             GXSelectArgs args = GXSelectArgs.SelectById<T, ID_TYPE>(id, columns);
             args.Settings = Builder.Settings;
@@ -1214,7 +1214,7 @@ namespace Gurux.Service.Orm
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of selected entities.</returns>
-        public List<T> Select<T>(GXSelectArgs arg, CancellationToken cancellationToken = default)
+        public List<T> Select<T>(GXSelectArgs? arg, CancellationToken cancellationToken = default)
         {
             return Select<T>(null, arg, cancellationToken);
         }
@@ -1273,7 +1273,7 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">Database transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>List of selected entities.</returns>
-        public async Task<List<T>> SelectAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
+        public async Task<List<T>> SelectAsync<T>(IDbTransaction? transaction, GXSelectArgs arg)
         {
             return await SelectAsync<T>(transaction, arg, CancellationToken.None);
         }
@@ -1288,7 +1288,7 @@ namespace Gurux.Service.Orm
         /// <returns>List of selected entities.</returns>
         public async Task<List<T>> SelectAsync<T>(
             IDbTransaction? transaction,
-            GXSelectArgs arg,
+            GXSelectArgs? arg,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1317,7 +1317,7 @@ namespace Gurux.Service.Orm
         /// <param name="arg">Selection arguments.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>List of selected entities.</returns>
-        public async Task<List<T>> SelectAsync<T>(GXSelectArgs arg, CancellationToken cancellationToken = default)
+        public async Task<List<T>> SelectAsync<T>(GXSelectArgs? arg, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return await Task.Run(() =>
@@ -1332,7 +1332,7 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
-        public T? SingleOrDefault<T>(IDbTransaction transaction, GXSelectArgs arg)
+        public T? SingleOrDefault<T>(IDbTransaction? transaction, GXSelectArgs arg)
         {
             List<T> list = Select<T>(transaction, arg);
             if (list.Count == 0)
@@ -1378,7 +1378,7 @@ namespace Gurux.Service.Orm
         /// <param name="cancellationToken">Cancellation token.</param>
         /// <returns>Database object.</returns>
         public async Task<T?> SingleOrDefaultAsync<T>(
-            GXSelectArgs arg,
+            GXSelectArgs? arg,
             CancellationToken cancellationToken = default)
         {
             return await SingleOrDefaultAsync<T>(null,
@@ -1391,7 +1391,7 @@ namespace Gurux.Service.Orm
         /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="arg">Selection arguments.</param>
         /// <returns>Database object.</returns>
-        public async Task<T?> SingleOrDefaultAsync<T>(IDbTransaction transaction, GXSelectArgs arg)
+        public async Task<T?> SingleOrDefaultAsync<T>(IDbTransaction? transaction, GXSelectArgs arg)
         {
             return await SingleOrDefaultAsync<T>(transaction, arg, CancellationToken.None);
         }
@@ -1405,7 +1405,7 @@ namespace Gurux.Service.Orm
         /// <returns>Database object.</returns>
         public async Task<T?> SingleOrDefaultAsync<T>(
             IDbTransaction? transaction,
-            GXSelectArgs arg,
+            GXSelectArgs? arg,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(arg);
@@ -1619,7 +1619,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="transaction">Transaction</param>
         /// <param name="arg">Update arguments.</param>
-        public Task<int> UpdateAsync(IDbTransaction transaction, GXUpdateArgs arg)
+        public Task<int> UpdateAsync(IDbTransaction? transaction, GXUpdateArgs arg)
         {
             return UpdateAsync(transaction, arg, CancellationToken.None);
         }

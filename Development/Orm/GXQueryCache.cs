@@ -50,7 +50,7 @@ namespace Gurux.Service.DB
             /// <param name="x">The first object to compare.</param>
             /// <param name="y">The second object to compare.</param>
             /// <returns>true if the objects are the same instance; otherwise, false.</returns>
-            public new bool Equals(object x, object y)
+            public new bool Equals(object? x, object? y)
             {
                 return ReferenceEquals(x, y);
             }
@@ -93,14 +93,14 @@ namespace Gurux.Service.DB
         /// Per-thread reusable StringBuilder to avoid allocations in BuildKey.
         /// </summary>
         [ThreadStatic]
-        private static StringBuilder _keyBuilder;
+        private static StringBuilder? _keyBuilder;
 
         /// <summary>
         /// Returns the thread-local StringBuilder, cleared and ready for use.
         /// </summary>
         private static StringBuilder AcquireBuilder()
         {
-            StringBuilder sb = _keyBuilder;
+            StringBuilder? sb = _keyBuilder;
             if (sb == null)
             {
                 sb = new StringBuilder(256);
@@ -275,7 +275,8 @@ namespace Gurux.Service.DB
             Items[key] = new GXCacheItem()
             {
                 Value = value,
-                Expires = DateTime.UtcNow.Add(CacheTime)
+                Expires = DateTime.UtcNow.Add(CacheTime),
+                GenerationTime = generationTime
             };
         }
 
@@ -312,7 +313,7 @@ namespace Gurux.Service.DB
         /// <summary>
         /// Computes a content-based hash code for the specified value without allocating a signature string.
         /// </summary>
-        internal int GetHash(object value)
+        internal int GetHash(object? value)
         {
             if (value == null)
             {
@@ -335,7 +336,7 @@ namespace Gurux.Service.DB
         /// Appends a unique signature for <paramref name="value"/> into <paramref name="sb"/>,
         /// reusing the same StringBuilder to avoid intermediate string allocations.
         /// </summary>
-        private void AppendSignature(StringBuilder sb, object value, HashSet<object> visited, int depth)
+        private void AppendSignature(StringBuilder sb, object? value, HashSet<object> visited, int depth)
         {
             if (value == null)
             {
@@ -515,7 +516,7 @@ namespace Gurux.Service.DB
             sb.Append('}');
         }
 
-        private void AppendExpressionValues(StringBuilder sb, Expression expression, HashSet<object> visited, int depth)
+        private void AppendExpressionValues(StringBuilder sb, Expression? expression, HashSet<object> visited, int depth)
         {
             if (expression == null || depth > 64)
             {
@@ -541,7 +542,7 @@ namespace Gurux.Service.DB
                     AppendExpressionValues(sb, member.Expression, visited, depth + 1);
                     if (member.Expression is ConstantExpression closure)
                     {
-                        object captured = null;
+                        object? captured = null;
                         if (member.Member is FieldInfo field)
                         {
                             captured = field.GetValue(closure.Value);

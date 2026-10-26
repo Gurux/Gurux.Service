@@ -89,7 +89,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// SQL server version. This is used to determine if some features are supported or not.
         /// </summary>
-        public string ServerVersion { get; internal set; }
+        public string? ServerVersion { get; internal set; }
 
         /// <summary>
         /// Maximum length of an index name.
@@ -160,7 +160,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="tableName">Table name.</param>
         /// <param name="columnName">Column name.</param>
         /// <returns>The SQL query that retrieves the table or column comment.</returns>
-        public abstract string GetDescriptionQuery(string schema, string tableName, string columnName);
+        public abstract string GetDescriptionQuery(string schema, string tableName, string? columnName);
 
         /// <summary>
         /// Get column order query for the column.
@@ -179,7 +179,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="columnName">Column name.</param>
         /// <param name="comment">Added comment.</param>
         /// <returns>Generated SQL query.</returns>
-        public abstract string GetCommentQuery(string schema, string tableName, string columnName, string comment);
+        public abstract string GetCommentQuery(string schema, string tableName, string? columnName, string comment);
 
 
         /// <summary>
@@ -503,7 +503,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="value">Default value.</param>
         /// <returns>String representation of the default value.</returns>
         /// <param name="columnType">CLR type of the column receiving the default value.</param>
-        public abstract string GetColumnDefaultValue(object value, Type columnType);
+        public abstract string? GetColumnDefaultValue(object value, Type columnType);
 
         /// <summary>
         /// Get column query.
@@ -969,7 +969,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// All DB's do not support ON DELETE by default.
         /// </summary>
-        public virtual string OnDelete(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyDelete deleteType)
+        public virtual string? OnDelete(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyDelete deleteType)
         {
             return null;
         }
@@ -977,7 +977,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// All DB's do not support ON UPDATE by default.
         /// </summary>
-        public virtual string OnUpdate(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyUpdate updateType)
+        public virtual string? OnUpdate(string primaryTable, string primaryColumn, string foreignTable, string foreignColumn, ForeignKeyUpdate updateType)
         {
             return null;
         }
@@ -995,7 +995,7 @@ namespace Gurux.Service.Orm.Settings
         /// <summary>
         /// All DB's do not support Auto Increment by default.
         /// </summary>
-        public virtual string[] DropAutoIncrement(string tableName, string columnName)
+        public virtual string[]? DropAutoIncrement(string tableName, string columnName)
         {
             return null;
         }

@@ -117,7 +117,7 @@ ORDER BY rc.CONSTRAINT_NAME, rc.POSITION", schema, GetTableFilter(tableName, "rc
         public override string GetDescriptionQuery(
             string schema,
             string tableName,
-            string columnName)
+            string? columnName)
         {
             schema = schema.Replace("'", "''");
             if (tableName.StartsWith("'"))
@@ -164,7 +164,7 @@ ORDER BY rc.CONSTRAINT_NAME, rc.POSITION", schema, GetTableFilter(tableName, "rc
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             tableName = tableName.ToUpperInvariant();
             comment = comment.Replace("'", "''");
@@ -451,7 +451,7 @@ FROM effective_privileges WHERE user_name = '{userName}' AND schema_name = '{dat
             return string.Format("SELECT DEFAULT_VALUE FROM TABLE_COLUMNS WHERE {1} AND UPPER(COLUMN_NAME) = '{2}'", schema, GetTableFilter(tableName), columnName.ToUpperInvariant());
         }
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -801,7 +801,7 @@ ORDER BY POSITION", GetTableFilter(name));
         /// </summary>
         private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             if (value is DateTime dt)
             {
@@ -845,7 +845,7 @@ ORDER BY POSITION", GetTableFilter(name));
         /// <param name="value">Value to be converted.</param>
         /// <param name="type">Target type.</param>
         /// <returns>Converted value.</returns>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             if (type == typeof(DateTimeOffset) && value is DateTime dt)
             {

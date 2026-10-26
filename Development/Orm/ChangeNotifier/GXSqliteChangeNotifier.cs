@@ -176,8 +176,8 @@ namespace Gurux.Service.Orm.Enums
         private async Task<long> GetDataVersionAsync(
             CancellationToken cancellationToken)
         {
-            return (long)GXSchemaManager.ExecuteScalarInternal(_connection.Connection,
-            null, "PRAGMA data_version", typeof(Int64));
+            return (long)(GXSchemaManager.ExecuteScalarInternal(_connection.Connection,
+            null, "PRAGMA data_version", typeof(Int64)) ?? throw new InvalidOperationException("SQLite did not return a data version."));
         }
 
         /// <inheritdoc/>

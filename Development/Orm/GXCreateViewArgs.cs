@@ -58,13 +58,15 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Constructor.
         /// </summary>
-        private GXCreateViewArgs()
+        private GXCreateViewArgs(GXSelectArgs select, Type viewType)
         {
+            Select = select;
+            type = viewType;
             Parent = new GXSettingsArgs();
             Maps = new GXMapCollection(Parent);
         }
 
-        private void UpdateMaps(GXDBSettings settings, GXMapCollection list, List<GXJoin> joins)
+        private void UpdateMaps(GXDBSettings settings, GXMapCollection list)
         {
             Select.Columns.Maps.Clear();
             foreach (BinaryExpression it in list.List)
@@ -74,9 +76,9 @@ namespace Gurux.Service.Orm
                 {
                     Expression = it.Left,
                 };
-                string[] target = GXDbHelpers.GetMembers(args);
+                string[] target = GXDbHelpers.GetMembers(args) ?? throw new InvalidOperationException("View target columns are missing.");
                 args.Expression = it.Right;
-                string[] source = GXDbHelpers.GetMembers(args);
+                string[] source = GXDbHelpers.GetMembers(args) ?? throw new InvalidOperationException("View source columns are missing.");
                 Select.Columns.Maps.Add(source[0], target[0]);
             }
         }
@@ -84,7 +86,7 @@ namespace Gurux.Service.Orm
         /// <inheritdoc/>
         public override string ToString()
         {
-            UpdateMaps(Settings, Maps, null);
+            UpdateMaps(Settings, Maps);
             GXGetMembersArgs args = new GXGetMembersArgs(Settings, TargetType.Table)
             {
                 StringBuilder = new StringBuilder()
@@ -128,9 +130,7 @@ namespace Gurux.Service.Orm
         /// <returns>GXCreateViewArgs instance.</returns>
         public static GXCreateViewArgs Create<T>(GXSelectArgs arg)
         {
-            GXCreateViewArgs view = new GXCreateViewArgs();
-            view.Select = arg;
-            view.type = typeof(T);
+            GXCreateViewArgs view = new GXCreateViewArgs(arg, typeof(T));
             if (arg.Parent.QueryCache != null)
             {
                 view.UseQueryCache(arg.Parent.QueryCache);

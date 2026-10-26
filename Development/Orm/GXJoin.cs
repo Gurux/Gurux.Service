@@ -72,30 +72,30 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Table 1 name.
         /// </summary>
-        public string Table1 { get; private set; }
+        public string Table1 { get; private set; } = string.Empty;
         /// <summary>
         /// Table 2 name.
         /// </summary>
-        public string Table2 { get; private set; }
+        public string Table2 { get; private set; } = string.Empty;
         /// <summary>
         /// Column 1 name.
         /// </summary>       
-        public string Column1;
+        public string Column1 = string.Empty;
 
         /// <summary>
         /// Column 2 name.
         /// </summary>        
-        public string Column2;
+        public string Column2 = string.Empty;
 
         /// <summary>
         /// Column 1 alias name.
         /// </summary>        
-        public string Alias1;
+        public string? Alias1;
 
         /// <summary>
         /// Column 2 alias name.
         /// </summary>        
-        public string Alias2;
+        public string? Alias2;
 
         /// <summary>
         /// Is null allowed in relation.
@@ -110,16 +110,16 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Table 1 name.
         /// </summary>
-        public System.Type Table1Type;
+        public System.Type? Table1Type;
         /// <summary>
         /// Table 2 name.
         /// </summary>
-        public System.Type Table2Type;
+        public System.Type? Table2Type;
 
         /// <summary>
         /// If we have multiple references to same table.
         /// </summary>
-        public int Index;
+        public int Index = 0;
 
         /// <inheritdoc/>
         public override string ToString()

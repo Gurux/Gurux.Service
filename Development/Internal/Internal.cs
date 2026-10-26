@@ -37,6 +37,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Serialization;
@@ -200,7 +201,7 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Filter value if given.
         /// </summary>
-        public object FilterValue = default!;
+        public object? FilterValue;
 
         /// <summary>
         /// Set method.
@@ -357,7 +358,8 @@ namespace Gurux.Common.Internal
 
         internal static GetHandler CreateGetHandler(Type type, PropertyInfo propertyInfo)
         {
-            MethodInfo getMethodInfo = propertyInfo.GetGetMethod(true);
+            MethodInfo getMethodInfo = propertyInfo.GetGetMethod(true)
+                ?? throw new ArgumentException("Property has no getter.", nameof(propertyInfo));
             DynamicMethod dynamicGet = CreateGetDynamicMethod(type);
             ILGenerator getGenerator = dynamicGet.GetILGenerator();
 
@@ -384,7 +386,8 @@ namespace Gurux.Common.Internal
 
         internal static SetHandler CreateSetHandler(Type type, PropertyInfo propertyInfo)
         {
-            MethodInfo setMethodInfo = propertyInfo.GetSetMethod(true);
+            MethodInfo setMethodInfo = propertyInfo.GetSetMethod(true)
+                ?? throw new ArgumentException("Property has no setter.", nameof(propertyInfo));
             DynamicMethod dynamicSet = CreateSetDynamicMethod(type);
             ILGenerator setGenerator = dynamicSet.GetILGenerator();
 
@@ -416,24 +419,11 @@ namespace Gurux.Common.Internal
         /// <typeparam name="T">The attribute type to retrieve.</typeparam>
         /// <param name="target">The reflected property or field to inspect for attributes.</param>
         /// <returns>The first matching attribute, or the default value when none is present.</returns>
-        static public T GetAttribute<T>(object target)
+        static public T? GetAttribute<T>(object target)
         {
-            T[] atts;
-            PropertyInfo pi = target as PropertyInfo;
-            if (pi != null)
-            {
-                atts = pi.GetCustomAttributes(typeof(T), true) as T[];
-            }
-            else
-            {
-                FieldInfo fi = target as FieldInfo;
-                atts = fi.GetCustomAttributes(typeof(T), true) as T[];
-            }
-            if (atts.Length == 0)
-            {
-                return default(T);
-            }
-            return atts[0];
+            var member = target as MemberInfo
+                ?? throw new ArgumentException("Target must be a reflected member.", nameof(target));
+            return member.GetCustomAttributes(typeof(T), true).OfType<T>().FirstOrDefault();
         }
 
         /// <summary>
@@ -442,14 +432,9 @@ namespace Gurux.Common.Internal
         /// <typeparam name="T">Target class type.</typeparam>
         /// <param name="type">Custom attribute type to search for.</param>
         /// <returns>Find custom attribute.</returns>
-        static public T GetAttribute<T>(Type type)
+        static public T? GetAttribute<T>(Type type)
         {
-            T[] atts = type.GetCustomAttributes(typeof(T), true) as T[];
-            if (atts.Length == 0)
-            {
-                return default(T);
-            }
-            return atts[0];
+            return type.GetCustomAttributes(typeof(T), true).OfType<T>().FirstOrDefault();
         }
 
 
@@ -460,8 +445,7 @@ namespace Gurux.Common.Internal
         /// <param name="target">Property what is get from the instance.</param>
         public static Tuple<GetHandler, SetHandler> GetHandlers(Type type, object target)
         {
-            PropertyInfo pi = target as PropertyInfo;
-            if (pi != null)
+            if (target is PropertyInfo pi)
             {
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
                 Tuple<GetHandler, SetHandler> handlers = _handlerCache.GetOrAdd(pi, p =>
@@ -472,7 +456,8 @@ namespace Gurux.Common.Internal
                 return pi.GetValue(instance, null);
 #endif
             }
-            FieldInfo fi = target as FieldInfo;
+            var fi = target as FieldInfo
+                ?? throw new ArgumentException("Target must be a property or field.", nameof(target));
 #if !NETSTANDARD2_0 && !NETSTANDARD2_1
             Tuple<GetHandler, SetHandler> handlers2 = _handlerCache.GetOrAdd(fi, f =>
                 new Tuple<GetHandler, SetHandler>(CreateGetHandler(type, fi),
@@ -540,7 +525,7 @@ namespace Gurux.Common.Internal
                         }
                         else
                         {
-                            name = attr[0].Name;
+                            name = attr[0].Name!;
                         }
                         if (attributeUpdater != null)
                         {
@@ -578,7 +563,7 @@ namespace Gurux.Common.Internal
                             }
                             else
                             {
-                                name = attr[0].Name;
+                                name = attr[0].Name!;
                             }
                             if (attributeUpdater != null)
                             {
@@ -625,7 +610,7 @@ namespace Gurux.Common.Internal
             };
         }
 
-        public static object ConvertListIfNeeded(object value, Type targetType)
+        public static object? ConvertListIfNeeded(object? value, Type targetType)
         {
             if (value == null)
             {
@@ -669,7 +654,7 @@ namespace Gurux.Common.Internal
             }
             if (target.IsArray)
             {
-                return target.GetElementType();
+                return target.GetElementType()!;
             }
             Type[] types = target.GetGenericArguments();
             if (types.Length == 0)
@@ -682,7 +667,7 @@ namespace Gurux.Common.Internal
                 {
                     return target;
                 }
-                return GetPropertyType(target.BaseType);
+                return target.BaseType == null ? target : GetPropertyType(target.BaseType);
             }
             if (types.Length == 1)
             {

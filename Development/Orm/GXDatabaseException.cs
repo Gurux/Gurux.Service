@@ -49,7 +49,7 @@ namespace Gurux.Service.Orm
         /// Executed SQL query that caused the exception. 
         /// This property may be null if the SQL query is not available or applicable to the exception.
         /// </summary>
-        public string Sql
+        public string? Sql
         {
             get; init;
         }
@@ -73,7 +73,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Gets the SQL state associated with the operation.
         /// </summary>
-        public string SqlState
+        public string? SqlState
         {
             get;
         }
@@ -103,9 +103,9 @@ namespace Gurux.Service.Orm
             string message,
             bool isTransient = false,
             int? errorCode = null,
-            string sqlState = null,
-            string sql = null,
-            Exception innerException = null)
+            string? sqlState = null,
+            string? sql = null,
+            Exception? innerException = null)
             : base(message, innerException)
         {
             ErrorType = errorType;
@@ -142,14 +142,14 @@ namespace Gurux.Service.Orm
         /// <returns>A GXDatabaseException representing the analyzed exception.</returns>
         public static GXDatabaseException Create(Exception ex, string sql)
         {
-            for (Exception current = ex; current != null; current = current.InnerException)
+            for (Exception? current = ex; current != null; current = current.InnerException)
             {
                 string typeName = current.GetType().FullName ?? "";
 
                 int? number = GetIntProperty(current, "Number") ??
                     GetIntProperty(current, "ErrorCode") ??
                     GetIntProperty(current, "Code");
-                string sqlState = GetStringProperty(current, "SqlState") ??
+                string? sqlState = GetStringProperty(current, "SqlState") ??
                     GetStringProperty(current, "SQLState");
                 string message = current.Message;
 
@@ -559,7 +559,7 @@ namespace Gurux.Service.Orm
         }
         private static int? GetIntProperty(object obj, string propertyName)
         {
-            object value = obj.GetType()
+            object? value = obj.GetType()
                 .GetProperty(propertyName)?
                 .GetValue(obj);
 
@@ -577,7 +577,7 @@ namespace Gurux.Service.Orm
             };
         }
 
-        private static string GetStringProperty(object obj, string propertyName)
+        private static string? GetStringProperty(object obj, string propertyName)
         {
             return obj.GetType()
                 .GetProperty(propertyName)?

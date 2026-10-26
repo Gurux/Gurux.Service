@@ -97,7 +97,7 @@ ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION", schema, tableName);
         }
 
         /// <inheritdoc />
-        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        public override string GetDescriptionQuery(string schema, string tableName, string? columnName)
         {
             schema = schema.Replace("'", "''");
             tableName = tableName.Replace("'", "''");
@@ -119,7 +119,7 @@ ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION", schema, tableName);
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             if (!string.IsNullOrEmpty(columnName))
             {
@@ -242,7 +242,7 @@ ORDER BY SCHEMA_NAME";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string database, string userName)
+        public override string GetDatabaseUserPermissionQuery(string? database, string userName)
         {
             if (userName.EndsWith("@%"))
             {
@@ -450,7 +450,7 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -776,7 +776,7 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc/>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             if (type == typeof(Guid) && value is string str)
             {
@@ -816,7 +816,7 @@ FLUSH PRIVILEGES;
                     return new DateTimeOffset(dt2, TimeSpan.Zero).ToLocalTime();
                 }
                 //MySQL doesn't support time zone so all values are saving using UTC time zone.
-                DateTimeOffset utc = (DateTimeOffset)Convert.ChangeType(value, type);
+                DateTimeOffset utc = (DateTimeOffset)(Convert.ChangeType(value, type) ?? throw new InvalidCastException("Cannot convert a null value to DateTimeOffset."));
                 return utc.ToLocalTime();
             }
             return base.ChangeType(value, type);
@@ -824,7 +824,7 @@ FLUSH PRIVILEGES;
 
 
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
             if (value is Guid id)

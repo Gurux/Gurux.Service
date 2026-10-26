@@ -37,11 +37,11 @@ namespace Gurux.Service.Orm.Internal
 {
     sealed class TreeNode
     {
-        public object Id
+        public required object Id
         {
             get; init;
         }
-        public object Target
+        public required object Target
         {
             get; init;
         }

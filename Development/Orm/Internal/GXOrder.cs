@@ -36,8 +36,20 @@ namespace Gurux.Service.Orm.Internal
 {
     internal class GXOrder
     {
-        public Type Table;
-        public string Column;
+        private Type? table;
+        private string? column;
+
+        public Type Table
+        {
+            get => table ?? throw new InvalidOperationException("Order table has not been initialized.");
+            set => table = value;
+        }
+
+        public string Column
+        {
+            get => column ?? throw new InvalidOperationException("Order column has not been initialized.");
+            set => column = value;
+        }
         public bool? Descending;
     }
 }

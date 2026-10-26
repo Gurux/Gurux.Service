@@ -196,18 +196,18 @@ namespace Gurux.Service.Orm
                 List<string>? excluded = null;
                 sql = Where.ToString();
                 string tmp;
-                foreach (KeyValuePair<object, LambdaExpression> it in Values)
+                foreach (KeyValuePair<object, LambdaExpression?> it in Values)
                 {
                     if (it.Key is GXSelectArgs)
                     {
                         //Get type.
-                        Type type = GXDbHelpers.GetType(it.Value);
+                        Type type = GXDbHelpers.GetType(it.Value ?? throw new InvalidOperationException("Update select columns are missing."));
                         table = type;
                     }
                     else if (it.Key is IEnumerable<GXColumnSchema> columns)
                     {
                         args.StringBuilder.Append("UPDATE ");
-                        args.StringBuilder.Append(columns.First().Parent.Name);
+                        args.StringBuilder.Append((columns.First().Parent ?? throw new InvalidOperationException("Column has no parent table.")).Name);
                         args.StringBuilder.Append(" SET ");
                         foreach (var c in columns)
                         {
@@ -301,7 +301,7 @@ namespace Gurux.Service.Orm
                                 {
                                     if (item != null)
                                     {
-                                        var s = GXSqlBuilder.FindUnique(item.GetType());
+                                        var s = GXSqlBuilder.FindUnique(item.GetType()) ?? throw new InvalidOperationException("Related item has no unique identifier.");
                                         var tmp3 = s.Get(item);
                                         if (!GXDbHelpers.IsZero(tmp3))
                                         {
@@ -463,7 +463,7 @@ namespace Gurux.Service.Orm
         /// <returns>Created update attribute.</returns>
         public static GXUpdateArgs Update<T>(T value)
         {
-            return Update<T>(value, (Expression<Func<T, object>>)null);
+            return Update<T>(value, (Expression<Func<T, object>>?)null);
         }
 
         /// <summary>
@@ -474,7 +474,7 @@ namespace Gurux.Service.Orm
         /// <returns>Created update attribute.</returns>
         public static GXUpdateArgs Update<T>(T value, GXQueryCache queryCache)
         {
-            return Update<T>(value, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
+            return Update<T>(value, (Expression<Func<T, object>>?)null).UseQueryCache(queryCache);
         }
 
         /// <summary>
@@ -677,7 +677,7 @@ namespace Gurux.Service.Orm
         /// <returns>Created update attribute.</returns>
         public static GXUpdateArgs UpdateRange<T>(IEnumerable<T> collection, GXQueryCache queryCache)
         {
-            return UpdateRange(collection, (Expression<Func<T, object>>)null).UseQueryCache(queryCache);
+            return UpdateRange(collection, (Expression<Func<T, object>>?)null).UseQueryCache(queryCache);
         }
 
         /// <summary>
@@ -696,7 +696,7 @@ namespace Gurux.Service.Orm
                 {
                     tb.BeforeUpdate();
                 }
-                args.Values.Add(new(it, columns));
+                args.Values.Add(new(it ?? throw new ArgumentNullException(nameof(collection)), columns));
             }
             return args;
         }
@@ -726,7 +726,7 @@ namespace Gurux.Service.Orm
             {
                 Values.Clear();
             }
-            Values.Add(new KeyValuePair<object, LambdaExpression>(value, columns));
+            Values.Add(new KeyValuePair<object, LambdaExpression?>(value ?? throw new ArgumentNullException(nameof(value)), columns));
         }
 
         /// <summary>

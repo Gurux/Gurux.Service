@@ -66,8 +66,8 @@ namespace Gurux.Service.Orm
             {
                 throw new ArgumentNullException("sourceColumn");
             }
-            Expression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
-            List.Add(t as BinaryExpression);
+            BinaryExpression t = Expression.Equal(destinationColumn.Body, sourceColumn.Body);
+            List.Add(t);
         }
     }
 }

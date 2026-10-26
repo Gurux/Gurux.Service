@@ -92,7 +92,7 @@ ORDER BY r.CONSTNAME, child.COLSEQ", schema, tableName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
-        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        public override string GetDescriptionQuery(string schema, string tableName, string? columnName)
         {
             if (string.IsNullOrEmpty(columnName))
             {
@@ -108,7 +108,7 @@ ORDER BY r.CONSTNAME, child.COLSEQ", schema, tableName.ToUpperInvariant());
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             comment = comment.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
@@ -397,7 +397,7 @@ ORDER BY PERMISSION;";
         }
 
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -751,7 +751,7 @@ ORDER BY PERMISSION;";
         /// </summary>
         private const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             if (value is Guid guid)
             {
@@ -795,7 +795,7 @@ ORDER BY PERMISSION;";
         /// <param name="value">Value to be converted.</param>
         /// <param name="type">Target type.</param>
         /// <returns>Converted value.</returns>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             if (type == typeof(Guid) && value is byte[] ba)
             {

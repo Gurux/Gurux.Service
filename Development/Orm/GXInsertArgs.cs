@@ -71,7 +71,7 @@ namespace Gurux.Service.Orm
         /// <remarks>
         /// This is used in update.
         /// </remarks>
-        public bool Inserted;
+        public bool Inserted = false;
 
         public GXUpdateItem()
         {
@@ -267,7 +267,7 @@ namespace Gurux.Service.Orm
                                 if (Parent.Settings.Type != DatabaseType.SapHana ||
                                     init)
                                 {
-                                    tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, columns.First().Parent.Name, null);
+                                    tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, (columns.First().Parent ?? throw new InvalidOperationException("Column has no parent table.")).Name, null);
                                     args.StringBuilder.Append(tmp);
                                     args.StringBuilder.Append(" (");
                                     foreach (var c in columns)
@@ -387,7 +387,7 @@ namespace Gurux.Service.Orm
                     {
                         members = properties.Keys.ToArray();
                     }
-                    foreach (var name in members)
+                    foreach (var name in members ?? throw new InvalidOperationException("Insert columns are missing."))
                     {
                         object? value;
                         var p = properties != null ? properties[name] : null;
@@ -477,7 +477,7 @@ namespace Gurux.Service.Orm
                                     {
                                         if (item != null)
                                         {
-                                            var s = GXSqlBuilder.FindUnique(item.GetType());
+                                            var s = GXSqlBuilder.FindUnique(item.GetType()) ?? throw new InvalidOperationException("Related item has no unique identifier.");
                                             var tmp3 = s.Get(item);
                                             if (!GXDbHelpers.IsZero(tmp3))
                                             {
@@ -506,7 +506,7 @@ namespace Gurux.Service.Orm
                                     {
                                         //If we have already added a select statement, we don't need to add another one.
                                         select = true;
-                                        tmp = (string)value;
+                                        tmp = value as string ?? throw new InvalidOperationException("Select expression did not produce SQL.");
                                         //Remove "SELECT " from the beginning of the string.
                                         tmp = tmp.Substring(6).Trim();
                                         if (values.Length != 0)
@@ -665,7 +665,7 @@ namespace Gurux.Service.Orm
                 Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(typeof(T));
                 if (!properties.Any())
                 {
-                    List<object> list = [value as IEnumerable];
+                    List<object?> list = [value as IEnumerable];
                     var body = Expression.NewArrayInit(
                         typeof(object),
                         list.Select(x =>
@@ -1173,24 +1173,26 @@ namespace Gurux.Service.Orm
             }
             Type itemType = typeof(TItem);
             Type collectionType = typeof(TDestination);
-            GXSerializedItem si = GXSqlBuilder.FindRelation(itemType, collectionType);
+            GXSerializedItem si = GXSqlBuilder.FindRelation(itemType, collectionType) ?? throw new ArgumentException("Invalid collection relation.");
             if (si.Relation == null || si.Relation.RelationMapTable == null)
             {
                 throw new ArgumentNullException("Invalid collection");
             }
             GXInsertArgs args = new GXInsertArgs();
-            GXSerializedItem siItem = GXSqlBuilder.FindRelation(collectionType, itemType);
+            var map = si.Relation.RelationMapTable.Relation ?? throw new ArgumentException("Invalid collection relation.");
+            GXSerializedItem siItem = GXSqlBuilder.FindRelation(collectionType, itemType) ?? throw new ArgumentException("Invalid item relation.");
+            var itemMap = siItem.Relation?.RelationMapTable?.Relation ?? throw new ArgumentException("Invalid item relation.");
             foreach (TDestination c in collections)
             {
                 //Get collection id.
-                collectionId = si.Relation.RelationMapTable.Relation.ForeignId.Get(c!);
+                collectionId = map.ForeignId.Get(c ?? throw new ArgumentNullException(nameof(collections)));
                 foreach (TItem it in items)
                 {
-                    object target = GXInternal.CreateClass(si.Relation.RelationMapTable.Relation.PrimaryTable);
-                    si.Relation.RelationMapTable.Relation.PrimaryId.Set(target, collectionId);
+                    object target = GXInternal.CreateClass((si.Relation.RelationMapTable.Relation ?? throw new ArgumentException("Invalid collection relation.")).PrimaryTable);
+                    map.PrimaryId.Set(target, collectionId);
                     //Get item id.
-                    id = siItem.Relation.RelationMapTable.Relation.ForeignId.Get(it!);
-                    siItem.Relation.RelationMapTable.Relation.PrimaryId.Set(target, id);
+                    id = itemMap.ForeignId.Get(it ?? throw new ArgumentNullException(nameof(items)));
+                    itemMap.PrimaryId.Set(target, id);
                     args.Values.Add(new KeyValuePair<object?, LambdaExpression?>(target, null));
                 }
             }
@@ -1216,7 +1218,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="TDestination">Type of the destination item.</typeparam>
         /// <param name="item">Source item.</param>
         /// <param name="collection">Destination item to disassociate.</param>
-        public static GXInsertArgs Remove<TItem, TDestination>(TItem item, TDestination collection)
+        public static GXInsertArgs? Remove<TItem, TDestination>(TItem item, TDestination collection)
         {
             return null;
         }

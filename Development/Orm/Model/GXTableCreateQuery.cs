@@ -38,7 +38,7 @@ namespace Gurux.Service.Orm.Model
 {
     class GXTableCreateQuery
     {
-        public Type Table;
+        public required Type Table;
         /// <summary>
         /// List of queries to execute.
         /// </summary>
@@ -51,7 +51,7 @@ namespace Gurux.Service.Orm.Model
         /// <inheritdoc/>
         public override string ToString()
         {
-            string str = null;
+            string? str = null;
             foreach (var it in Dependencies)
             {
                 str += GXDbHelpers.ConvertToString(null, TargetType.Table, null, it.Table.GetProperty("Name"), null) + ", ";

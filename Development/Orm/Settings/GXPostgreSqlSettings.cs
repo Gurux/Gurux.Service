@@ -114,7 +114,7 @@ ORDER BY tc.constraint_name, kcu.ordinal_position", schema, GetTableFilter(table
         }
 
         /// <inheritdoc />
-        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        public override string GetDescriptionQuery(string schema, string tableName, string? columnName)
         {
             tableName = tableName.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
@@ -136,7 +136,7 @@ ORDER BY tc.constraint_name, kcu.ordinal_position", schema, GetTableFilter(table
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             comment = comment.Replace("'", "''");
             if (string.IsNullOrEmpty(columnName))
@@ -393,7 +393,7 @@ END FROM information_schema.columns WHERE {1} AND column_name = '{2}'", schema, 
         }
 
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -719,7 +719,7 @@ END FROM information_schema.columns WHERE {1} AND column_name = '{2}'", schema, 
         private readonly DateTime MaxValue = new DateTime(9999, 12, 31, 23, 59, 59, 000, DateTimeKind.Utc);
 
         /// <inheritdoc/>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             if (type == typeof(DateTime) && value is DateTime dt2)
             {
@@ -749,7 +749,7 @@ END FROM information_schema.columns WHERE {1} AND column_name = '{2}'", schema, 
         }
 
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
             if (value is Guid id)

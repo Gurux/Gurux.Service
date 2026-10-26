@@ -70,12 +70,15 @@ namespace Gurux.Service.Orm.Internal
         /// </summary>
         internal bool SingleTable;
 
-        internal UnaryExpression UnaryExpression;
-        internal MethodCallExpression MethodCallExpression;
+        internal UnaryExpression? UnaryExpression;
+        internal MethodCallExpression? MethodCallExpression;
         /// <summary>
         /// Generated SQL query is stored in this string builder.
         /// </summary>
         internal StringBuilder? StringBuilder;
+
+        internal StringBuilder Output => StringBuilder ??
+            throw new InvalidOperationException("This expression requires a SQL output builder.");
 
         public GXGetMembersArgs(GXDBSettings settings, TargetType targetType)
         {
@@ -89,7 +92,7 @@ namespace Gurux.Service.Orm.Internal
             {
                 return StringBuilder.ToString();
             }
-            return base.ToString();
+            return base.ToString() ?? string.Empty;
         }
     }
 
@@ -132,13 +135,13 @@ namespace Gurux.Service.Orm.Internal
             DataContractAttribute[] attr = (DataContractAttribute[])type.GetCustomAttributes(typeof(DataContractAttribute), true);
             if (attr.Length == 0 || attr[0].Name == null)
             {
-                if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
+                if (type.BaseType != null && type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0)
                 {
                     return OriginalTableName(type.BaseType);
                 }
                 return type.Name;
             }
-            return attr[0].Name;
+            return attr[0].Name!;
         }
 
         internal static bool IsAliasName(Type type)
@@ -148,18 +151,18 @@ namespace Gurux.Service.Orm.Internal
 
         internal static bool IsSharedTable(Type type)
         {
-            return type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0;
+            return type.BaseType != null && type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Length != 0;
         }
 
-        internal static string GetMemberStringValue(GXGetMembersArgs args)
+        internal static string? GetMemberStringValue(GXGetMembersArgs args)
         {
             var old = args.StringBuilder;
             args.StringBuilder = new StringBuilder();
             GetMembers(args, TargetType.Value);
-            string tmp = null;
-            if (args.StringBuilder.Length != 0)
+            string? tmp = null;
+            if (args.Output.Length != 0)
             {
-                tmp = args.StringBuilder.ToString();
+                tmp = args.Output.ToString();
             }
             args.StringBuilder = old;
             return tmp;
@@ -199,7 +202,7 @@ namespace Gurux.Service.Orm.Internal
             return list;
         }
 
-        internal static string[] HandleMethod(GXGetMembersArgs args, TargetType targetType)
+        internal static string[]? HandleMethod(GXGetMembersArgs args, TargetType targetType)
         {
             var old = args.TargetType;
             args.TargetType = targetType;
@@ -215,6 +218,10 @@ namespace Gurux.Service.Orm.Internal
 
         internal static string[]? HandleMethod(GXGetMembersArgs args)
         {
+            if (args.MethodCallExpression == null)
+            {
+                throw new ArgumentException("The method call expression cannot be null.", nameof(args));
+            }
             var metadata = GXOrderByCollection.GetSchemaJoinColumn(args.Settings, args.MethodCallExpression);
             if (metadata.HasValue)
             {
@@ -226,10 +233,10 @@ namespace Gurux.Service.Orm.Internal
                     return [sql];
                 }
 
-                args.StringBuilder.Append(sql);
+                args.Output.Append(sql);
                 return null;
             }
-            if (args.MethodCallExpression.Method.DeclaringType.IsGenericType &&
+            if (args.MethodCallExpression.Method.DeclaringType?.IsGenericType == true &&
                 args.MethodCallExpression.Method.DeclaringType.GetGenericTypeDefinition() == typeof(ReadOnlySpan<>))
             {
                 args.Expression = args.MethodCallExpression.Arguments[0];
@@ -239,7 +246,7 @@ namespace Gurux.Service.Orm.Internal
             {
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.Count))
                 {
-                    string value = null;
+                    string? value = null;
                     if (args.MethodCallExpression.Arguments[0].NodeType != ExpressionType.Parameter)
                     {
                         args.Expression = args.MethodCallExpression.Arguments[0];
@@ -251,7 +258,7 @@ namespace Gurux.Service.Orm.Internal
                         {
                             return ["COUNT(1)"];
                         }
-                        args.StringBuilder.Append("COUNT(1)");
+                        args.Output.Append("COUNT(1)");
                     }
                     else
                     {
@@ -259,13 +266,13 @@ namespace Gurux.Service.Orm.Internal
                         {
                             return ["COUNT(" + value + ")"];
                         }
-                        args.StringBuilder.Append("COUNT(" + value + ")");
+                        args.Output.Append("COUNT(" + value + ")");
                     }
                     return null;
                 }
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.DistinctCount))
                 {
-                    string value = null;
+                    string? value = null;
                     if (args.MethodCallExpression.Arguments[0].NodeType != ExpressionType.Parameter)
                     {
                         args.Expression = args.MethodCallExpression.Arguments[0];
@@ -283,15 +290,15 @@ namespace Gurux.Service.Orm.Internal
                     GetMembers(args);
                     if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
                     {
-                        args.StringBuilder.Append(" NOT IN (");
+                        args.Output.Append(" NOT IN (");
                     }
                     else
                     {
-                        args.StringBuilder.Append(" IN (");
+                        args.Output.Append(" IN (");
                     }
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args, TargetType.Value);
-                    args.StringBuilder.Append(")");
+                    args.Output.Append(")");
                     return null;
                 }
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.Exists))
@@ -301,31 +308,31 @@ namespace Gurux.Service.Orm.Internal
                         var mc = args.MethodCallExpression;
                         if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
                         {
-                            args.StringBuilder.Append("NOT EXISTS (");
+                            args.Output.Append("NOT EXISTS (");
                         }
                         else
                         {
-                            args.StringBuilder.Append("EXISTS (");
+                            args.Output.Append("EXISTS (");
                         }
                         args.Expression = mc.Arguments[2];
                         bool old = args.SingleTable;
                         args.SingleTable = false;
-                        string query = GetMemberStringValue(args);
-                        args.StringBuilder.Append(query);
+                        string query = GetMemberStringValue(args) ?? throw new ArgumentException("The query expression cannot be empty.");
+                        args.Output.Append(query);
                         if (query.IndexOf("WHERE") == -1)
                         {
-                            args.StringBuilder.Append(" WHERE ");
+                            args.Output.Append(" WHERE ");
                         }
                         else
                         {
-                            args.StringBuilder.Append(" AND ");
+                            args.Output.Append(" AND ");
                         }
                         args.Expression = mc.Arguments[1];
                         GetMembers(args);
-                        args.StringBuilder.Append(" = ");
+                        args.Output.Append(" = ");
                         args.Expression = mc.Arguments[0];
                         GetMembers(args);
-                        args.StringBuilder.Append(")");
+                        args.Output.Append(")");
                         args.SingleTable = old;
                         return null;
                     }
@@ -333,15 +340,15 @@ namespace Gurux.Service.Orm.Internal
                     {
                         if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
                         {
-                            args.StringBuilder.Append("NOT EXISTS (");
+                            args.Output.Append("NOT EXISTS (");
                         }
                         else
                         {
-                            args.StringBuilder.Append("EXISTS (");
+                            args.Output.Append("EXISTS (");
                         }
                         args.Expression = args.MethodCallExpression.Arguments[0];
                         GetMembers(args, TargetType.Value);
-                        args.StringBuilder.Append(")");
+                        args.Output.Append(")");
                         return null;
                     }
                     else
@@ -363,12 +370,12 @@ namespace Gurux.Service.Orm.Internal
                             var a = args.MethodCallExpression.Arguments;
                             args.Expression = a[0];
                             GetMembers(args, TargetType.Value);
-                            args.StringBuilder.Append(" AS ");
+                            args.Output.Append(" AS ");
                             args.Expression = a[1];
                             GetMembers(args, TargetType.Value | TargetType.Plain);
                             if (empty)
                             {
-                                return [args.StringBuilder.ToString()];
+                                return [args.Output.ToString()];
                             }
                         }
                         finally
@@ -396,13 +403,13 @@ namespace Gurux.Service.Orm.Internal
                         }
                         try
                         {
-                            args.StringBuilder!.Append("(");
+                            args.Output.Append("(");
                             args.Expression = args.MethodCallExpression.Arguments[0];
                             GetMembers(args, TargetType.Value);
-                            args.StringBuilder.Append(")");
+                            args.Output.Append(")");
                             if (empty)
                             {
-                                return [args.StringBuilder.ToString()];
+                                return [args.Output.ToString()];
                             }
                         }
                         finally
@@ -430,13 +437,13 @@ namespace Gurux.Service.Orm.Internal
                         }
                         try
                         {
-                            args.StringBuilder!.Append("(");
+                            args.Output.Append("(");
                             args.Expression = args.MethodCallExpression.Arguments[0];
                             GetMembers(args, TargetType.Value);
-                            args.StringBuilder.Append(")");
+                            args.Output.Append(")");
                             if (empty)
                             {
-                                return [args.StringBuilder.ToString()];
+                                return [args.Output.ToString()];
                             }
                         }
                         finally
@@ -492,16 +499,16 @@ namespace Gurux.Service.Orm.Internal
                             return [sql];
                         }
 
-                        args.StringBuilder.Append(sql);
+                        args.Output.Append(sql);
                         return null;
                     }
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder!.Append(" LIKE('%");
+                    args.Output.Append(" LIKE('%");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     args.TargetType |= TargetType.Plain;
                     GetMembers(args);
-                    args.StringBuilder.Append("%')");
+                    args.Output.Append("%')");
                     return null;
                 }
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.IsEmpty))
@@ -536,18 +543,18 @@ namespace Gurux.Service.Orm.Internal
                     {
                         args.StringBuilder = new StringBuilder();
                     }
-                    args.StringBuilder.Append("ROW_NUMBER() OVER (");
+                    args.Output.Append("ROW_NUMBER() OVER (");
                     foreach (var arg in a)
                     {
                         args.Expression = arg;
                         GetMembers(args);
                     }
-                    args.StringBuilder.Append(")");
-                    return [args.StringBuilder.ToString()];
+                    args.Output.Append(")");
+                    return [args.Output.ToString()];
                 }
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.PartitionBy))
                 {
-                    args.StringBuilder.Append("PARTITION BY ");
+                    args.Output.Append("PARTITION BY ");
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
                     return null;
@@ -561,14 +568,14 @@ namespace Gurux.Service.Orm.Internal
                     if (!args.OperationCount.ContainsKey(nameof(GXSql.OrderBy)))
                     {
                         args.OperationCount[nameof(GXSql.OrderBy)] = 0;
-                        args.StringBuilder!.Append(" ORDER BY ");
+                        args.Output.Append(" ORDER BY ");
                     }
                     foreach (var arg in args.MethodCallExpression.Arguments)
                     {
                         args.Expression = arg;
                         GetMembers(args);
                     }
-                    args.StringBuilder.Append(" ASC");
+                    args.Output.Append(" ASC");
                     return null;
                 }
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.OrderByDescending))
@@ -580,21 +587,21 @@ namespace Gurux.Service.Orm.Internal
                     if (!args.OperationCount.ContainsKey(nameof(GXSql.OrderBy)))
                     {
                         args.OperationCount[nameof(GXSql.OrderBy)] = 0;
-                        args.StringBuilder!.Append(" ORDER BY ");
+                        args.Output.Append(" ORDER BY ");
                     }
                     foreach (var arg in args.MethodCallExpression.Arguments)
                     {
                         args.Expression = arg;
                         GetMembers(args);
                     }
-                    args.StringBuilder.Append(" DESC");
+                    args.Output.Append(" DESC");
                     return null;
                 }
                 if (args.MethodCallExpression.Method.Name == nameof(GXSql.Greater))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder.Append(" > ");
+                    args.Output.Append(" > ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
                     return null;
@@ -603,7 +610,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder.Append(" < ");
+                    args.Output.Append(" < ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
                     return null;
@@ -612,7 +619,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder.Append(" >= ");
+                    args.Output.Append(" >= ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
                     return null;
@@ -621,7 +628,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder.Append(" <= ");
+                    args.Output.Append(" <= ");
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
                     return null;
@@ -630,13 +637,13 @@ namespace Gurux.Service.Orm.Internal
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
                     GetMembers(args);
-                    args.StringBuilder.Append(" IS NULL");
+                    args.Output.Append(" IS NULL");
                 }
                 if (args.MethodCallExpression.Method.Name == "NotNull")
                 {
                     args.Expression = args.MethodCallExpression.Arguments[1];
                     GetMembers(args);
-                    args.StringBuilder.Append(" IS NOT NULL");
+                    args.Output.Append(" IS NOT NULL");
                 }
             }
             if (args.MethodCallExpression.Method.Name == "Contains" &&
@@ -648,19 +655,19 @@ namespace Gurux.Service.Orm.Internal
                 GetMembers(args);
                 if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
                 {
-                    args.StringBuilder.Append(" NOT IN (");
+                    args.Output.Append(" NOT IN (");
                 }
                 else
                 {
-                    args.StringBuilder.Append(" IN (");
+                    args.Output.Append(" IN (");
                 }
                 args.Expression = tmp.Arguments[0];
                 var values = GetMembers(args, TargetType.Value | TargetType.Plain);
                 if (values != null)
                 {
-                    args.StringBuilder.Append(string.Join(args.ListSeparator, values));
+                    args.Output.Append(string.Join(args.ListSeparator, values));
                 }
-                args.StringBuilder.Append(")");
+                args.Output.Append(")");
                 return null;
             }
             if (typeof(IEnumerable).IsAssignableFrom(args.MethodCallExpression.Method.DeclaringType) &&
@@ -671,19 +678,19 @@ namespace Gurux.Service.Orm.Internal
                 GetMembers(args);
                 if (args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not)
                 {
-                    args.StringBuilder.Append(" NOT IN (");
+                    args.Output.Append(" NOT IN (");
                 }
                 else
                 {
-                    args.StringBuilder.Append(" IN (");
+                    args.Output.Append(" IN (");
                 }
                 args.Expression = args.MethodCallExpression.Object;
                 var values = GetMembers(args, TargetType.Value | TargetType.Plain);
                 if (values != null)
                 {
-                    args.StringBuilder.Append(string.Join(args.ListSeparator, values));
+                    args.Output.Append(string.Join(args.ListSeparator, values));
                 }
-                args.StringBuilder.Append(")");
+                args.Output.Append(")");
                 return null;
             }
             if (args.MethodCallExpression.Method.DeclaringType == typeof(string))
@@ -708,12 +715,12 @@ namespace Gurux.Service.Orm.Internal
                 if (mce.Method.DeclaringType == typeof(string))
                 {
                     args.Expression = args.MethodCallExpression.Arguments[0];
-                    string tmp = GetMemberStringValue(args);
+                    string? tmp = GetMemberStringValue(args);
                     if (tmp == null)
                     {
                         args.Expression = args.MethodCallExpression.Object;
                         GetMembers(args);
-                        args.StringBuilder.Append(" IS NULL");
+                        args.Output.Append(" IS NULL");
                         return null;
                     }
                     tmp = tmp.ToUpper();
@@ -721,10 +728,10 @@ namespace Gurux.Service.Orm.Internal
                     {
                         tmp = "'" + tmp + "'";
                     }
-                    args.StringBuilder.Append("UPPER(");
+                    args.Output.Append("UPPER(");
                     args.Expression = args.MethodCallExpression.Object;
                     GetMembers(args);
-                    args.StringBuilder.Append(") LIKE(" + tmp + ")");
+                    args.Output.Append(") LIKE(" + tmp + ")");
                     return null;
                 }
                 else
@@ -732,22 +739,22 @@ namespace Gurux.Service.Orm.Internal
                     args.Expression = mce.Object;
                     GetMembers(args, TargetType.Column);
                     args.Expression = mce.Arguments[0];
-                    string value = GetMemberStringValue(args);
+                    string? value = GetMemberStringValue(args);
                     bool not = args.UnaryExpression != null && args.UnaryExpression.NodeType == ExpressionType.Not;
                     if (value == "NULL")
                     {
                         if (not)
                         {
-                            args.StringBuilder.Append(" IS NOT NULL");
+                            args.Output.Append(" IS NOT NULL");
                         }
                         else
                         {
-                            args.StringBuilder.Append(" IS NULL");
+                            args.Output.Append(" IS NULL");
                         }
                         return null;
                     }
-                    args.StringBuilder.Append(" = ");
-                    args.StringBuilder.Append(value);
+                    args.Output.Append(" = ");
+                    args.Output.Append(value);
                     return null;
                 }
             }
@@ -779,11 +786,11 @@ namespace Gurux.Service.Orm.Internal
                 args.UnaryExpression = null;
                 if (args.Settings.Type == DatabaseType.Oracle)
                 {
-                    args.StringBuilder.Append("(" + stripped + (negated ? " IS NOT NULL)" : " IS NULL)"));
+                    args.Output.Append("(" + stripped + (negated ? " IS NOT NULL)" : " IS NULL)"));
                 }
                 else
                 {
-                    args.StringBuilder.Append(negated
+                    args.Output.Append(negated
                         ? "(" + column + " IS NOT NULL AND " + stripped + " <> '')"
                         : "(" + column + " IS NULL OR " + stripped + " = '')");
                 }
@@ -794,28 +801,28 @@ namespace Gurux.Service.Orm.Internal
                 var mce = args.MethodCallExpression;
                 args.Expression = mce.Arguments[0];
                 GetMembers(args);
-                string sql = args.StringBuilder.ToString();
-                args.StringBuilder.Length = 0;
+                string sql = args.Output.ToString();
+                args.Output.Length = 0;
                 if (args.Settings.Type == DatabaseType.Oracle)
                 {
                     if (args.UnaryExpression?.NodeType == ExpressionType.Not)
                     {
-                        args.StringBuilder.Append(sql + " IS NOT NULL");
+                        args.Output.Append(sql + " IS NOT NULL");
                     }
                     else
                     {
-                        args.StringBuilder.Append(sql + " IS NULL");
+                        args.Output.Append(sql + " IS NULL");
                     }
                 }
                 else
                 {
                     if (args.UnaryExpression?.NodeType == ExpressionType.Not)
                     {
-                        args.StringBuilder.Append("(" + sql + " IS NOT NULL AND " + sql + " <> '')");
+                        args.Output.Append("(" + sql + " IS NOT NULL AND " + sql + " <> '')");
                     }
                     else
                     {
-                        args.StringBuilder.Append("(" + sql + " IS NULL OR " + sql + " = '')");
+                        args.Output.Append("(" + sql + " IS NULL OR " + sql + " = '')");
                     }
                 }
                 return null;
@@ -827,35 +834,35 @@ namespace Gurux.Service.Orm.Internal
             {
                 return HandleOperation(args, args.MethodCallExpression.Method.Name.ToUpper());
             }
-            object value22 = Expression.Lambda(args.MethodCallExpression).Compile().DynamicInvoke();
+            object? value22 = Expression.Lambda(args.MethodCallExpression).Compile().DynamicInvoke();
             if (value22 is GXColumnSchema cs)
             {
                 string? name = args.Settings.ConvertToString(cs.Name, ConvertOption.None);
                 if (args.StringBuilder != null)
                 {
-                    args.StringBuilder.Append(name);
+                    args.Output.Append(name);
                 }
-                return [name];
+                return [name ?? string.Empty];
             }
-            return [args.Settings.ConvertToString(value22, ConvertOption.None)];
+            return [args.Settings.ConvertToString(value22, ConvertOption.None) ?? string.Empty];
         }
 
-        private static string[] HandleMethod(GXGetMembersArgs args, MethodCallExpression mce,
+        private static string[]? HandleMethod(GXGetMembersArgs args, MethodCallExpression mce,
             string pre,
             string post)
         {
             args.Expression = mce.Object;
             GetMembers(args);
-            args.StringBuilder.Append(pre);
+            args.Output.Append(pre);
             args.Expression = mce.Arguments[0];
             GetMembers(args, TargetType.Value | TargetType.Plain);
-            args.StringBuilder.Append(post);
+            args.Output.Append(post);
             return null;
         }
 
         private static string[] HandleOperation(GXGetMembersArgs args, string operation)
         {
-            args.Expression = args.MethodCallExpression.Arguments[0];
+            args.Expression = (args.MethodCallExpression ?? throw new ArgumentException("The method call expression cannot be null.", nameof(args))).Arguments[0];
             bool empty = args.StringBuilder is null;
             if (empty)
             {
@@ -863,14 +870,14 @@ namespace Gurux.Service.Orm.Internal
             }
             try
             {
-                args.StringBuilder!.Append(operation);
-                args.StringBuilder.Append('(');
+                args.Output.Append(operation);
+                args.Output.Append('(');
                 var listSeparator = args.ListSeparator;
                 args.ListSeparator = " + ";
                 GetMembers(args);
                 args.ListSeparator = listSeparator;
-                args.StringBuilder.Append(")");
-                return [args.StringBuilder.ToString()];
+                args.Output.Append(")");
+                return [args.Output.ToString()];
             }
             finally
             {
@@ -881,7 +888,7 @@ namespace Gurux.Service.Orm.Internal
             }
         }
 
-        internal static string[] GetMembers(GXGetMembersArgs args, TargetType targetType)
+        internal static string[]? GetMembers(GXGetMembersArgs args, TargetType targetType)
         {
             TargetType old = args.TargetType;
             args.TargetType = targetType;
@@ -897,7 +904,7 @@ namespace Gurux.Service.Orm.Internal
 
         internal static string GetTableName(GXDBSettings settings, Type type, bool plain)
         {
-            if (type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Any())
+            if (type.BaseType != null && type.BaseType != typeof(object) && type.BaseType.GetCustomAttributes(typeof(DataContractAttribute), true).Any())
             {
                 return GetTableName(settings, type.BaseType, plain);
             }
@@ -912,9 +919,9 @@ namespace Gurux.Service.Orm.Internal
             }
             if (plain)
             {
-                return settings?.TablePrefix + attr[0].Name;
+                return settings.TablePrefix + attr[0].Name;
             }
-            return settings.EscapeIdentifier(settings.TablePrefix, attr[0].Name);
+            return settings.EscapeIdentifier(settings.TablePrefix, attr[0].Name!);
         }
 
         internal static string GetColumnName(GXDBSettings settings, MemberInfo info)
@@ -932,12 +939,12 @@ namespace Gurux.Service.Orm.Internal
             return settings.EscapeIdentifier(null, name);
         }
 
-        internal static string ConvertToString(GXGetMembersArgs args, object value)
+        internal static string ConvertToString(GXGetMembersArgs args, object? value)
         {
             return ConvertToString(args.Settings, args.TargetType, null, value, null);
         }
 
-        internal static string ConvertToString(GXDBSettings settings,
+        internal static string ConvertToString(GXDBSettings? settings,
             TargetType targetType,
             string? tableName,
             object? value,
@@ -954,6 +961,7 @@ namespace Gurux.Service.Orm.Internal
             }
             if ((targetType & TargetType.Value) != 0)
             {
+                ArgumentNullException.ThrowIfNull(settings);
                 if (settings.UseEpochTimeFormat)
                 {
                     if (value is DateTime dt)
@@ -974,7 +982,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     options |= ConvertOption.Seconds;
                 }
-                return settings.ConvertToString(value, options);
+                return settings.ConvertToString(value, options) ?? string.Empty;
             }
             if ((targetType & TargetType.Column) != 0)
             {
@@ -1013,7 +1021,7 @@ namespace Gurux.Service.Orm.Internal
                             if (maps.TryGetValue(name, out var mappedName))
                             {
                                 name = tableName + "." + ConvertToString(settings, TargetType.Column, null, cn, maps);
-                                return name + " AS " + AddQuotes(ConvertToString(settings, targetType | TargetType.Plain, null, mappedName, null), null, settings.ColumnNameQuoteCharacter);
+                                return name + " AS " + AddQuotes(ConvertToString(settings, targetType | TargetType.Plain, null, mappedName, null), null, settings?.ColumnNameQuoteCharacter ?? '\0');
                                 ;
                             }
                             name = tableName + "." + cn;
@@ -1025,7 +1033,8 @@ namespace Gurux.Service.Orm.Internal
                 }
                 else if (value is Type type)
                 {
-                    string name = null;
+                    ArgumentNullException.ThrowIfNull(settings);
+                    string? name = null;
                     if (type.IsClass)
                     {
                         if (IsAliasName(type))
@@ -1053,7 +1062,7 @@ namespace Gurux.Service.Orm.Internal
                 }
                 else if (value is MemberExpression memberExpression)
                 {
-                    if (memberExpression.Member.DeclaringType.IsClass)
+                    if (memberExpression.Member.DeclaringType?.IsClass == true)
                     {
                         return ConvertToString(settings, targetType, tableName, memberExpression.Member, maps);
                     }
@@ -1069,7 +1078,7 @@ namespace Gurux.Service.Orm.Internal
                     }
                     else
                     {
-                        name = attr[0].Name;
+                        name = attr[0].Name!;
                     }
                     return ConvertToString(settings, targetType, tableName, name, maps);
                 }
@@ -1094,6 +1103,7 @@ namespace Gurux.Service.Orm.Internal
                 }
                 if (value is Type tableType)
                 {
+                    ArgumentNullException.ThrowIfNull(settings);
                     return GetTableName(settings, tableType, plain);
                 }
             }
@@ -1192,7 +1202,7 @@ namespace Gurux.Service.Orm.Internal
             if (args.Expression is MemberExpression memberExpression)
             {
                 // Reference type property or field
-                Expression e = memberExpression.Expression!;
+                Expression? e = memberExpression.Expression;
                 string? tableAlias = GetTableAlias(args.Settings, e);
                 if (tableAlias != null)
                 {
@@ -1200,7 +1210,7 @@ namespace Gurux.Service.Orm.Internal
                     string column = ConvertToString(args.Settings, TargetType.Column, table, memberExpression.Member, null);
                     if (args.StringBuilder != null)
                     {
-                        args.StringBuilder.Append(column);
+                        args.Output.Append(column);
                         return null;
                     }
                     return [column];
@@ -1216,7 +1226,7 @@ namespace Gurux.Service.Orm.Internal
                     var lambda = Expression.Lambda<Func<object>>(member);
                     var getter = lambda.Compile();
                     object value = getter();
-                    args.StringBuilder!.Append(args.Settings.ConvertToString(value, ConvertOption.Quete));
+                    args.Output.Append(args.Settings.ConvertToString(value, ConvertOption.Quete));
                     return null;
                 }
                 //Get member name.
@@ -1244,12 +1254,12 @@ namespace Gurux.Service.Orm.Internal
                     {
                         return [name];
                     }
-                    args.StringBuilder.Append(name);
+                    args.Output.Append(name);
                     if (args.TargetType == TargetType.Where && memberExpression.Type == typeof(bool))
                     {
                         //If this is a boolean property, add " = 1" to the where clause.
-                        args.StringBuilder.Append(" = ");
-                        args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Value, tableName, true, null));
+                        args.Output.Append(" = ");
+                        args.Output.Append(ConvertToString(args.Settings, TargetType.Value, tableName, true, null));
                     }
                     return null;
                 }
@@ -1276,7 +1286,7 @@ namespace Gurux.Service.Orm.Internal
                     {
                         StringBuilder sb = new StringBuilder();
                         bool first = true;
-                        foreach (object it in value as IEnumerable)
+                        foreach (object? it in (IEnumerable)value)
                         {
                             if (first)
                             {
@@ -1292,13 +1302,13 @@ namespace Gurux.Service.Orm.Internal
                     }
                     else if (value is PropertyInfo p)
                     {
-                        string tableName = null;
+                        string? tableName = null;
                         if (!args.SingleTable)
                         {
                             tableName = ConvertToString(args.Settings, TargetType.Table, null, p.DeclaringType, null);
                         }
                         //In where get table type and column name.
-                        if (p.DeclaringType.IsClass)
+                        if (p.DeclaringType?.IsClass == true)
                         {
                             if (IsAliasName(p.DeclaringType))
                             {
@@ -1309,19 +1319,19 @@ namespace Gurux.Service.Orm.Internal
                         string name = ConvertToString(args.Settings, TargetType.Column, tableName, value, null);
                         if (args.StringBuilder != null)
                         {
-                            args.StringBuilder.Append(name);
+                            args.Output.Append(name);
                             return null;
                         }
                         return [name];
                     }
                     if (value != null && value.GetType().IsClass)
                     {
-                        GXSerializedItem si = GXSqlBuilder.FindUnique(value.GetType());
+                        GXSerializedItem? si = GXSqlBuilder.FindUnique(value.GetType());
                         if (si != null && si.Target is PropertyInfo p)
                         {
                             value = si.Target;
                             //In where get table type and column name.
-                            if (args.TargetType != TargetType.Column && p.DeclaringType.IsClass)
+                            if (args.TargetType != TargetType.Column && p.DeclaringType?.IsClass == true)
                             {
                                 if (IsAliasName(p.DeclaringType))
                                 {
@@ -1333,7 +1343,7 @@ namespace Gurux.Service.Orm.Internal
                             return [ConvertToString(args.Settings, TargetType.Column, null, value, null)];
                         }
                     }
-                    args.StringBuilder.Append(ConvertToString(args.Settings, args.TargetType | TargetType.Value, null, value, null));
+                    args.Output.Append(ConvertToString(args.Settings, args.TargetType | TargetType.Value, null, value, null));
                     return null;
                 }
                 if (e.NodeType == ExpressionType.Call)
@@ -1343,11 +1353,12 @@ namespace Gurux.Service.Orm.Internal
                 if (memberExpression.NodeType == ExpressionType.MemberAccess && e.NodeType == ExpressionType.Constant)
                 {
                     bool first = true;
-                    object value;
+                    object? value;
                     var target = Expression.Lambda(args.Expression).Compile().DynamicInvoke();
                     if (target == null)
                     {
-                        return [null];
+                        // A null entry represents a captured null value to existing callers.
+                        return [null!];
                     }
                     if (target is GXColumnSchema cs)
                     {
@@ -1362,11 +1373,11 @@ namespace Gurux.Service.Orm.Internal
                         {
                             ((GXSelectArgs)target).Settings = args.Settings;
                         }
-                        string tableName = null;
+                        string? tableName = null;
                         string tmp = ConvertToString(args.Settings, args.TargetType, tableName, target, null);
                         if (args.StringBuilder != null)
                         {
-                            args.StringBuilder.Append(tmp);
+                            args.Output.Append(tmp);
                         }
                         return [tmp];
                     }
@@ -1392,9 +1403,9 @@ namespace Gurux.Service.Orm.Internal
                                     }
                                     else
                                     {
-                                        args.StringBuilder.Append(args.ListSeparator);
+                                        args.Output.Append(args.ListSeparator);
                                     }
-                                    args.StringBuilder.Append(ConvertToString(args.Settings, (args.TargetType | TargetType.Value) & ~TargetType.Plain, null, it, null));
+                                    args.Output.Append(ConvertToString(args.Settings, (args.TargetType | TargetType.Value) & ~TargetType.Plain, null, it, null));
                                 }
                             }
                             if (first && args.StringBuilder != null)
@@ -1418,9 +1429,9 @@ namespace Gurux.Service.Orm.Internal
                             {
                                 if ((args.TargetType & TargetType.Plain) == 0)
                                 {
-                                    string tableName = null;
-                                    args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, tableName, it.Value.Target, null));
-                                    args.StringBuilder.Append(" IN(");
+                                    string? tableName = null;
+                                    args.Output.Append(ConvertToString(args.Settings, TargetType.Column, tableName, it.Value.Target, null));
+                                    args.Output.Append(" IN(");
                                 }
                                 first = true;
                                 foreach (var e2 in list)
@@ -1432,13 +1443,13 @@ namespace Gurux.Service.Orm.Internal
                                     }
                                     else
                                     {
-                                        args.StringBuilder.Append(args.ListSeparator);
+                                        args.Output.Append(args.ListSeparator);
                                     }
-                                    args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Value, null, value, null));
+                                    args.Output.Append(ConvertToString(args.Settings, TargetType.Value, null, value, null));
                                 }
                                 if ((args.TargetType & TargetType.Plain) == 0)
                                 {
-                                    args.StringBuilder.Append(")");
+                                    args.Output.Append(")");
                                 }
                                 return null;
                             }
@@ -1448,13 +1459,13 @@ namespace Gurux.Service.Orm.Internal
                             {
                                 if (it.Value.Target is PropertyInfo pi)
                                 {
-                                    string tableName = null;
+                                    string? tableName = null;
                                     if (args.TargetType != TargetType.Value)
                                     {
-                                        args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, tableName, pi, null));
-                                        args.StringBuilder.Append(" = ");
+                                        args.Output.Append(ConvertToString(args.Settings, TargetType.Column, tableName, pi, null));
+                                        args.Output.Append(" = ");
                                     }
-                                    args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Value, null, value, null));
+                                    args.Output.Append(ConvertToString(args.Settings, TargetType.Value, null, value, null));
                                 }
                                 else
                                 {
@@ -1464,7 +1475,7 @@ namespace Gurux.Service.Orm.Internal
                             else if (args.StringBuilder?.Length == 1)
                             {
                                 //Remove ) from the string.
-                                --args.StringBuilder.Length;
+                                --args.Output.Length;
                             }
                             return null;
                         }
@@ -1483,21 +1494,21 @@ namespace Gurux.Service.Orm.Internal
                             }
                             else
                             {
-                                args.StringBuilder.Append(args.ListSeparator);
+                                args.Output.Append(args.ListSeparator);
                             }
                             if (!args.SingleTable)
                             {
                                 //Get table name.
-                                args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Table, null, it.Parent!.Name, null));
-                                args.StringBuilder.Append('.');
+                                args.Output.Append(ConvertToString(args.Settings, TargetType.Table, null, it.Parent!.Name, null));
+                                args.Output.Append('.');
                             }
-                            args.StringBuilder.Append(ConvertToString(args.Settings, TargetType.Column, null, it.Name, null));
+                            args.Output.Append(ConvertToString(args.Settings, TargetType.Column, null, it.Name, null));
                         }
                         return null;
                     }
                     //If primary key is not used.
                     //If collection
-                    if (target is IEnumerable)
+                    if (target is IEnumerable enumerable)
                     {
                         Type itemType = GXInternal.GetPropertyType(target.GetType());
                         StringBuilder? sb = args.StringBuilder;
@@ -1510,7 +1521,7 @@ namespace Gurux.Service.Orm.Internal
                             sb.Append('(');
                         }
                         bool firstRow = true;
-                        IEnumerator e2 = (target as IEnumerable).GetEnumerator();
+                        IEnumerator e2 = enumerable.GetEnumerator();
                         while (e2.MoveNext())
                         {
                             if (firstRow)
@@ -1555,7 +1566,7 @@ namespace Gurux.Service.Orm.Internal
                         }
                         return null;
                     }
-                    args.StringBuilder.Append('(');
+                    args.Output.Append('(');
                     foreach (var it in GXSqlBuilder.GetProperties(target.GetType()))
                     {
                         value = it.Value.Get(target);
@@ -1565,21 +1576,21 @@ namespace Gurux.Service.Orm.Internal
                         }
                         else
                         {
-                            args.StringBuilder.Append(" AND ");
+                            args.Output.Append(" AND ");
                         }
                         if (value == null && args.TargetType == TargetType.Where)
                         {
-                            args.StringBuilder.Append(it.Key);
-                            args.StringBuilder.Append(" IS NULL ");
+                            args.Output.Append(it.Key);
+                            args.Output.Append(" IS NULL ");
                         }
                         else
                         {
-                            args.StringBuilder.Append(it.Key);
-                            args.StringBuilder.Append(" = ");
-                            args.StringBuilder.Append(args.Settings.ConvertToString(value));
+                            args.Output.Append(it.Key);
+                            args.Output.Append(" = ");
+                            args.Output.Append(args.Settings.ConvertToString(value));
                         }
                     }
-                    args.StringBuilder.Append(')');
+                    args.Output.Append(')');
                     return null;
                 }
                 throw new Exception("Invalid expression.");
@@ -1600,8 +1611,8 @@ namespace Gurux.Service.Orm.Internal
                     args.MethodCallExpression = methodCallExpression;
                     return HandleMethod(args);
                 }
-                object value = Expression.Lambda(methodCallExpression).Compile().DynamicInvoke();
-                args.StringBuilder.Append(ConvertToString(args, value));
+                object? value = Expression.Lambda(methodCallExpression).Compile().DynamicInvoke();
+                args.Output.Append(ConvertToString(args, value));
                 return null;
             }
 
@@ -1629,7 +1640,7 @@ namespace Gurux.Service.Orm.Internal
                     args.Expression = it;
                     if (args.StringBuilder == null)
                     {
-                        list.AddRange(GetMembers(args));
+                        list.AddRange(GetMembers(args) ?? []);
                     }
                     else
                     {
@@ -1639,7 +1650,7 @@ namespace Gurux.Service.Orm.Internal
                         }
                         else
                         {
-                            args.StringBuilder.Append(args.ListSeparator);
+                            args.Output.Append(args.ListSeparator);
                         }
                         GetMembers(args);
                     }
@@ -1664,13 +1675,13 @@ namespace Gurux.Service.Orm.Internal
                         }
                         else
                         {
-                            args.StringBuilder.Append(args.ListSeparator);
+                            args.Output.Append(args.ListSeparator);
                         }
                         GetMembers(args);
                     }
                     else
                     {
-                        list.AddRange(GetMembers(args));
+                        list.AddRange(GetMembers(args) ?? []);
                     }
 
                 }
@@ -1697,49 +1708,49 @@ namespace Gurux.Service.Orm.Internal
                     case ExpressionType.AndAlso:
                         if (!args.SingleTable)
                         {
-                            args.StringBuilder.Append("(");
+                            args.Output.Append("(");
                         }
                         args.Expression = bi.Left;
                         bool groupLeft = bi.Left.NodeType is ExpressionType.OrElse or ExpressionType.Or;
                         if (groupLeft)
                         {
-                            args.StringBuilder.Append('(');
+                            args.Output.Append('(');
                         }
 
                         GetMembers(args);
                         if (groupLeft)
                         {
-                            args.StringBuilder.Append(')');
+                            args.Output.Append(')');
                         }
 
-                        args.StringBuilder.Append(" AND ");
+                        args.Output.Append(" AND ");
                         args.Expression = bi.Right;
                         bool groupRight = bi.Right.NodeType is ExpressionType.OrElse or ExpressionType.Or;
                         if (groupRight)
                         {
-                            args.StringBuilder.Append('(');
+                            args.Output.Append('(');
                         }
 
                         GetMembers(args);
                         if (groupRight)
                         {
-                            args.StringBuilder.Append(')');
+                            args.Output.Append(')');
                         }
 
                         if (!args.SingleTable)
                         {
-                            args.StringBuilder.Append(")");
+                            args.Output.Append(")");
                         }
                         return null;
                     case ExpressionType.Coalesce:
                         var coalesce = (BinaryExpression)args.Expression;
-                        args.StringBuilder.Append("COALESCE(");
+                        args.Output.Append("COALESCE(");
                         args.Expression = coalesce.Left;
                         GetMembers(args);
-                        args.StringBuilder.Append(", ");
+                        args.Output.Append(", ");
                         args.Expression = coalesce.Right;
                         GetMembers(args);
-                        args.StringBuilder.Append(')');
+                        args.Output.Append(')');
                         return null;
                     case ExpressionType.Divide:
                         op = " / ";
@@ -1781,13 +1792,13 @@ namespace Gurux.Service.Orm.Internal
                         op = " OR ";
                         break;
                     case ExpressionType.Power:
-                        args.StringBuilder.Append("POWER(");
+                        args.Output.Append("POWER(");
                         args.Expression = bi.Left;
                         GetMembers(args);
-                        args.StringBuilder.Append(args.ListSeparator);
+                        args.Output.Append(args.ListSeparator);
                         args.Expression = bi.Right;
                         GetMembers(args);
-                        args.StringBuilder.Append(")");
+                        args.Output.Append(")");
                         return null;
                     case ExpressionType.LeftShift:
                         op = " << ";
@@ -1802,18 +1813,18 @@ namespace Gurux.Service.Orm.Internal
                     default:
                         throw new ArgumentOutOfRangeException("Unknown SQL command.");
                 }
-                string tmp = null;
-                UnaryExpression u = bi.Left as UnaryExpression;
+                string? tmp = null;
+                UnaryExpression? u = bi.Left as UnaryExpression;
                 bool isenum = u != null && u.Operand.Type.IsEnum;
                 var nodeType = args.Expression.NodeType;
-                if (isenum)
+                if (isenum && u != null)
                 {
                     args.Expression = bi.Right;
                     tmp = GetMemberStringValue(args);
                     if (args.Settings.UseEnumStringValue)
                     {
-                        tmp = Enum.Parse(u.Operand.Type, tmp, true).ToString();
-                        tmp = AddQuotes(tmp, null, '\'');
+                        tmp = Enum.Parse(u.Operand.Type, tmp ?? throw new ArgumentException("The enum value cannot be null."), true).ToString();
+                        tmp = AddQuotes(tmp!, null, '\'');
                     }
                 }
                 else
@@ -1848,8 +1859,8 @@ namespace Gurux.Service.Orm.Internal
                 {
                     return ["(" + list[0] + op + tmp + ")"];
                 }
-                args.StringBuilder.Append(op);
-                args.StringBuilder.Append(tmp);
+                args.Output.Append(op);
+                args.Output.Append(tmp);
                 return null;
             }
 
@@ -1861,7 +1872,7 @@ namespace Gurux.Service.Orm.Internal
                     {
                         return [str];
                     }
-                    args.StringBuilder.Append("*");
+                    args.Output.Append("*");
                     return null;
                 }
                 string tmp = ConvertToString(args.Settings, args.TargetType | TargetType.Value, null, ce.Value, null);
@@ -1869,7 +1880,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     return [tmp];
                 }
-                args.StringBuilder.Append(tmp);
+                args.Output.Append(tmp);
                 return null;
             }
             if (args.Expression is ParameterExpression pe)
@@ -1884,7 +1895,7 @@ namespace Gurux.Service.Orm.Internal
                         return GetMembers(args);
                     }
                 }
-                string tableName = null;
+                string? tableName = null;
                 TargetType type = TargetType.Column;
                 if (args.StringBuilder == null)
                 {
@@ -1895,7 +1906,7 @@ namespace Gurux.Service.Orm.Internal
                 {
                     return [name];
                 }
-                args.StringBuilder.Append(name);
+                args.Output.Append(name);
                 return null;
             }
             throw new ArgumentException("Invalid expression");

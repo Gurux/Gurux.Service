@@ -560,7 +560,7 @@ namespace Gurux.Service.Orm.Model
             object value,
             Type columnType)
         {
-            string tmp = Builder.Settings.GetColumnDefaultValue(value, columnType);
+            string? tmp = Builder.Settings.GetColumnDefaultValue(value, columnType);
             if (string.IsNullOrEmpty(tmp))
             {
                 return;
@@ -711,7 +711,7 @@ namespace Gurux.Service.Orm.Model
         public Type[] GetRelationTables(IDbTransaction? transaction, Type type)
         {
             List<Type> list = [];
-            Dictionary<Type, GXSerializedItem> tables = [];
+            Dictionary<Type, GXSerializedItem?> tables = [];
             GXSqlBuilder.GetTables(type, tables);
             if (!tables.ContainsKey(type))
             {
@@ -723,7 +723,7 @@ namespace Gurux.Service.Orm.Model
                 Type tmp = it.Key;
                 if (GXDbHelpers.IsSharedTable(tmp))
                 {
-                    tmp = tmp.BaseType;
+                    tmp = tmp.BaseType ?? throw new InvalidOperationException("Shared table must have a base type.");
                 }
                 if (TableExist(transaction, Builder.GetTableName(tmp, false)))
                 {
@@ -754,7 +754,7 @@ namespace Gurux.Service.Orm.Model
         /// <param name="overwrite">Old table is dropped first if exists.</param>
         public int CreateTable(IDbTransaction? transaction, Type type, bool relations, bool overwrite)
         {
-            Dictionary<Type, GXSerializedItem> tables = [];
+            Dictionary<Type, GXSerializedItem?> tables = [];
             if (relations)
             {
                 GXSqlBuilder.GetTables(type, tables);
@@ -786,7 +786,7 @@ namespace Gurux.Service.Orm.Model
             try
             {
                 //Find dropped tables.
-                Dictionary<Type, GXSerializedItem> dropTables = [];
+                Dictionary<Type, GXSerializedItem?> dropTables = [];
                 foreach (var it in tables)
                 {
                     Type tmp = it.Key;
@@ -802,7 +802,7 @@ namespace Gurux.Service.Orm.Model
                     }
                     if (tmp.BaseType != typeof(object) && tmp.BaseType != typeof(GXTableBase))
                     {
-                        tmp = tmp.BaseType;
+                        tmp = tmp.BaseType ?? throw new InvalidOperationException("Shared table must have a base type.");
                         if (TableExist(Builder.GetTableName(tmp, false)))
                         {
                             if (!overwrite)
@@ -837,7 +837,7 @@ namespace Gurux.Service.Orm.Model
 
         private void CreateTable(IDbConnection connection,
             IDbTransaction? transaction,
-            Type type, Dictionary<Type, GXSerializedItem> tables)
+            Type type, Dictionary<Type, GXSerializedItem?> tables)
         {
             Dictionary<Type, GXTableCreateQuery> tablesCreationQueries = new Dictionary<Type, GXTableCreateQuery>();
             GetCreateTableQueries(true, type, null, tables, tablesCreationQueries, true);
@@ -867,7 +867,7 @@ namespace Gurux.Service.Orm.Model
             }
             if (GXDbHelpers.IsSharedTable(table.Table))
             {
-                type = table.Table.BaseType;
+                type = table.Table.BaseType ?? throw new InvalidOperationException("Shared table must have a base type.");
             }
             else
             {
@@ -886,7 +886,7 @@ namespace Gurux.Service.Orm.Model
         private int DropTable(IDbConnection connection,
             IDbTransaction? transaction,
             Type type,
-            Dictionary<Type, GXSerializedItem> tables)
+            Dictionary<Type, GXSerializedItem?> tables)
         {
             int count = 0;
             Dictionary<Type, GXTableCreateQuery> tablesCreationQueries = new Dictionary<Type, GXTableCreateQuery>();
@@ -916,7 +916,7 @@ namespace Gurux.Service.Orm.Model
             string query = Builder.Settings.GetForeignKeysQuery(tableName);
             List<object[]> columns = new List<object[]>();
             ExecuteQuery(Connection, transaction, query, 2, columns);
-            return columns.Select(c => (c[0].ToString(), c[1].ToString())).ToList();
+            return columns.Select(c => (c[0].ToString() ?? string.Empty, c[1].ToString() ?? string.Empty)).ToList();
         }
 
 
@@ -1416,7 +1416,7 @@ namespace Gurux.Service.Orm.Model
         /// <param name="sb">The buffer used to assemble each index statement.</param>
         private void CreateIndex(Type type, GXTableCreateQuery tableItem, string tableName, StringBuilder sb)
         {
-            string name;
+            string? name;
             Dictionary<string, GXSerializedItem> list = GXSqlBuilder.GetProperties(type);
             foreach (var it in list)
             {
@@ -1426,7 +1426,8 @@ namespace Gurux.Service.Orm.Model
                     if (!(Builder.Settings.Type == DatabaseType.Oracle &&
                         (it.Value.Attributes & (Attributes.AutoIncrement | Attributes.PrimaryKey)) != 0))
                     {
-                        IndexAttribute index = GXInternal.GetAttribute<IndexAttribute>(it.Value.Target);
+                        IndexAttribute index = GXInternal.GetAttribute<IndexAttribute>(it.Value.Target)
+                            ?? throw new InvalidOperationException("Indexed member must declare an IndexAttribute.");
                         sb.Length = 0;
                         sb.Append("CREATE ");
                         if (index.Unique)
@@ -1566,8 +1567,8 @@ namespace Gurux.Service.Orm.Model
         /// <param name="tables">Dictionary of tables.</param>
         /// <param name="tablesCreationQueries">Dictionary of table creation queries.</param>
         /// <param name="isForeignKey">Is FK to relation. This is used when tables are created or dropped.</param>
-        GXTableCreateQuery GetCreateTableQueries(bool create, Type type, GXTableCreateQuery parent,
-            Dictionary<Type, GXSerializedItem> tables,
+        GXTableCreateQuery GetCreateTableQueries(bool create, Type type, GXTableCreateQuery? parent,
+            Dictionary<Type, GXSerializedItem?> tables,
             Dictionary<Type, GXTableCreateQuery> tablesCreationQueries, bool isForeignKey)
         {
             GXTableCreateQuery t, m;
@@ -1575,9 +1576,10 @@ namespace Gurux.Service.Orm.Model
             Type tp;
             //Check that table is not created yet.
             bool first = !tablesCreationQueries.ContainsKey(type);
-            string str, name;
+            string? str;
+            string name;
             string tableName = Builder.GetTableName(type, true);
-            Dictionary<Type, GXSerializedItem> relationTables = null;
+            Dictionary<Type, GXSerializedItem?>? relationTables = null;
             if (!first)
             {
                 tableItem = tablesCreationQueries[type];
@@ -1602,7 +1604,7 @@ namespace Gurux.Service.Orm.Model
                 {
                     tablesCreationQueries.Add(type, tableItem);
                 }
-                if (tables.ContainsKey(type) || tables.ContainsKey(type.BaseType))
+                if (tables.ContainsKey(type) || (type.BaseType != null && tables.ContainsKey(type.BaseType)))
                 {
                     if (tables.ContainsKey(type))
                     {
@@ -1610,7 +1612,7 @@ namespace Gurux.Service.Orm.Model
                     }
                     else
                     {
-                        tables.Remove(type.BaseType);
+                        tables.Remove(type.BaseType ?? throw new InvalidOperationException("Table must have a base type."));
                     }
                     name = Builder.GetTableName(type, true);
                     if (!create)//Drop table.
@@ -1628,11 +1630,11 @@ namespace Gurux.Service.Orm.Model
                         //Get relation tables and remove them.
                         if (GXDbHelpers.IsSharedTable(type))
                         {
-                            relationTables = new Dictionary<Type, GXSerializedItem>();
+                            relationTables = new Dictionary<Type, GXSerializedItem?>();
                             for (int pos = 0; pos != tables.Count; ++pos)
                             {
-                                KeyValuePair<Type, GXSerializedItem> it = tables.ElementAt(pos);
-                                if (GXDbHelpers.IsSharedTable(it.Key) && it.Key.BaseType.IsAssignableFrom(type.BaseType))
+                                KeyValuePair<Type, GXSerializedItem?> it = tables.ElementAt(pos);
+                                if (GXDbHelpers.IsSharedTable(it.Key) && it.Key.BaseType != null && it.Key.BaseType.IsAssignableFrom(type.BaseType))
                                 {
                                     tables.Remove(it.Key);
                                     relationTables.Add(it.Key, it.Value);
@@ -1645,7 +1647,7 @@ namespace Gurux.Service.Orm.Model
                             relationTables = [];
                             for (int pos = 0; pos != tables.Count; ++pos)
                             {
-                                KeyValuePair<Type, GXSerializedItem> it = tables.ElementAt(pos);
+                                KeyValuePair<Type, GXSerializedItem?> it = tables.ElementAt(pos);
                                 if (type.IsAssignableFrom(it.Key))
                                 {
                                     tables.Remove(it.Key);
@@ -1690,8 +1692,8 @@ namespace Gurux.Service.Orm.Model
                                     t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
                                             tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
 
-                                    m = GetCreateTableQueries(create, it.Value.Relation.RelationMapTable.Relation.PrimaryTable, null, tables,
-                                            tablesCreationQueries, it.Value.Relation.RelationMapTable.Relation.RelationType != RelationType.Relation);
+                                    m = GetCreateTableQueries(create, (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).PrimaryTable, null, tables,
+                                            tablesCreationQueries, (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).RelationType != RelationType.Relation);
                                     if (!create)//Drop table.
                                     {
                                         tableItem.Dependencies.Add(m);
@@ -1810,7 +1812,7 @@ namespace Gurux.Service.Orm.Model
                             bool required = false;
                             if (it.Value.Target is PropertyInfo)
                             {
-                                DataMemberAttribute[] attr = (DataMemberAttribute[])(it.Value.Target as PropertyInfo).GetCustomAttributes(typeof(DataMemberAttribute), true);
+                                DataMemberAttribute[] attr = (DataMemberAttribute[])((PropertyInfo)it.Value.Target).GetCustomAttributes(typeof(DataMemberAttribute), true);
                                 if (attr.Length != 0)
                                 {
                                     required = attr[0].IsRequired;
@@ -1887,7 +1889,7 @@ namespace Gurux.Service.Orm.Model
                             if (Builder.Settings.Type == DatabaseType.MySQL ||
                                 Builder.Settings.Type == DatabaseType.MariaDB)
                             {
-                                DescriptionAttribute description =
+                                DescriptionAttribute? description =
                                     (it.Value.Target as MemberInfo)?
                                     .GetCustomAttribute<DescriptionAttribute>(true);
                                 if (!string.IsNullOrEmpty(description?.Description))
@@ -1904,7 +1906,7 @@ namespace Gurux.Service.Orm.Model
                                 string pk;
                                 if (it.Value.Relation.RelationType == RelationType.ManyToMany)
                                 {
-                                    GXSerializedItem u = it.Value.Relation.RelationMapTable.Relation.PrimaryId;
+                                    GXSerializedItem u = (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).PrimaryId;
                                     pk = GXDbHelpers.ConvertToString(Builder.Settings, TargetType.Column, null, u.Target, null);
                                 }
                                 else
@@ -1927,13 +1929,13 @@ namespace Gurux.Service.Orm.Model
                                 string table2;
                                 if (it.Value.Relation.RelationType == RelationType.ManyToMany)
                                 {
-                                    table2 = Builder.GetTableName(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, false);
+                                    table2 = Builder.GetTableName((it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).PrimaryTable, false);
                                 }
                                 else
                                 {
                                     table2 = Builder.GetTableName(it.Value.Relation.ForeignTable, false);
                                 }
-                                ForeignKeyAttribute fk = ((ForeignKeyAttribute[])(it.Value.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), true))[0];
+                                ForeignKeyAttribute fk = ((ForeignKeyAttribute[])((PropertyInfo)it.Value.Target).GetCustomAttributes(typeof(ForeignKeyAttribute), true))[0];
 
                                 //Name is generated automatically at the moment. Use CONSTRAINT to give name to the Foreign key.
                                 fkStr.Append(" FOREIGN KEY (");
@@ -1986,7 +1988,7 @@ namespace Gurux.Service.Orm.Model
                         }
                         if (relationTables != null && relationTables.Count != 0)
                         {
-                            KeyValuePair<Type, GXSerializedItem> it = relationTables.ElementAt(0);
+                            KeyValuePair<Type, GXSerializedItem?> it = relationTables.ElementAt(0);
                             type = it.Key;
                             relationTables.Remove(type);
                         }
@@ -2003,7 +2005,7 @@ namespace Gurux.Service.Orm.Model
                         sb.Append(')');
                         tableItem.Queries.Add(sb.ToString());
 
-                        DescriptionAttribute tableDescription =
+                        DescriptionAttribute? tableDescription =
                             type.GetCustomAttribute<DescriptionAttribute>(true);
                         if (!string.IsNullOrEmpty(tableDescription?.Description))
                         {
@@ -2021,7 +2023,7 @@ namespace Gurux.Service.Orm.Model
                             {
                                 continue;
                             }
-                            DescriptionAttribute columnDescription =
+                            DescriptionAttribute? columnDescription =
                                 (property.Value.Target as MemberInfo)?
                                 .GetCustomAttribute<DescriptionAttribute>(true);
                             if (string.IsNullOrEmpty(columnDescription?.Description))
@@ -2074,7 +2076,7 @@ namespace Gurux.Service.Orm.Model
 
         private void GetDefaultValue(StringBuilder sb, object value, Type columnType)
         {
-            string tmp = Builder.Settings.GetColumnDefaultValue(value, columnType);
+            string? tmp = Builder.Settings.GetColumnDefaultValue(value, columnType);
             if (!string.IsNullOrEmpty(tmp))
             {
                 sb.Append(" DEFAULT");
@@ -2238,7 +2240,7 @@ namespace Gurux.Service.Orm.Model
                     Value = oldValue
                 };
                 ColumnValueConverting?.Invoke(this, args);
-                object newValue = args.IsConverted
+                object? newValue = args.IsConverted
                     ? args.Value
                     : Builder.Settings.ChangeType(args.Value, newType);
                 UpdateConvertedColumnValue(connection, transaction, quotedTable,
@@ -2287,7 +2289,7 @@ namespace Gurux.Service.Orm.Model
             return list.ToArray();
         }
 
-        internal static void ExecuteQuery(IDbConnection connection, IDbTransaction transaction,
+        internal static void ExecuteQuery(IDbConnection connection, IDbTransaction? transaction,
            string query, int count, List<object[]> list)
         {
             try
@@ -2382,8 +2384,8 @@ namespace Gurux.Service.Orm.Model
         }
 
         private void UpdateConvertedColumnValue(IDbConnection connection,
-            IDbTransaction transaction, string quotedTable, string quotedColumn,
-            string quotedTemporary, object oldValue, object newValue)
+            IDbTransaction? transaction, string quotedTable, string quotedColumn,
+            string quotedTemporary, object oldValue, object? newValue)
         {
             string prefix = Builder.Settings.Type == DatabaseType.Oracle ||
                 Builder.Settings.Type == DatabaseType.SapHana ? ":" : "@";
@@ -2792,7 +2794,7 @@ namespace Gurux.Service.Orm.Model
         }
 
         /// <summary>Drops exactly the specified physical table, preserving schema and identifier case.</summary>
-        public int DropTable(IDbTransaction transaction, GXTableSchema table)
+        public int DropTable(IDbTransaction? transaction, GXTableSchema table)
         {
             string name = GXDbHelpers.ConvertToString(Builder.Settings, TargetType.Table, null, table.Name, null);
             return DropTable(transaction, name);
@@ -2814,7 +2816,7 @@ namespace Gurux.Service.Orm.Model
             {
                 if (TableExist(transaction, table))
                 {
-                    Dictionary<Type, GXSerializedItem> tables = new Dictionary<Type, GXSerializedItem>();
+                    Dictionary<Type, GXSerializedItem?> tables = new Dictionary<Type, GXSerializedItem?>();
                     if (relations)
                     {
                         GXSqlBuilder.GetTables(type, tables);
@@ -2842,7 +2844,7 @@ namespace Gurux.Service.Orm.Model
                         //If field is marked as an auto increment.
                         if ((it.Value.Attributes & Attributes.AutoIncrement) != 0)
                         {
-                            string[] arr = Builder.Settings.DropAutoIncrement(table, it.Key);
+                            string[]? arr = Builder.Settings.DropAutoIncrement(table, it.Key);
                             if (arr != null)
                             {
                                 foreach (string it2 in arr)
@@ -3356,7 +3358,7 @@ namespace Gurux.Service.Orm.Model
         /// <param name="table">The type representing the table to describe.</param>
         /// <returns>A GXTableSchema instance containing the schema of the specified table.</returns>
         /// <remarks>Uses <see cref="SchemaCache"/> and returns an independently editable schema.</remarks>
-        public GXTableSchema Describe(IDbTransaction transaction, Type table)
+        public GXTableSchema Describe(IDbTransaction? transaction, Type table)
         {
             string name = Builder.GetTableName(table, false);
             var schema = Describe(transaction, name);

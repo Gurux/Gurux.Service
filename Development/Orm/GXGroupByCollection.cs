@@ -110,7 +110,7 @@ namespace Gurux.Service.Orm
                 SingleTable = !joinList.Any(),
                 Expression = sourceColumn.Body,
             };
-            string[] list = GXDbHelpers.GetMemberList(args);
+            string[] list = GXDbHelpers.GetMemberList(args) ?? throw new InvalidOperationException("Column expression did not identify any members.");
             foreach (string it in list)
             {
                 GXOrder o = new GXOrder();
@@ -120,20 +120,20 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static MemberExpression GetMemberExpression(Expression expression, out bool allowNull)
+        internal static MemberExpression GetMemberExpression(Expression? expression, out bool allowNull)
         {
             if (expression is MemberExpression me)
             {
                 MemberInfo m = me.Member;
-                Type tp = (m as PropertyInfo).PropertyType;
+                Type tp = m is PropertyInfo property ? property.PropertyType : throw new ArgumentException("Join member must be a property.");
                 allowNull = tp.IsGenericType && tp.GetGenericTypeDefinition() == typeof(Nullable<>);
-                return (expression as MemberExpression);
+                return me;
             }
             if (expression is UnaryExpression ue)
             {
                 MemberExpression e = GetMemberExpression(ue.Operand, out allowNull);
                 //If value is nullable.
-                if (e.Expression.Type.IsGenericType && e.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+                if (e.Expression != null && e.Expression.Type.IsGenericType && e.Expression.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
                 {
                     e = GetMemberExpression(e.Expression, out allowNull);
                     if (e.NodeType == ExpressionType.MemberAccess)
@@ -167,7 +167,7 @@ namespace Gurux.Service.Orm
                         sb.Append(", ");
                     }
                     //Table name is not added if there is only one table.
-                    string tableName = null;
+                    string? tableName = null;
                     if (joinList.Any())
                     {
                         tableName = GXDbHelpers.ConvertToString(parent.Settings, TargetType.Column, null, it.Table, null);

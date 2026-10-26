@@ -208,8 +208,14 @@ namespace Gurux.Service.Orm
             AddJoin(JoinType.Cross, sourceColumn, destinationColumn);
         }
 
+        /// <summary>Add a query source join.</summary>
+        /// <param name="source">The source query.</param>
+        /// <param name="type">The join type.</param>
+        /// <param name="on">The optional join condition.</param>
         public void Add(GXSelectArgs source, JoinType type, Expression? on = null) => List.Add((type, on, source));
 
+        /// <summary>Append joins from another collection.</summary>
+        /// <param name="source">The joins to append.</param>
         public void AddRange(GXJoinCollection source) => Append(source);
 
 

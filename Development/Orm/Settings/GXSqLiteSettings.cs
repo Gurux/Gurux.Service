@@ -89,7 +89,7 @@ ORDER BY id, seq";
         }
 
         /// <inheritdoc />
-        public override string GetDescriptionQuery(string schema, string tableName, string columnName)
+        public override string GetDescriptionQuery(string schema, string tableName, string? columnName)
         {
             return "SELECT ''";
 
@@ -105,7 +105,7 @@ ORDER BY id, seq";
         }
 
         /// <inheritdoc />
-        public override string GetCommentQuery(string schema, string tableName, string columnName, string comment)
+        public override string GetCommentQuery(string schema, string tableName, string? columnName, string comment)
         {
             //SQLIte doesn't support comments.
             return "";
@@ -138,7 +138,7 @@ ORDER BY id, seq";
         }
 
         /// <inheritdoc />
-        public override string GetDatabaseUserPermissionQuery(string database, string user)
+        public override string GetDatabaseUserPermissionQuery(string? database, string user)
         {
             throw new NotSupportedException("SQLite does not support database users or permissions.");
         }
@@ -233,7 +233,7 @@ ORDER BY id, seq";
         }
 
         /// <inheritdoc />
-        public override string GetColumnDefaultValue(object value, Type columnType)
+        public override string? GetColumnDefaultValue(object value, Type columnType)
         {
             if (value is DefaultValueKind v)
             {
@@ -560,7 +560,7 @@ ORDER BY id, seq";
         }
 
         /// <inheritdoc/>
-        internal override object ChangeType(object value, Type type)
+        internal override object? ChangeType(object? value, Type type)
         {
             if (value is string str1)
             {
@@ -602,7 +602,7 @@ ORDER BY id, seq";
 
 
         /// <inheritdoc/>
-        internal override string ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object value, ConvertOption options)
         {
             if (value is byte[] ba)
             {

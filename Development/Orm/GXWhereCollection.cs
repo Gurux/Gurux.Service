@@ -101,7 +101,7 @@ namespace Gurux.Service.Orm
             return Parent.QueryCache.GetHash(List);
         }
 
-        internal string LimitToString()
+        internal string? LimitToString()
         {
             return LimitToString(Parent.Settings, Parent.Index, Parent.Count);
         }
@@ -343,7 +343,7 @@ namespace Gurux.Service.Orm
             }
         }
 
-        internal static string LimitToString(GXDBSettings settings, long index, long count)
+        internal static string? LimitToString(GXDBSettings settings, long index, long count)
         {
             StringBuilder sb;
             if ((index != 0 || count != 0))
@@ -391,7 +391,6 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Update where condition.
         /// </summary>
-        /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="filters">The object whose mapped values provide the filter.</param>
         public void FilterBy(IEnumerable<(GXColumnSchema Column, object? value)> filters)
         {
@@ -418,7 +417,7 @@ namespace Gurux.Service.Orm
                 {
                     if ((it.Value.Attributes & Attributes.Filter) != 0 && it.Value.Get != null)
                     {
-                        object actual = it.Value.Get(target);
+                        object? actual = it.Value.Get(target);
                         if (actual != null && it.Value.FilterValue == null)
                         {
                             if (actual is DateTime d)

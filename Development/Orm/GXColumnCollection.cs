@@ -98,7 +98,7 @@ namespace Gurux.Service.Orm
         private void GetColumns(
             Type type,
             Dictionary<Type, List<(string, Type)>> columns,
-            Dictionary<Type, GXSerializedItem> tables)
+            Dictionary<Type, GXSerializedItem?> tables)
         {
             if (type == null)
             {
@@ -117,7 +117,7 @@ namespace Gurux.Service.Orm
                     list = new List<(string, Type)>();
                 }
                 tables.Remove(type);
-                string tableName = null;
+                string? tableName = null;
                 Dictionary<string, GXSerializedItem> properties = GXSqlBuilder.GetProperties(type);
                 foreach (var it in properties)
                 {
@@ -127,7 +127,7 @@ namespace Gurux.Service.Orm
                         {
                             if (it.Value.Relation.RelationType == RelationType.ManyToMany)
                             {
-                                GetColumns(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, columns, tables);
+                                GetColumns((it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Many-to-many relation has no mapping table.")).PrimaryTable, columns, tables);
                             }
                             else
                             {
@@ -180,7 +180,7 @@ namespace Gurux.Service.Orm
                 Parent.Settings.Type,
                 List,
                 Excluded,
-                Joins != null ? Joins.GetItemHash() : 0,
+                Joins.GetItemHash(),
                 Parent.QueryCache.GetHash(Maps),
                 Parent.Distinct,
                 Parent.Index,
@@ -315,7 +315,7 @@ namespace Gurux.Service.Orm
                     continue;
                 }
                 var excluded = GXDbHelpers.ExcludedProperties(Excluded, args, e.Key.Parameters[0].Type);
-                string[] list = GXDbHelpers.GetMemberList(args);
+                string[] list = GXDbHelpers.GetMemberList(args) ?? throw new InvalidOperationException("Column expression did not identify any members.");
                 foreach (var col in list)
                 {
                     int pos = col.LastIndexOf('(');
@@ -587,7 +587,7 @@ namespace Gurux.Service.Orm
         /// </example>
         public void Add<T>(Expression<Func<T, object>> expression, Expression<Func<T, object>> target)
         {
-            List?.Add(new KeyValuePair<LambdaExpression, LambdaExpression>(expression, target));
+            List?.Add(new KeyValuePair<LambdaExpression, LambdaExpression?>(expression, target));
         }
 
         private void AppendColumnAlias(StringBuilder sql, Type tableType, string columnName)

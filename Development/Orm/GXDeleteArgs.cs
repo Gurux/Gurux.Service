@@ -113,7 +113,7 @@ namespace Gurux.Service.Orm
             string cacheKey = Parent.QueryCache.BuildKey(
                 Parent.Settings.Type,
                 schemaTable ?? Table,
-                Where != null ? Where.GetItemHash() : 0,
+                Where.GetItemHash(),
                 Count);
             if (Parent.QueryCache.TryGet(cacheKey, out string? cachedSql, out int generationTime))
             {
@@ -453,31 +453,33 @@ namespace Gurux.Service.Orm
         /// <param name="collections">Destination items to disassociate.</param>
         public static GXDeleteArgs Remove<TItem, TDestination>(TItem[] items, TDestination[] collections)
         {
-            object collectionId, id;
+            object? collectionId, id;
             if (items == null || collections == null || items.Length == 0 || collections.Length == 0)
             {
                 throw new ArgumentNullException("Invalid value");
             }
             Type itemType = typeof(TItem);
             Type collectionType = typeof(TDestination);
-            GXSerializedItem si = GXSqlBuilder.FindRelation(itemType, collectionType);
+            GXSerializedItem si = GXSqlBuilder.FindRelation(itemType, collectionType) ?? throw new ArgumentException("Invalid collection relation.");
             if (si.Relation == null || si.Relation.RelationMapTable == null)
             {
                 throw new ArgumentNullException("Invalid collection");
             }
-            GXDeleteArgs args = Delete(si.Relation.RelationMapTable.Relation.PrimaryTable);
-            GXSerializedItem siItem = GXSqlBuilder.FindRelation(collectionType, itemType);
+            GXDeleteArgs args = Delete((si.Relation.RelationMapTable.Relation ?? throw new ArgumentException("Invalid collection relation.")).PrimaryTable);
+            var map = si.Relation.RelationMapTable.Relation ?? throw new ArgumentException("Invalid collection relation.");
+            GXSerializedItem siItem = GXSqlBuilder.FindRelation(collectionType, itemType) ?? throw new ArgumentException("Invalid item relation.");
+            var itemMap = siItem.Relation?.RelationMapTable?.Relation ?? throw new ArgumentException("Invalid item relation.");
             foreach (TDestination c in collections)
             {
                 //Get collection id.
-                collectionId = si.Relation.RelationMapTable.Relation.ForeignId.Get(c);
+                collectionId = map.ForeignId.Get(c ?? throw new ArgumentNullException(nameof(collections)));
                 foreach (TItem it in items)
                 {
-                    object target = GXInternal.CreateClass(si.Relation.RelationMapTable.Relation.PrimaryTable);
-                    si.Relation.RelationMapTable.Relation.PrimaryId.Set(target, collectionId);
+                    object target = GXInternal.CreateClass((si.Relation.RelationMapTable.Relation ?? throw new ArgumentException("Invalid collection relation.")).PrimaryTable);
+                    map.PrimaryId.Set(target, collectionId);
                     //Get item id.
-                    id = siItem.Relation.RelationMapTable.Relation.ForeignId.Get(it);
-                    siItem.Relation.RelationMapTable.Relation.PrimaryId.Set(target, id);
+                    id = itemMap.ForeignId.Get(it ?? throw new ArgumentNullException(nameof(items)));
+                    itemMap.PrimaryId.Set(target, id);
                     Expression<Func<object, object>> t = q => target;
                     args.Where.List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.Or, t));
                 }

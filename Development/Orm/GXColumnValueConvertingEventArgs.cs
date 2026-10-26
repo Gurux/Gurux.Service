@@ -72,7 +72,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Current column value. This can be changed to new value.
         /// </summary>
-        public object Value { get; set; }
+        public object? Value { get; set; }
 
         /// <summary>
         /// Indicates whether value is converted to new type. 

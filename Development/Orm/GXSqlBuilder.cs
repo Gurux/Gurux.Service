@@ -47,6 +47,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Data.Common;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -68,7 +69,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Name of the connected database. This is used to get table names from the database.
         /// </summary>
-        internal string Database;
+        internal string Database = string.Empty;
         private string GetType(string value)
         {
             int pos = value.IndexOf('(');
@@ -106,7 +107,7 @@ namespace Gurux.Service.Orm
                     return typeof(Guid);
                 }
             }
-            string type2 = null;
+            string? type2 = null;
             if (Settings.Type == DatabaseType.DB2 &&
                 string.Equals(type, "BLOB", StringComparison.OrdinalIgnoreCase))
             {
@@ -380,13 +381,13 @@ namespace Gurux.Service.Orm
             return connection;
         }
 
-        internal string GetDataBaseType(Type type, object target)
+        internal string GetDataBaseType(Type type, object? target)
         {
             if (GXJsonCollection.IsCollection(type))
                 type = typeof(string);
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
-                type = Nullable.GetUnderlyingType(type);
+                type = Nullable.GetUnderlyingType(type) ?? type;
             }
             //100 character is allocated for type.
             if (type == typeof(Type))
@@ -409,17 +410,17 @@ namespace Gurux.Service.Orm
             if (type == typeof(string) || type == typeof(System.String) ||
                 type == typeof(char[]) || type == typeof(object))
             {
-                if (target is PropertyInfo)
+                if (target is PropertyInfo property)
                 {
                     {
-                        MaxLengthAttribute[] attr = (MaxLengthAttribute[])(target as PropertyInfo).GetCustomAttributes(typeof(MaxLengthAttribute), true);
+                        MaxLengthAttribute[] attr = (MaxLengthAttribute[])property.GetCustomAttributes(typeof(MaxLengthAttribute), true);
                         if (attr.Length != 0)
                         {
                             return Settings.StringColumnDefinition(attr[0].Length);
                         }
                     }
                     {
-                        StringLengthAttribute[] attr = (StringLengthAttribute[])(target as PropertyInfo).GetCustomAttributes(typeof(StringLengthAttribute), true);
+                        StringLengthAttribute[] attr = (StringLengthAttribute[])property.GetCustomAttributes(typeof(StringLengthAttribute), true);
                         if (attr.Length == 0)
                         {
                             return Settings.StringColumnDefinition(0);
@@ -431,9 +432,9 @@ namespace Gurux.Service.Orm
             }
             if (type == typeof(byte[]))
             {
-                if (target is PropertyInfo)
+                if (target is PropertyInfo property)
                 {
-                    MaxLengthAttribute[] attr = (MaxLengthAttribute[])(target as PropertyInfo).GetCustomAttributes(typeof(MaxLengthAttribute), true);
+                    MaxLengthAttribute[] attr = (MaxLengthAttribute[])property.GetCustomAttributes(typeof(MaxLengthAttribute), true);
                     if (attr.Length != 0)
                     {
                         return Settings.ByteArrayColumnDefinition(attr[0].Length);
@@ -456,7 +457,9 @@ namespace Gurux.Service.Orm
                         if (i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IUnique<>))
                         {
                             type = i.GenericTypeArguments[0];
-                            return GetDataBaseType(type, null);
+                            // Preserve the navigation property so attributes such as
+                            // StringLength and MaxLength define the foreign-key column.
+                            return GetDataBaseType(type, target);
                         }
                     }
                 }
@@ -472,9 +475,9 @@ namespace Gurux.Service.Orm
             else if (type == typeof(DateTime) || type == typeof(DateOnly) ||
                 type == typeof(DateTimeOffset) || type == typeof(TimeOnly))
             {
-                if (target is PropertyInfo)
+                if (target is PropertyInfo property)
                 {
-                    TimeStorageUnitAttribute[] attr = (TimeStorageUnitAttribute[])(target as PropertyInfo).GetCustomAttributes(typeof(TimeStorageUnitAttribute), true);
+                    TimeStorageUnitAttribute[] attr = (TimeStorageUnitAttribute[])property.GetCustomAttributes(typeof(TimeStorageUnitAttribute), true);
                     if (attr.Length == 1)
                     {
                         if (type == typeof(DateTimeOffset))
@@ -513,7 +516,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="type">Parent table type</param>
         /// <param name="tables">Collection of tables to create.</param>
-        internal static void GetTables(Type type, Dictionary<Type, GXSerializedItem> tables)
+        internal static void GetTables(Type type, Dictionary<Type, GXSerializedItem?> tables)
         {
             if (!tables.ContainsKey(type))
             {
@@ -544,7 +547,9 @@ namespace Gurux.Service.Orm
                         //Add relation map table.
                         if (it.Value.Relation.RelationMapTable != null)
                         {
-                            tables.TryAdd(it.Value.Relation.RelationMapTable.Relation.PrimaryTable, it.Value.Relation.RelationMapTable.Relation.PrimaryId);
+                            var mapRelation = it.Value.Relation.RelationMapTable.Relation
+                                ?? throw new InvalidOperationException("Relation map metadata is missing.");
+                            tables.TryAdd(mapRelation.PrimaryTable, mapRelation.PrimaryId);
                         }
                     }
                 }
@@ -638,7 +643,7 @@ namespace Gurux.Service.Orm
                 throw new ArgumentOutOfRangeException("Unknown connection.");
             }
             Init(type, tablePrefix);
-            Settings!.ServerVersion = version;
+            Settings.ServerVersion = version;
         }
 
         /// <summary>
@@ -657,6 +662,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         /// <param name="type">Database type.</param>
         /// <param name="tablePrefix">Used table prefix (optional).</param>
+        [MemberNotNull(nameof(Settings))]
         private void Init(DatabaseType type, string? tablePrefix)
         {
             Settings = CreateSettings(type);
@@ -701,7 +707,7 @@ namespace Gurux.Service.Orm
         /// <param name="relationTable">Relation tables.</param>
         private static void UpdateRelations(Type mainType, GXSerializedItem s, bool primaryData, Dictionary<Type, GXRelationTable> relationTable)
         {
-            Type type;
+            Type? type;
             if (primaryData)
             {
                 s.Relation = new GXRelationTable();
@@ -710,8 +716,8 @@ namespace Gurux.Service.Orm
                 s.Relation.PrimaryId = s;
                 if ((s.Attributes & Attributes.ForeignKey) != 0)
                 {
-                    ForeignKeyAttribute[] fks = ((ForeignKeyAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), false));
-                    ForeignKeyAttribute fk;
+                    ForeignKeyAttribute[] fks = ((ForeignKeyAttribute[])((PropertyInfo)s.Target).GetCustomAttributes(typeof(ForeignKeyAttribute), false));
+                    ForeignKeyAttribute? fk;
                     if (fks.Length == 0)
                     {
                         fk = null;
@@ -739,13 +745,14 @@ namespace Gurux.Service.Orm
                     else if (s.Type != typeof(string) && typeof(System.Collections.IEnumerable).IsAssignableFrom(s.Type))
                     {
                         s.Relation.RelationType = RelationType.OneToMany;
-                        s.Relation.PrimaryId = GXSqlBuilder.FindRelation(type, mainType);
-                        if (s.Relation.PrimaryId == null)
+                        GXSerializedItem? primaryId = GXSqlBuilder.FindRelation(type, mainType);
+                        if (primaryId == null)
                         {
                             throw new Exception(string.Format("Relation create failed. Foreign table '{0}' do not have relation to table '{1}'.",
                                 GXDbHelpers.ConvertToString(null, TargetType.Table, null, type, null),
                                 GXDbHelpers.OriginalTableName(mainType)));
                         }
+                        s.Relation.PrimaryId = primaryId;
                     }
                     else
                     {
@@ -754,7 +761,7 @@ namespace Gurux.Service.Orm
                 }
                 else if ((s.Attributes & Attributes.Relation) != 0)
                 {
-                    RelationAttribute ra = ((RelationAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(RelationAttribute), false))[0];
+                    RelationAttribute ra = ((RelationAttribute[])((PropertyInfo)s.Target).GetCustomAttributes(typeof(RelationAttribute), false))[0];
                     type = ra.Target;
                     if (type == null)
                     {
@@ -769,10 +776,14 @@ namespace Gurux.Service.Orm
             }
             else
             {
+                if (s.Relation == null)
+                {
+                    throw new InvalidOperationException("Primary relation metadata must be initialized first.");
+                }
                 if ((s.Attributes & Attributes.ForeignKey) != 0)
                 {
-                    ForeignKeyAttribute[] fks = ((ForeignKeyAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(ForeignKeyAttribute), false));
-                    ForeignKeyAttribute fk;
+                    ForeignKeyAttribute[] fks = ((ForeignKeyAttribute[])((PropertyInfo)s.Target).GetCustomAttributes(typeof(ForeignKeyAttribute), false));
+                    ForeignKeyAttribute? fk;
                     if (fks.Length == 0)
                     {
                         fk = null;
@@ -792,7 +803,7 @@ namespace Gurux.Service.Orm
                             type = GXInternal.GetPropertyType(type);
                         }
                     }
-                    GXSerializedItem secondary = FindUnique(type);
+                    GXSerializedItem? secondary = FindUnique(type);
                     if (secondary == null)
                     {
                         throw new Exception(string.Format("Table {0} Relation create failed. Class must be derived from IUnique or target type must set in ForeignKey or Relation attribute.",
@@ -815,7 +826,7 @@ namespace Gurux.Service.Orm
                 }
                 else if ((s.Attributes & Attributes.Relation) != 0)
                 {
-                    RelationAttribute ra = ((RelationAttribute[])(s.Target as PropertyInfo).GetCustomAttributes(typeof(RelationAttribute), false))[0];
+                    RelationAttribute ra = ((RelationAttribute[])((PropertyInfo)s.Target).GetCustomAttributes(typeof(RelationAttribute), false))[0];
                     type = ra.Target;
                     if (type == null)
                     {
@@ -825,7 +836,7 @@ namespace Gurux.Service.Orm
                     {
                         type = GXInternal.GetPropertyType(type);
                     }
-                    GXSerializedItem secondary = FindUnique(type);
+                    GXSerializedItem? secondary = FindUnique(type);
                     if (secondary == null)
                     {
                         throw new Exception(string.Format("Table {0} Relation create failed. Class must be derived from IUnique or target type must set in ForeignKey or Relation attribute.",
@@ -845,7 +856,7 @@ namespace Gurux.Service.Orm
         private static void UpdateAttributes(Type type, object[] attributes, GXSerializedItem s)
         {
             int value = 0;
-            PropertyInfo pi = s.Target as PropertyInfo;
+            PropertyInfo? pi = s.Target as PropertyInfo;
             if (pi != null && pi.Name == "Id")
             {
                 foreach (var i in type.GetInterfaces())
@@ -887,9 +898,8 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    if (att is DefaultValueAttribute)
+                    if (att is DefaultValueAttribute def)
                     {
-                        DefaultValueAttribute def = att as DefaultValueAttribute;
                         s.DefaultValue = def.Value;
                         value |= (int)Attributes.DefaultValue;
                         if (s.DefaultValue is DefaultValueKind.NewGuid)
@@ -939,9 +949,8 @@ namespace Gurux.Service.Orm
                     {
                         value |= (int)Attributes.StringLength;
                     }
-                    else if (att is DataMemberAttribute)
+                    else if (att is DataMemberAttribute n)
                     {
-                        DataMemberAttribute n = att as DataMemberAttribute;
                         if (n.IsRequired)
                         {
                             value |= (int)Attributes.IsRequired;
@@ -1007,7 +1016,7 @@ namespace Gurux.Service.Orm
         {
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
-                type = Nullable.GetUnderlyingType(type)!;
+                type = Nullable.GetUnderlyingType(type) ?? type;
             }
             foreach (var it in GetProperties(type))
             {
@@ -1023,7 +1032,7 @@ namespace Gurux.Service.Orm
         {
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
-                type = Nullable.GetUnderlyingType(type)!;
+                type = Nullable.GetUnderlyingType(type) ?? type;
             }
             foreach (var it in GetProperties(type))
             {
@@ -1045,7 +1054,7 @@ namespace Gurux.Service.Orm
                    type == typeof(byte[]);
         }
 
-        static internal GXSerializedItem FindRelation(Type target, Type table)
+        static internal GXSerializedItem? FindRelation(Type target, Type table)
         {
             foreach (var it in GetProperties(target))
             {
@@ -1057,7 +1066,7 @@ namespace Gurux.Service.Orm
             return null;
         }
 
-        static internal GXSerializedItem FindAutoIncrement(Type type)
+        static internal GXSerializedItem? FindAutoIncrement(Type type)
         {
             foreach (var it in GetProperties(type))
             {
@@ -1187,7 +1196,8 @@ namespace Gurux.Service.Orm
                             {
                                 value = Convert.ChangeType(value, typeof(T));
                             }
-                            list.Add((T)value);
+                            // SQL NULL is a valid result for reference and nullable T.
+                            list.Add((T)value!);
                         }
                         reader.Close();
                         sw.Stop();
@@ -1503,7 +1513,8 @@ namespace Gurux.Service.Orm
                 }
                 else
                 {
-                    properties = (Dictionary<string, GXSerializedItem>)GXInternal.GetValues(type, false, UpdateAttributes);
+                    properties = GXInternal.GetValues(type, false, UpdateAttributes) as Dictionary<string, GXSerializedItem>
+                        ?? throw new InvalidOperationException("Serialized property metadata could not be created.");
                     SerializedObjects[type] = properties;
                     foreach (var it in properties)
                     {

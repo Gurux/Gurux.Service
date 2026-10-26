@@ -69,7 +69,7 @@ namespace Gurux.Service.Orm
             {
                 return cached!;
             }
-            string sql = HavingToString(Parent.Settings, List, !_joins.List.Any());
+            string? sql = HavingToString(Parent.Settings, List, !_joins.List.Any());
             if (!string.IsNullOrEmpty(sql))
             {
                 StringBuilder sb = new StringBuilder();
@@ -81,7 +81,7 @@ namespace Gurux.Service.Orm
                     Parent.QueryCache.Set(cacheKey, sql, 0);
                 }
             }
-            return sql;
+            return sql ?? string.Empty;
         }
 
         internal int GetItemHash()
@@ -121,7 +121,7 @@ namespace Gurux.Service.Orm
             List.Add(new KeyValuePair<WhereType, LambdaExpression>(WhereType.Or, expression));
         }
 
-        internal static string HavingToString(GXDBSettings settings,
+        internal static string? HavingToString(GXDBSettings settings,
             List<KeyValuePair<WhereType, LambdaExpression>> list, bool singleTable)
         {
             if (list.Count != 0)
@@ -163,7 +163,7 @@ namespace Gurux.Service.Orm
             return null;
         }
 
-        internal static string Having(GXDBSettings Settings, LambdaExpression value, bool singleTable)
+        internal static string? Having(GXDBSettings Settings, LambdaExpression value, bool singleTable)
         {
             if (value != null)
             {

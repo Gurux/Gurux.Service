@@ -40,18 +40,18 @@ namespace Gurux.Service.Orm.Model
         /// <summary>
         /// Column name.
         /// </summary>
-        public string Name;
+        public string? Name { get; set; }
         /// <summary>
         /// Table name.
         /// </summary>
-        public string Table;
+        public string? Table { get; set; }
 
-        public Type TableType;
+        public Type? TableType { get; set; }
 
         /// <summary>
         /// Property setter.
         /// </summary>
-        public GXSerializedItem Setter;
+        public GXSerializedItem? Setter { get; set; }
 
         /// <inheritdoc/>
         public override string ToString()
