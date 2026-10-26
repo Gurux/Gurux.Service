@@ -1573,6 +1573,7 @@ namespace Gurux.Service.Orm
             }
             arg.UseQueryCache(QueryCache);
             arg.Settings = Builder.Settings;
+            arg.PrepareForExecution();
             string query = arg.ToString(false);
             if (string.IsNullOrEmpty(query))
             {

@@ -1968,6 +1968,8 @@ namespace Gurux.Service.Orm.Internal
                 double v => v == 0,
                 decimal v => v == 0,
                 Guid v => v == Guid.Empty,
+                DateTime v => v == default,
+                DateTimeOffset v => v == default,
                 string v => v == string.Empty,
                 null => true,
                 _ => false

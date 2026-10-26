@@ -382,7 +382,8 @@ namespace Gurux.Service.Orm
 
         internal string GetDataBaseType(Type type, object target)
         {
-            if (GXJsonCollection.IsCollection(type)) type = typeof(string);
+            if (GXJsonCollection.IsCollection(type))
+                type = typeof(string);
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
                 type = Nullable.GetUnderlyingType(type);
@@ -963,6 +964,14 @@ namespace Gurux.Service.Orm
                     {
                         value |= (int)Attributes.ConcurrencyCheck;
                     }
+                    else if (att is CreationTimeAttribute)
+                    {
+                        value |= (int)Attributes.CreationTime;
+                    }
+                    else if (att is UpdatedTimeAttribute)
+                    {
+                        value |= (int)Attributes.CurrentTimestamp;
+                    }
                     else if (att is System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedAttribute gen && gen.DatabaseGeneratedOption == System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.None)
                     {
                         value |= (int)Attributes.NotGenerated;
@@ -1219,6 +1228,8 @@ namespace Gurux.Service.Orm
             arg.Settings = Settings;
             string query = arg.ToString(false);
             cancellationToken.ThrowIfCancellationRequested();
+            var schemaCache = connection is DbConnection dbConnection
+                ? Gurux.Service.DB.GXSchemaCache.ForConnection(dbConnection) : null;
             List<object[]> list = new List<object[]>();
             using (IDbCommand com = connection.CreateCommand())
             {
@@ -1289,6 +1300,16 @@ namespace Gurux.Service.Orm
                             {
                                 value = null;
                             }
+                            else if (elementType == typeof(object) &&
+                                arg.Columns.MetadataColumns is { } columns && pos < columns.Length &&
+                                schemaCache?.GetMember(columns[pos]) is { Relation: null } member)
+                            {
+                                Type columnType = Nullable.GetUnderlyingType(member.Type) ?? member.Type;
+                                if (value != null && !columnType.IsInstanceOfType(value))
+                                {
+                                    value = Settings.ChangeType(value, columnType);
+                                }
+                            }
                             values.SetValue(value, pos);
                         }
                         objects.Add((T)(object)values);
@@ -1302,6 +1323,24 @@ namespace Gurux.Service.Orm
             //Find classes.
             Dictionary<Type, TreeLevel> tables = new Dictionary<Type, TreeLevel>();
             int index = 0;
+            if (arg.Columns.Columns.Count == 0 && arg.Columns.MetadataColumns is { } selectedColumns)
+            {
+                var mapped = new Dictionary<int, GXSerializedItem>();
+                int idIndex = 0;
+                for (int position = 0; position < selectedColumns.Length; ++position)
+                {
+                    var member = schemaCache?.GetMember(selectedColumns[position], typeof(T));
+                    if (member != null)
+                    {
+                        mapped.Add(position, member);
+                        if ((member.Attributes & (Attributes.Id | Attributes.PrimaryKey)) != 0)
+                        {
+                            idIndex = position;
+                        }
+                    }
+                }
+                tables.Add(typeof(T), new TreeLevel(typeof(T), idIndex, mapped));
+            }
             if (arg.Columns.Columns.Count != 0)
             {
                 foreach (var it in arg.Columns.Columns)

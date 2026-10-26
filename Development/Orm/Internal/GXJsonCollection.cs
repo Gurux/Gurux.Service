@@ -38,7 +38,7 @@ using System.Text.Json;
 
 namespace Gurux.Service.Orm.Internal;
 
-/// <summary>Maps scalar collections to one JSON text column. Byte arrays retain their binary mapping.</summary>
+/// <summary>Maps scalar collections and string-keyed scalar dictionaries to one JSON text column. Byte arrays retain their binary mapping.</summary>
 internal static class GXJsonCollection
 {
     internal readonly record struct Value(string Json);
@@ -56,7 +56,8 @@ internal static class GXJsonCollection
 
     internal static bool IsCollection(Type type)
     {
-        var element = GetElementType(type);
+        var dictionary = GetDictionaryType(type);
+        var element = dictionary?.GetGenericArguments()[1] ?? GetElementType(type);
         if (element == null)
         {
             return false;
@@ -68,11 +69,21 @@ internal static class GXJsonCollection
             || element == typeof(TimeSpan) || element == typeof(DateOnly) || element == typeof(TimeOnly);
     }
 
+    private static Type? GetDictionaryType(Type type) => type.GetInterfaces().Prepend(type).FirstOrDefault(t =>
+        t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+            || t.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>))
+        && t.GetGenericArguments()[0] == typeof(string));
+
     internal static object? Encode(object? value, Type type) => value == null ? null
-        : new Value(JsonSerializer.Serialize(value, typeof(IEnumerable<>).MakeGenericType(GetElementType(type)!)));
+        : new Value(JsonSerializer.Serialize(value, GetDictionaryType(type)
+            ?? typeof(IEnumerable<>).MakeGenericType(GetElementType(type)!)));
 
     internal static object? Decode(string json, Type type)
     {
+        if (GetDictionaryType(type) != null)
+        {
+            return JsonSerializer.Deserialize(json, type);
+        }
         var element = GetElementType(type)!;
         var listType = typeof(List<>).MakeGenericType(element);
         var values = (IList?)JsonSerializer.Deserialize(json, listType);

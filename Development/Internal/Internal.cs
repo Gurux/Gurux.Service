@@ -134,7 +134,11 @@ namespace Gurux.Common.Internal
         /// Database don't generate value when data is inserted to the database. 
         /// Value is set by application.
         /// </summary>
-        NotGenerated = 0x20000
+        NotGenerated = 0x20000,
+        /// <summary>
+        /// Creation time is generated when data is inserted to the database.
+        /// </summary>
+        CreationTime = 0x40000
     }
 
     [DataContract]
@@ -147,34 +151,34 @@ namespace Gurux.Common.Internal
         /// <summary>
         /// Column 1 table.
         /// </summary>
-        public Type PrimaryTable;
+        public Type PrimaryTable = default!;
 
         /// <summary>
         /// Column 1 id.
         /// </summary>
-        public GXSerializedItem PrimaryId;
+        public GXSerializedItem PrimaryId = default!;
 
         /// <summary>
         /// Column 1 info.
         /// </summary>
-        public GXSerializedItem Column;
+        public GXSerializedItem Column = default!;
 
         /// <summary>
         /// Column 2 table.
         /// </summary>
-        public Type ForeignTable;
+        public Type ForeignTable = default!;
 
         /// <summary>
         /// Column 2 id.
         /// </summary>
-        public GXSerializedItem ForeignId;
+        public GXSerializedItem ForeignId = default!;
 
         /// <summary>
         /// Relation map table if used.
         /// </summary>
-        public GXSerializedItem RelationMapTable;
+        public GXSerializedItem? RelationMapTable;
 
-        public RelationType RelationType;
+        public RelationType RelationType = default!;
     }
 
     class GXSerializedItem

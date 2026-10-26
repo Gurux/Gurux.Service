@@ -312,7 +312,11 @@ namespace Gurux.Service.Orm
                             excluded = GXDbHelpers.ExcludedProperties(Excluded, args, table!);
                             if (multipleRows)
                             {
-                                excluded.AddRange(GXDbHelpers.GetAlwaysNullProperties(table!, Values.Where(w => w.Key != null).Select(v => v.Key!)));
+                                var generatedProperties = GXSqlBuilder.GetProperties(table!);
+                                excluded.AddRange(GXDbHelpers.GetAlwaysNullProperties(table!, Values.Where(w => w.Key != null).Select(v => v.Key!))
+                                    .Where(name => !generatedProperties.TryGetValue(name, out var property) ||
+                                        (property.Attributes & (Attributes.PrimaryKey | Attributes.ConcurrencyCheck |
+                                            Attributes.CreationTime | Attributes.CurrentTimestamp)) == 0));
                             }
                             string tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Table, null, table, null);
                             if (Parent.Settings.Type == DatabaseType.Oracle &&
@@ -387,7 +391,7 @@ namespace Gurux.Service.Orm
                     {
                         object? value;
                         var p = properties != null ? properties[name] : null;
-                        var att = Attributes.AutoIncrement | Attributes.CurrentTimestamp;
+                        var att = Attributes.AutoIncrement;
                         GXSelectArgs? a = it.Key as GXSelectArgs;
                         if (p != null && (p.Attributes & (att)) == 0 &&
                             (p.Relation?.RelationType != RelationType.OneToMany || a != null) &&
@@ -397,8 +401,8 @@ namespace Gurux.Service.Orm
                             if (a == null)
                             {
                                 value = p.Get(it.Key!);
-                                if ((p.Attributes & (Attributes.PrimaryKey | Attributes.ConcurrencyCheck)) != 0 &&
-                                    GXDbHelpers.IsZero(value))
+                                if (((p.Attributes & (Attributes.PrimaryKey | Attributes.ConcurrencyCheck | Attributes.CreationTime)) != 0 &&
+                                    GXDbHelpers.IsZero(value)) || (p.Attributes & (Attributes.CurrentTimestamp)) != 0)
                                 {
                                     //Generate new guid for primary key if it is not set and type is guid.
                                     if (p.Type == typeof(Guid))
@@ -411,6 +415,18 @@ namespace Gurux.Service.Orm
                                     {
                                         modified = true;
                                         value = Guid.CreateVersion7().ToString();
+                                        p.Set(it.Key!, value);
+                                    }
+                                    else if (p.Type == typeof(DateTime) || p.Type == typeof(DateTime?))
+                                    {
+                                        modified = true;
+                                        value = DateTime.Now;
+                                        p.Set(it.Key!, value);
+                                    }
+                                    else if (p.Type == typeof(DateTimeOffset) || p.Type == typeof(DateTimeOffset?))
+                                    {
+                                        modified = true;
+                                        value = DateTimeOffset.Now;
                                         p.Set(it.Key!, value);
                                     }
                                     else

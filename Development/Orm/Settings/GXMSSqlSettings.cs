@@ -892,7 +892,9 @@ END");
         /// <inheritdoc />
         public override string GetLastInsertId(string tableName, string columnName)
         {
-            return "SELECT @@IDENTITY FROM " + tableName;
+            // Identity is connection-local. Reading the table acquires unnecessary
+            // shared locks and can deadlock concurrent inserts before commit.
+            return "SELECT @@IDENTITY";
         }
 
         /// <inheritdoc />

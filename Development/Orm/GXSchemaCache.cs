@@ -1,4 +1,6 @@
 using Gurux.Service.Orm.Common.Model;
+using Gurux.Service.Orm;
+using Gurux.Common.Internal;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -24,6 +26,8 @@ namespace Gurux.Service.DB
         private readonly object _gate = new();
         private readonly Dictionary<string, (GXTableSchema Schema, long Created)> items = new(StringComparer.Ordinal);
         private readonly HashSet<IDbTransaction> _transactions = new();
+        private readonly Dictionary<Type, Dictionary<string, GXSerializedItem>> _modelMembers = new();
+        private readonly ConditionalWeakTable<GXTableSchema, Dictionary<string, GXSerializedItem>> _schemaMembers = new();
         private TimeSpan _cacheTime = TimeSpan.FromMinutes(10);
         private int _operations;
 
@@ -86,6 +90,45 @@ namespace Gurux.Service.DB
                 value.StateChange += (_, _) => cache.Clear();
                 return cache;
             });
+
+        // Native database types stay in the schema. CLR mappings belong to each
+        // returned schema snapshot and remain usable after database cache invalidation.
+        internal GXTableSchema BindModel(GXTableSchema schema, Type modelType)
+        {
+            lock (_gate)
+            {
+                _schemaMembers.Add(schema, GetModelMembers(modelType));
+                return schema;
+            }
+        }
+
+        internal GXSerializedItem? GetMember(GXColumnSchema column, Type? modelType = null)
+        {
+            lock (_gate)
+            {
+                Dictionary<string, GXSerializedItem>? members;
+                if (modelType != null)
+                {
+                    members = GetModelMembers(modelType);
+                }
+                else if (column.Parent == null || !_schemaMembers.TryGetValue(column.Parent, out members))
+                {
+                    return null;
+                }
+                return members.TryGetValue(column.Name, out var member) ? member : null;
+            }
+        }
+
+        private Dictionary<string, GXSerializedItem> GetModelMembers(Type modelType)
+        {
+            if (!_modelMembers.TryGetValue(modelType, out var members))
+            {
+                members = new Dictionary<string, GXSerializedItem>(
+                    GXSqlBuilder.GetProperties(modelType), StringComparer.OrdinalIgnoreCase);
+                _modelMembers.Add(modelType, members);
+            }
+            return members;
+        }
 
         internal void Invalidate(IDbTransaction? transaction)
         {

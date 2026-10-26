@@ -3333,7 +3333,7 @@ namespace Gurux.Service.Orm.Model
         /// <remarks>Uses <see cref="SchemaCache"/> and returns an independently editable schema.</remarks>
         public GXTableSchema Describe<T>(IDbTransaction? transaction = default)
         {
-            return Describe(typeof(T));
+            return transaction == null ? Describe(typeof(T)) : Describe(transaction, typeof(T));
         }
 
         /// <summary>
@@ -3345,7 +3345,8 @@ namespace Gurux.Service.Orm.Model
         public GXTableSchema Describe(Type table)
         {
             string name = Builder.GetTableName(table, false);
-            return Describe(null, name);
+            var schema = Describe(null, name);
+            return SchemaCache.BindModel(schema, table);
         }
 
         /// <summary>
@@ -3358,7 +3359,8 @@ namespace Gurux.Service.Orm.Model
         public GXTableSchema Describe(IDbTransaction transaction, Type table)
         {
             string name = Builder.GetTableName(table, false);
-            return Describe(transaction, name);
+            var schema = Describe(transaction, name);
+            return SchemaCache.BindModel(schema, table);
         }
 
         /// <summary>

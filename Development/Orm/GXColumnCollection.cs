@@ -55,6 +55,7 @@ namespace Gurux.Service.Orm
         internal bool Insert = false;
         internal LambdaExpression? SourceExpression;
         internal GXTableSchema? MetadataTable;
+        internal GXColumnSchema[]? MetadataColumns;
         /// <summary>
         /// Target columns.
         /// </summary>
@@ -549,6 +550,7 @@ namespace Gurux.Service.Orm
         {
             ArgumentNullException.ThrowIfNull(columns);
             columns = columns.ToArray();
+            MetadataColumns = (GXColumnSchema[])columns;
             MetadataTable = columns.FirstOrDefault()?.Parent;
             Expression<Func<object, IEnumerable<GXColumnSchema>>> e = _ => columns;
             List.Add(new(e, null));
@@ -604,6 +606,8 @@ namespace Gurux.Service.Orm
         public void Clear()
         {
             List.Clear();
+            MetadataColumns = null;
+            MetadataTable = null;
         }
 
         /// <summary>

@@ -68,6 +68,55 @@ namespace Gurux.Service.Orm
         [DebuggerBrowsable(DebuggerBrowsableState.Never)]
         internal List<KeyValuePair<Type, LambdaExpression>> Excluded = new List<KeyValuePair<Type, LambdaExpression>>();
 
+        private bool generatedValuesPrepared;
+
+        // SQL rendering is stable; each database execution starts a new generation.
+        internal void PrepareForExecution()
+        {
+            generatedValuesPrepared = false;
+        }
+
+        private void PrepareGeneratedValues()
+        {
+            if (generatedValuesPrepared)
+            {
+                return;
+            }
+            var args = new GXGetMembersArgs(Parent.Settings, TargetType.Column);
+            foreach (var item in Values)
+            {
+                if (item.Key is GXSelectArgs || item.Key is IEnumerable<GXColumnSchema>)
+                {
+                    continue;
+                }
+                var type = item.Key.GetType();
+                var excluded = GXDbHelpers.ExcludedProperties(Excluded, args, type);
+                foreach (var property in GXSqlBuilder.GetProperties(type))
+                {
+                    var p = property.Value;
+                    if (excluded.Contains(property.Key) ||
+                        (p.Attributes & (Attributes.PrimaryKey | Attributes.AutoIncrement | Attributes.NewGuid)) != 0)
+                    {
+                        continue;
+                    }
+                    if ((p.Attributes & Attributes.ConcurrencyCheck) != 0)
+                    {
+                        var stamp = Guid.CreateVersion7();
+                        if (p.Type == typeof(Guid)) p.Set(item.Key, stamp);
+                        else if (p.Type == typeof(string)) p.Set(item.Key, stamp.ToString());
+                        else throw new ArgumentException($"Column {property.Key} is not a string or Guid type.");
+                    }
+                    else if ((p.Attributes & Attributes.CurrentTimestamp) != 0)
+                    {
+                        if (p.Type == typeof(DateTime) || p.Type == typeof(DateTime?)) p.Set(item.Key, DateTime.Now);
+                        else if (p.Type == typeof(DateTimeOffset) || p.Type == typeof(DateTimeOffset?)) p.Set(item.Key, DateTimeOffset.Now);
+                        else throw new ArgumentException($"Column {property.Key} is not a DateTime or DateTimeOffset type.");
+                    }
+                }
+            }
+            generatedValuesPrepared = true;
+        }
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -82,6 +131,7 @@ namespace Gurux.Service.Orm
         /// </summary>
         public void Clear()
         {
+            generatedValuesPrepared = false;
             Parent.Clear();
             Values.Clear();
             Joins.List.Clear();
@@ -116,6 +166,7 @@ namespace Gurux.Service.Orm
         /// <returns>The generated SQL update statement.</returns>
         public string ToString(bool addGenerationTime)
         {
+            PrepareGeneratedValues();
             string sql;
             string cacheKey = Parent.QueryCache.BuildKey(
                 Parent.Settings.Type,
@@ -201,12 +252,18 @@ namespace Gurux.Service.Orm
                     {
                         members = properties.Keys.ToArray();
                     }
+                    if (it.Key is not GXSelectArgs)
+                    {
+                        members = members.Concat(properties.Where(p =>
+                            (p.Value.Attributes & (Attributes.ConcurrencyCheck | Attributes.CurrentTimestamp)) != 0)
+                            .Select(p => p.Key)).Distinct().ToArray();
+                    }
                     foreach (var name in members)
                     {
                         object? value;
                         var p = properties[name];
                         //Primary key is not updated.
-                        if ((p.Attributes & (Attributes.PrimaryKey | Attributes.AutoIncrement | Attributes.NewGuid | Attributes.CurrentTimestamp)) == 0 &&
+                        if ((p.Attributes & (Attributes.PrimaryKey | Attributes.AutoIncrement | Attributes.NewGuid)) == 0 &&
                             p.Relation?.RelationType != RelationType.OneToMany &&
                             p.Relation?.RelationType != RelationType.ManyToMany &&
                             excluded!.Contains(name) != true)
