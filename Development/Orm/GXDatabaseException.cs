@@ -453,7 +453,7 @@ namespace Gurux.Service.Orm
         }
 
 
-        private static DatabaseErrorType GetDb2ErrorType(string sqlState, int? number, out bool isTransient)
+        private static DatabaseErrorType GetDb2ErrorType(string? sqlState, int? number, out bool isTransient)
         {
             isTransient = sqlState == "40001" || number == -911 || number == -913;
             return sqlState switch
@@ -529,7 +529,7 @@ namespace Gurux.Service.Orm
             return DatabaseErrorType.Unknown;
         }
 
-        private static DatabaseErrorType GetSapHanaErrorType(string sqlState, int? number, out bool isTransient)
+        private static DatabaseErrorType GetSapHanaErrorType(string? sqlState, int? number, out bool isTransient)
         {
             isTransient = sqlState == "40001" || number == 133;
             return sqlState switch

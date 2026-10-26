@@ -911,7 +911,7 @@ WHERE TABLE_NAME = '{tableName.ToUpperInvariant()}' AND UPPER(COLUMN_NAME) = '{c
 
 
         /// <inheritdoc/>
-        internal override string? ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object? value, ConvertOption options)
         {
             if (value is DateTime dt)
             {

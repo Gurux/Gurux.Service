@@ -602,7 +602,7 @@ ORDER BY id, seq";
 
 
         /// <inheritdoc/>
-        internal override string? ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object? value, ConvertOption options)
         {
             if (value is byte[] ba)
             {

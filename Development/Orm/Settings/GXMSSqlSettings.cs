@@ -850,7 +850,7 @@ END");
         /// </summary>
         private const string DateTimeFormat = "yyyy-MM-ddTHH:mm:ss";
         /// <inheritdoc/>
-        internal override string? ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object? value, ConvertOption options)
         {
             if (value is DateTime dt)
             {

@@ -295,13 +295,13 @@ namespace Gurux.Service.DB
         /// // Result: "SelectUser|f:123|f:True"
         /// </code>
         /// </example>
-        internal string BuildKey(params object[] values)
+        internal string BuildKey(params object?[] values)
         {
             StringBuilder sb = AcquireBuilder();
             if (values != null)
             {
                 HashSet<object> visited = new HashSet<object>(new ReferenceComparer());
-                foreach (object it in values)
+                foreach (object? it in values)
                 {
                     sb.Append('|');
                     AppendSignature(sb, it, visited, 0);
@@ -417,8 +417,8 @@ namespace Gurux.Service.DB
             }
             if (vt.IsGenericType && vt.GetGenericTypeDefinition() == typeof(KeyValuePair<,>))
             {
-                object kvKey = vt.GetProperty("Key")?.GetValue(value, null);
-                object kvVal = vt.GetProperty("Value")?.GetValue(value, null);
+                object? kvKey = vt.GetProperty("Key")?.GetValue(value, null);
+                object? kvVal = vt.GetProperty("Value")?.GetValue(value, null);
                 sb.Append("kv(");
                 AppendSignature(sb, kvKey, visited, depth + 1);
                 sb.Append(',');
@@ -621,7 +621,7 @@ namespace Gurux.Service.DB
                 {
                     continue;
                 }
-                object value;
+                object? value;
                 try
                 {
                     value = it.GetValue(settings, null);

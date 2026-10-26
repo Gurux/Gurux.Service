@@ -691,7 +691,7 @@ FLUSH PRIVILEGES;
         }
 
         /// <inheritdoc/>
-        internal override string? ConvertToString(object value, ConvertOption options)
+        internal override string? ConvertToString(object? value, ConvertOption options)
         {
             const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
             if (value is Guid id)

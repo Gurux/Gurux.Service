@@ -852,7 +852,7 @@ namespace Gurux.Service.Orm.Settings
         /// <param name="value">Value to be converted.</param>
         /// <param name="options">Conversion options.</param>
         /// <returns>Converted string value.</returns>
-        internal virtual string? ConvertToString(object value, ConvertOption options = ConvertOption.Quete)
+        internal virtual string? ConvertToString(object? value, ConvertOption options = ConvertOption.Quete)
         {
             if (value is GXJsonCollection.Value collection)
             {

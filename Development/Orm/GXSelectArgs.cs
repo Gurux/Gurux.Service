@@ -561,7 +561,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public static GXSelectArgs SelectById<T>(Guid id, Expression<Func<T, object>> columns)
+        public static GXSelectArgs SelectById<T>(Guid id, Expression<Func<T, object>>? columns)
         {
             return SelectById<T, Guid>(id, columns);
         }
@@ -573,7 +573,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
-        public static GXSelectArgs SelectById<T>(Guid id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        public static GXSelectArgs SelectById<T>(Guid id, Expression<Func<T, object>>? columns, GXQueryCache queryCache)
         {
             return SelectById<T, Guid>(id, columns, queryCache);
         }
@@ -630,7 +630,7 @@ namespace Gurux.Service.Orm
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
-        public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>> columns)
+        public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>>? columns)
         {
             return SelectById<T, UInt64>(id, columns);
         }
@@ -642,7 +642,7 @@ namespace Gurux.Service.Orm
         /// <param name="id">Item's ID.</param>
         /// <param name="columns">Selected columns.</param>
         /// <param name="queryCache">The query cache instance to use.</param>
-        public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>> columns, GXQueryCache queryCache)
+        public static GXSelectArgs SelectById<T>(UInt64 id, Expression<Func<T, object>>? columns, GXQueryCache queryCache)
         {
             return SelectById<T, UInt64>(id, columns, queryCache);
         }

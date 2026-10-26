@@ -1001,8 +1001,8 @@ namespace Gurux.Service.Orm.Model
                         if (it.Value.Relation != null &&
                             it.Value.Relation.RelationType == RelationType.OneToOne)
                         {
-                            //If 1:1 ralation
-                            sb.Append(Builder.GetDataBaseType(it.Value.Relation.ForeignId.Type, it.Value.Relation));
+                            // Match CREATE TABLE: foreign keys use the referenced key's storage attributes.
+                            sb.Append(Builder.GetDataBaseType(it.Value.Relation.ForeignId.Type, it.Value.Relation.ForeignId.Target));
                         }
                         else
                         {
@@ -1042,7 +1042,7 @@ namespace Gurux.Service.Orm.Model
                         out int length, out string databaseType);
                     object target = it.Value.Relation != null &&
                         it.Value.Relation.RelationType == RelationType.OneToOne
-                        ? it.Value.Relation
+                        ? it.Value.Relation.ForeignId.Target
                         : it.Value.Target;
                     string expectedType = Builder.GetDataBaseType(newType, target);
                     if (oldType != newType &&
@@ -1186,7 +1186,7 @@ namespace Gurux.Service.Orm.Model
                 }
                 Type expected = GetColumnDataType(type, item.Value);
                 Type actual = Builder.GetColumnType(this, tableName, item.Key, Connection, transaction, OnSqlExecuted, out int length, out string databaseType);
-                object target = item.Value.Relation != null && item.Value.Relation.RelationType == RelationType.OneToOne ? item.Value.Relation : item.Value.Target;
+                object target = item.Value.Relation != null && item.Value.Relation.RelationType == RelationType.OneToOne ? item.Value.Relation.ForeignId.Target : item.Value.Target;
                 if (actual != expected && !IsSameDatabaseType(databaseType, length, Builder.GetDataBaseType(expected, target), Builder.Settings.Type))
                 {
                     changes.Add("Column type changed: " + item.Key);
@@ -2197,7 +2197,7 @@ namespace Gurux.Service.Orm.Model
 
             string convertedType = Builder.GetDataBaseType(newType, item.Relation != null &&
                 item.Relation.RelationType == RelationType.OneToOne
-                ? item.Relation
+                ? item.Relation.ForeignId.Target
                 : item.Target);
             string addConvertedColumn = Builder.Settings.Type == DatabaseType.SapHana
                 ? $"ALTER TABLE {quotedTable} ADD ({quotedTemporary} {convertedType} NULL)"

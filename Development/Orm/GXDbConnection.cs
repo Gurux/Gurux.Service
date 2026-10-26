@@ -112,7 +112,7 @@ namespace Gurux.Service.Orm
             _queryCache.Clear();
         }
 
-        private RenameEventHandler rename;
+        private RenameEventHandler? rename;
 
         /// <summary>
         /// Used database.
@@ -288,7 +288,7 @@ namespace Gurux.Service.Orm
         /// <summary>
         /// Execute scalar.
         /// </summary>
-        /// <param name="query">The scalar query.</param>
+        /// <param name="args">The scalar query arguments.</param>
         /// <returns>Returns the result of the scalar query.</returns>
         /// <typeparam name="T">CLR type used to convert the scalar result.</typeparam>
         /// <param name="cancellationToken">Token used to cancel query execution.</param>
@@ -1474,8 +1474,11 @@ namespace Gurux.Service.Orm
                 if (arg.Id != null)
                 {
                     //Get last ID.
-                    GXSerializedItem? s = arg.Id?.ValuePair?.Value;
-                    var id = GetLastInsertId(connection, transaction, s.Type, arg.Id?.ValuePair?.Key, arg.Id?.Type);
+                    var insertItem = arg.Id.Value;
+                    var idColumn = insertItem.ValuePair
+                        ?? throw new InvalidOperationException("Insert identity column metadata is missing.");
+                    GXSerializedItem s = idColumn.Value;
+                    var id = GetLastInsertId(connection, transaction, s.Type, idColumn.Key, insertItem.Type);
                     if (arg.Values.Count > 1)
                     {
                         if (Builder.Settings.Type != DatabaseType.MySQL &&
