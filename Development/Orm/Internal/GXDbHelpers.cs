@@ -1624,8 +1624,18 @@ namespace Gurux.Service.Orm.Internal
                 args.MethodCallExpression = unaryExpression.Operand as MethodCallExpression;
                 if (args.MethodCallExpression != null)
                 {
+                    var previousUnaryExpression = args.UnaryExpression;
                     args.UnaryExpression = unaryExpression;
-                    return HandleMethod(args, args.TargetType | TargetType.Column);
+                    try
+                    {
+                        return HandleMethod(args, args.TargetType | TargetType.Column);
+                    }
+                    finally
+                    {
+                        // Negation belongs to this method call, not subsequent
+                        // predicates sharing the expression translation context.
+                        args.UnaryExpression = previousUnaryExpression;
+                    }
                 }
                 args.Expression = unaryExpression.Operand;
                 return GetMembers(args, args.TargetType);
