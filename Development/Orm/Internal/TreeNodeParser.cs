@@ -107,7 +107,9 @@ namespace Gurux.Service.Orm.Internal
             ArgumentNullException.ThrowIfNull(rows);
             ArgumentNullException.ThrowIfNull(levels);
 
-            if (!levels.Any())
+            // The result type determines the root, independently of SQL column order.
+            TreeLevel[] orderedLevels = levels.OrderByDescending(level => level.type == typeof(T)).ToArray();
+            if (orderedLevels.Length == 0)
             {
                 return new List<T>();
             }
@@ -119,7 +121,7 @@ namespace Gurux.Service.Orm.Internal
             foreach (object[] row in rows)
             {
                 List<TreeNode> rowNodes = [];
-                foreach (TreeLevel level in levels)
+                foreach (TreeLevel level in orderedLevels)
                 {
                     object? id = row[level.IdIndex];
                     if (id is null || id is DBNull)
