@@ -229,7 +229,7 @@ namespace Gurux.Service.Orm.Model
         /// Create new table.
         /// </summary>
         /// <typeparam name="T">The mapped entity type.</typeparam>
-        /// <param name="relations">Are relation tables created also.</param>
+        /// <param name="relations">Whether to create related tables and external foreign keys. False creates only this table and its columns.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
         public void CreateTable<T>(bool relations, bool overwrite)
         {
@@ -250,7 +250,7 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <typeparam name="T">The mapped entity type.</typeparam>
         /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
-        /// <param name="relations">Are relation tables created also.</param>
+        /// <param name="relations">Whether to create related tables and external foreign keys. False creates only this table and its columns.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
         public void CreateTable<T>(IDbTransaction? transaction, bool relations, bool overwrite)
         {
@@ -738,7 +738,7 @@ namespace Gurux.Service.Orm.Model
         /// Create new table.
         /// </summary>
         /// <param name="type">Type of the table.</param>
-        /// <param name="relations">Are relation tables created also.</param>
+        /// <param name="relations">Whether to create related tables and external foreign keys. False creates only this table and its columns.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
         public void CreateTable(Type type, bool relations, bool overwrite)
         {
@@ -750,7 +750,7 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         /// <param name="transaction">The database transaction to use, or null to create a new transaction.</param>
         /// <param name="type">Type of the table.</param>
-        /// <param name="relations">Are relation tables created also.</param>
+        /// <param name="relations">Whether to create related tables and external foreign keys. False creates only this table and its columns.</param>
         /// <param name="overwrite">Old table is dropped first if exists.</param>
         public int CreateTable(IDbTransaction? transaction, Type type, bool relations, bool overwrite)
         {
@@ -826,7 +826,7 @@ namespace Gurux.Service.Orm.Model
                     }
                 }
 
-                CreateTable(connection, transaction, type, tables);
+                CreateTable(connection, transaction, type, tables, relations);
             }
             catch (Exception)
             {
@@ -837,10 +837,10 @@ namespace Gurux.Service.Orm.Model
 
         private void CreateTable(IDbConnection connection,
             IDbTransaction? transaction,
-            Type type, Dictionary<Type, GXSerializedItem?> tables)
+            Type type, Dictionary<Type, GXSerializedItem?> tables, bool relations)
         {
             Dictionary<Type, GXTableCreateQuery> tablesCreationQueries = new Dictionary<Type, GXTableCreateQuery>();
-            GetCreateTableQueries(true, type, null, tables, tablesCreationQueries, true);
+            GetCreateTableQueries(true, type, null, tables, tablesCreationQueries, true, relations);
             List<Type> created = new List<Type>();
             foreach (var it in tablesCreationQueries)
             {
@@ -1567,9 +1567,10 @@ namespace Gurux.Service.Orm.Model
         /// <param name="tables">Dictionary of tables.</param>
         /// <param name="tablesCreationQueries">Dictionary of table creation queries.</param>
         /// <param name="isForeignKey">Is FK to relation. This is used when tables are created or dropped.</param>
+        /// <param name="relations">Whether to traverse relations and create external foreign keys.</param>
         GXTableCreateQuery GetCreateTableQueries(bool create, Type type, GXTableCreateQuery? parent,
             Dictionary<Type, GXSerializedItem?> tables,
-            Dictionary<Type, GXTableCreateQuery> tablesCreationQueries, bool isForeignKey)
+            Dictionary<Type, GXTableCreateQuery> tablesCreationQueries, bool isForeignKey, bool relations = true)
         {
             GXTableCreateQuery t, m;
             GXTableCreateQuery tableItem;
@@ -1673,53 +1674,61 @@ namespace Gurux.Service.Orm.Model
                             //Create relations.
                             if (it.Value.Relation != null && it.Value.Relation.ForeignTable != type)
                             {
-                                if (it.Value.Relation.RelationType == RelationType.OneToMany)
+                                if (!relations && (it.Value.Relation.RelationType == RelationType.OneToMany ||
+                                    it.Value.Relation.RelationType == RelationType.ManyToMany))
                                 {
-                                    if (create)
-                                    {
-                                        t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
-                                            tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
-                                    }
-                                    else
-                                    {
-                                        t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, tableItem, tables,
-                                            tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
-                                    }
                                     continue;
                                 }
-                                else if (it.Value.Relation.RelationType == RelationType.ManyToMany)
+                                if (relations)
                                 {
-                                    t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
-                                            tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
-
-                                    m = GetCreateTableQueries(create, (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).PrimaryTable, null, tables,
-                                            tablesCreationQueries, (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).RelationType != RelationType.Relation);
-                                    if (!create)//Drop table.
-                                    {
-                                        tableItem.Dependencies.Add(m);
-                                    }
-                                    continue;
-                                }
-                                else
-                                {
-                                    //If 1:1
-                                    if (it.Value.Relation.RelationMapTable == null)
+                                    if (it.Value.Relation.RelationType == RelationType.OneToMany)
                                     {
                                         if (create)
                                         {
-                                            t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, tableItem, tables,
+                                            t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
                                                 tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
                                         }
                                         else
                                         {
-                                            t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
-                                                 tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
+                                            t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, tableItem, tables,
+                                                tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
                                         }
+                                        continue;
                                     }
-                                    else //If relation map table.
+                                    else if (it.Value.Relation.RelationType == RelationType.ManyToMany)
                                     {
                                         t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
-                                            tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
+                                                tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
+
+                                        m = GetCreateTableQueries(create, (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).PrimaryTable, null, tables,
+                                                tablesCreationQueries, (it.Value.Relation.RelationMapTable?.Relation ?? throw new InvalidOperationException("Relation map metadata is missing.")).RelationType != RelationType.Relation);
+                                        if (!create)//Drop table.
+                                        {
+                                            tableItem.Dependencies.Add(m);
+                                        }
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        //If 1:1
+                                        if (it.Value.Relation.RelationMapTable == null)
+                                        {
+                                            if (create)
+                                            {
+                                                t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, tableItem, tables,
+                                                    tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
+                                            }
+                                            else
+                                            {
+                                                t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
+                                                     tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
+                                            }
+                                        }
+                                        else //If relation map table.
+                                        {
+                                            t = GetCreateTableQueries(create, it.Value.Relation.ForeignTable, null, tables,
+                                                tablesCreationQueries, it.Value.Relation.RelationType != RelationType.Relation);
+                                        }
                                     }
                                 }
                                 tp = it.Value.Relation.ForeignId.Type;
@@ -1899,7 +1908,7 @@ namespace Gurux.Service.Orm.Model
                                     sb.Append("' ");
                                 }
                             }
-                            if (it.Value.Relation != null &&
+                            if (it.Value.Relation != null && (relations || it.Value.Relation.ForeignTable == type) &&
                                     it.Value.Relation.RelationType == RelationType.OneToOne)
                             {
                                 fkStr.Append(", ");
