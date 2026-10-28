@@ -371,7 +371,7 @@ namespace Gurux.Service.DB
             if (value is LambdaExpression lambda)
             {
                 sb.Append("l:");
-                sb.Append(lambda.ReturnType.FullName);
+                sb.Append(lambda.Type.AssemblyQualifiedName);
                 sb.Append(':');
                 sb.Append(lambda.ToString());
                 AppendExpressionValues(sb, lambda.Body, visited, depth + 1);
