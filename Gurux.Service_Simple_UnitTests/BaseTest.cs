@@ -1045,10 +1045,7 @@ namespace Gurux.Service_Simple_Unit_Test
             List<TestClass> tmp = [];
             IEnumerable<Guid> list = tmp.Select(s => s.Guid);
             GXSelectArgs arg = GXSelectArgs.Select<TestClass>(x => x.Guid, w => list.Contains(w.Guid), _cache);
-            Assert.ThrowsExactly<ArgumentOutOfRangeException>(() =>
-            {
-                _ = arg.ToString(false);
-            }, "Where IN expression empty.");
+            StringAssert.Contains(arg.ToString(false), "WHERE 1 = 0");
         }
 
         /// <summary>

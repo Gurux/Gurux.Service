@@ -353,6 +353,11 @@ namespace Gurux.Service.Orm.Model
                 AppendSchemaForeignKeyAction(sb, "UPDATE", key.OnUpdate);
             }
             sb.Append(')');
+            if (Builder.Settings.Type == DatabaseType.Oracle)
+            {
+                //Deferred segment allocation can fail the first SERIALIZABLE insert (ORA-08177).
+                sb.Append(" SEGMENT CREATION IMMEDIATE");
+            }
             ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, sb.ToString());
 
             var primaryKeyNames = primaryKeys.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -1251,6 +1256,8 @@ namespace Gurux.Service.Orm.Model
                 ForeignKeyAction delete = attribute.OnDelete switch
                 {
                     ForeignKeyDelete.Cascade => ForeignKeyAction.Cascade,
+                    //Oracle's default NO ACTION enforces the attribute's delete restriction.
+                    ForeignKeyDelete.Restrict when Builder.Settings.Type == DatabaseType.Oracle => ForeignKeyAction.NoAction,
                     ForeignKeyDelete.Restrict => ForeignKeyAction.Restrict,
                     _ => ForeignKeyAction.NoAction
                 };
@@ -1967,7 +1974,11 @@ namespace Gurux.Service.Orm.Model
                                         break;
                                     case ForeignKeyDelete.Restrict:
                                         //ON DELETE RESTRICT doesn't work with MSSSQL.
-                                        fkStr.Append(" ON DELETE NO ACTION");
+                                        //Oracle enforces this action by default and rejects ON DELETE NO ACTION.
+                                        if (Builder.Settings.Type != DatabaseType.Oracle)
+                                        {
+                                            fkStr.Append(" ON DELETE NO ACTION");
+                                        }
                                         break;
                                     default:
                                         break;
@@ -2012,6 +2023,11 @@ namespace Gurux.Service.Orm.Model
                     if (create)
                     {
                         sb.Append(')');
+                        if (Builder.Settings.Type == DatabaseType.Oracle)
+                        {
+                            //Allocate table and index segments before a SERIALIZABLE transaction starts.
+                            sb.Append(" SEGMENT CREATION IMMEDIATE");
+                        }
                         tableItem.Queries.Add(sb.ToString());
 
                         DescriptionAttribute? tableDescription =

@@ -1,70 +1,72 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
- <PropertyGroup>
-    <RootNamespace>Gurux.Service</RootNamespace>
-    <AssemblyName>Gurux.Service</AssemblyName>
-    <Company>Gurux Ltd</Company>
-    <Authors>Gurux Ltd</Authors>
-    <Copyright>Copyright (c) 1998-2026 Gurux Ltd. All rights reserved.</Copyright>
-    <PackageProjectUrl>www.gurux.fi/index.php?q=Gurux.Service</PackageProjectUrl>
-    <Description>Gurux.Service class implements Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.</Description>
-    <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
-    <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <TargetFrameworks>net10.0;net90;</TargetFrameworks>
-    <Nullable>enable</Nullable>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
-    <PackageTags>Gurux Service framework.</PackageTags>
-    <PackageId>Gurux.Service</PackageId>
-    <ApplicationIcon></ApplicationIcon>
-    <ApplicationIcon>..\gurux_service.ico</ApplicationIcon> 
-    <RuntimeFrameworkVersion>2.1.0</RuntimeFrameworkVersion>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
-    <PackageIcon>gurux_service.png</PackageIcon>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <GenerateDocumentationFile>True</GenerateDocumentationFile>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Gurux.Service.Common" Version="3.0.2610.2601" />
-    <PackageReference Include="System.Data.Odbc" Version="10.0.14" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
- </ItemGroup>
+    <PropertyGroup>
+        <RootNamespace>Gurux.Service</RootNamespace>
+        <AssemblyName>Gurux.Service</AssemblyName>
+        <Company>Gurux Ltd</Company>
+        <Authors>Gurux Ltd</Authors>
+        <Copyright>Copyright (c) 1998-2026 Gurux Ltd. All rights reserved.</Copyright>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>www.gurux.fi/index.php?q=Gurux.Service</PackageProjectUrl>
+        <Description>Gurux.Service class implements Object Relational Mapping (ORM) component for c#. Purpose of Gurux ORM component is give FAST and SIMPLE to use component that you can use to serialize your database data to C# objects.</Description>
+        <Version Condition=" '$(BUILD_BUILDNUMBER)' == '' ">0.0.1-local</Version>
+        <Version Condition=" '$(BUILD_BUILDNUMBER)' != '' ">$(BUILD_BUILDNUMBER)</Version>
+        <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+        <TargetFrameworks>net10.0;net9.0;</TargetFrameworks>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <RepositoryUrl>https://github.com/gurux/Gurux.Service</RepositoryUrl>
+        <PackageTags>Gurux Service framework.</PackageTags>
+        <PackageId>Gurux.Service</PackageId>
+        <ApplicationIcon></ApplicationIcon>
+        <ApplicationIcon>..\gurux_service.ico</ApplicationIcon>
+        <RuntimeFrameworkVersion>2.1.0</RuntimeFrameworkVersion>
+        <PlatformTarget>AnyCPU</PlatformTarget>
+        <PackageLicenseExpression>GPL-2.0-only</PackageLicenseExpression>
+        <PackageIcon>gurux_service.png</PackageIcon>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <GenerateDocumentationFile>True</GenerateDocumentationFile>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Gurux.Service.Common" Version="3.0.2610.2601" />
+        <PackageReference Include="System.Data.Odbc" Version="10.0.14" />
+        <PackageReference Include="System.Data.SqlClient" Version="4.9.1" />
+    </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
-    <Reference Include="System.Web" />
-    <Reference Include="System.ComponentModel.DataAnnotations" />
-  </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net46' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
+        <Reference Include="System.Web" />
+        <Reference Include="System.ComponentModel.DataAnnotations" />
+    </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
-    <Reference Include="System.Data.Linq" />
-  </ItemGroup>
- 
- <ItemGroup>
-    <None Include="..\gurux_service.png" Pack="true" PackagePath="\" />
-  </ItemGroup>
- <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
-   <PackageReference Include="System.Data.Odbc">
-     <Version>5.0.0</Version>
-   </PackageReference>
- </ItemGroup>
- <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp2.1'">
-   <PackageReference Include="System.Data.Odbc">
-     <Version>5.0.0</Version>
-   </PackageReference>
- </ItemGroup>
- <ItemGroup>
-   <Compile Update="Properties\Resources.Designer.cs">
-     <DesignTime>True</DesignTime>
-     <AutoGen>True</AutoGen>
-     <DependentUpon>Resources.resx</DependentUpon>
-   </Compile>
- </ItemGroup>
- <ItemGroup>
-   <EmbeddedResource Update="Properties\Resources.resx">
-     <Generator>ResXFileCodeGenerator</Generator>
-     <LastGenOutput>Resources.Designer.cs</LastGenOutput>
-   </EmbeddedResource>
- </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'net45' or '$(TargetFramework)' == 'net40' or '$(TargetFramework)' == 'net35' or '$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
+        <Reference Include="System.Data.Linq" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\gurux_service.png" Pack="true" PackagePath="\" />
+        <None Include="..\README.md" Link="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1' or '$(TargetFramework)' == 'netcoreapp5.0'">
+        <PackageReference Include="System.Data.Odbc">
+            <Version>5.0.0</Version>
+        </PackageReference>
+    </ItemGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp2.1'">
+        <PackageReference Include="System.Data.Odbc">
+            <Version>5.0.0</Version>
+        </PackageReference>
+    </ItemGroup>
+    <ItemGroup>
+        <Compile Update="Properties\Resources.Designer.cs">
+            <DesignTime>True</DesignTime>
+            <AutoGen>True</AutoGen>
+            <DependentUpon>Resources.resx</DependentUpon>
+        </Compile>
+    </ItemGroup>
+    <ItemGroup>
+        <EmbeddedResource Update="Properties\Resources.resx">
+            <Generator>ResXFileCodeGenerator</Generator>
+            <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+        </EmbeddedResource>
+    </ItemGroup>
 </Project>

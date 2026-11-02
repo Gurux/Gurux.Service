@@ -539,20 +539,17 @@ namespace Gurux.Service.DB
                     }
                     break;
                 case MemberExpression member:
-                    AppendExpressionValues(sb, member.Expression, visited, depth + 1);
-                    if (member.Expression is ConstantExpression closure)
+                    // Only the referenced member contributes to SQL. Walking its
+                    // containing closure/object also reads unrelated services and
+                    // provider properties, which can throw or have side effects.
+                    if (TryGetCapturedValue(member, out object? captured))
                     {
-                        object? captured = null;
-                        if (member.Member is FieldInfo field)
-                        {
-                            captured = field.GetValue(closure.Value);
-                        }
-                        else if (member.Member is PropertyInfo property)
-                        {
-                            captured = property.GetValue(closure.Value, null);
-                        }
                         sb.Append(":cv:");
                         AppendSignature(sb, captured, visited, depth + 1);
+                    }
+                    else
+                    {
+                        AppendExpressionValues(sb, member.Expression, visited, depth + 1);
                     }
                     break;
                 case NewExpression newExpression:
@@ -585,6 +582,31 @@ namespace Gurux.Service.DB
                     }
                     break;
             }
+        }
+
+        private static bool TryGetCapturedValue(Expression? expression, out object? value)
+        {
+            if (expression is ConstantExpression constant)
+            {
+                value = constant.Value;
+                return true;
+            }
+            if (expression is MemberExpression member &&
+                TryGetCapturedValue(member.Expression, out object? owner))
+            {
+                if (member.Member is FieldInfo field)
+                {
+                    value = field.GetValue(owner);
+                    return true;
+                }
+                if (member.Member is PropertyInfo property)
+                {
+                    value = property.GetValue(owner, null);
+                    return true;
+                }
+            }
+            value = null;
+            return false;
         }
 
         /// <summary>

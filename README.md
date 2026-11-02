@@ -1,10 +1,8 @@
 # Gurux ORM
 
-See [Gurux](http://www.gurux.org/ "Gurux") for an overview.  
-Join the Gurux Community or follow [@Gurux](http://twitter.com/guruxorg "@Gurux") for project updates.
+**Gurux ORM** is an open-source object-relational mapper for C#, distributed as the `Gurux.Service` NuGet package. It maps C# models to database tables and uses lambda expressions to build queries across multiple database engines.
 
-**Gurux ORM** is an open-source **Object Relational Mapping (ORM)** component for **C#**, part of the **Gurux Device Framework**.  
-Its goal is to provide a **fast** and **easy-to-use** ORM that works across multiple database engines.
+Part of the [Gurux Device Framework](https://www.gurux.org/).
 
 ---
 
@@ -16,6 +14,7 @@ Its goal is to provide a **fast** and **easy-to-use** ORM that works across mult
 - Lambda-expression query support  
 - Attribute-driven schema mapping  
 - Supports `1:1`, `1:N`, and `N:N` relationships
+- [Cached schema status](docs/schema-status.md) through `GXSchemaManager`, with concurrent scan coalescing and DDL invalidation
 
 ---
 
@@ -32,6 +31,28 @@ Its goal is to provide a **fast** and **easy-to-use** ORM that works across mult
 
 ---
 
+## Installation
+
+Install the ORM and an ADO.NET provider for your database. For the SQLite example below:
+
+```shell
+dotnet add package Gurux.Service
+dotnet add package System.Data.SQLite.Core
+```
+
+The current source project targets .NET 9 and .NET 10. Building all targets requires the corresponding SDKs or targeting packs.
+
+Use these namespaces for the model and query examples:
+
+```csharp
+using Gurux.Service.Orm;
+using Gurux.Service.Orm.Common;
+using Gurux.Service.Orm.Common.Enums;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Runtime.Serialization;
+```
+
 ## ⚙️ Key Attributes
 
 | Attribute | Description |
@@ -41,9 +62,7 @@ Its goal is to provide a **fast** and **easy-to-use** ORM that works across mult
 | `ForeignKey` | Defines a foreign key relation. |
 | `Relation` | Declares a relation between tables. |
 | `Alias` | SQL alias for fields/tables. |
-| `UseEnumStringValue` | Save enums as strings (default is integer). |
-| `UseEpochTimeFormat` | Store dates as UNIX epoch. |
-| `StringLength(int max)` | Validates and limits string length in the schema. |
+| `StringLength(int max)` | Specifies the maximum string length in the schema. |
 | `IsRequired` | Field must have a value (NOT NULL). |
 
 ---
@@ -60,8 +79,9 @@ Gurux ORM supports:
 
 ## 🏗️ Defining C# Classes
 
-All ORM classes must implement `IUnique<T>`, ensuring a unique ID for each object.  
-This makes lookups faster and relations easier to manage.
+Implement `IUnique<T>` on entities that expose an `Id` property, as shown below. Use `DataContract` and `DataMember` to declare the mapped model and its columns.
+
+`UseEnumStringValue` and `UseEpochTimeFormat` are database settings, rather than model attributes.
 
 ---
 
@@ -119,49 +139,14 @@ Connection.Insert(GXInsertArgs.Insert(finland));
 
 ### Company ↔ Users (1:N)
 
-`GXUser` holds a direct reference to `GXCompany` (no `CompanyId`).
+To extend the country/company model, add this property to `GXCompany`. The `GXUser` model in the next section holds the corresponding company reference.
 
 ```csharp
-[DataContract]
-class GXCompany : IUnique<long>
-{
-    [AutoIncrement, DataMember]
-    public long Id { get; set; }
-
-    [DataMember, IsRequired, StringLength(150)]
-    public string Name { get; set; }
-
-    [DataMember, ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
-    public GXUser[] Users { get; set; }
-}
-
-[DataContract]
-class GXUser : IUnique<int>
-{
-    [AutoIncrement, DataMember]
-    public int Id { get; set; }
-
-    [DataMember, IsRequired, StringLength(120)]
-    public string Name { get; set; }
-
-    [DataMember, ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
-    public GXCompany Company { get; set; }
-}
+[DataMember, ForeignKey(OnDelete = ForeignKeyDelete.Cascade)]
+public GXUser[] Users { get; set; }
 ```
 
-**Usage Example:**
-
-```csharp
-GXCompany company = new GXCompany { Name = "Gurux Ltd" };
-GXUser u1 = new GXUser { Name = "Alice", Company = company };
-GXUser u2 = new GXUser { Name = "Bob", Company = company };
-company.Users = new[] { u1, u2 };
-
-// Create Company and all related tables (Users) in one go
-Connection.CreateTable<GXCompany>(true, false);
-
-Connection.Insert(GXInsertArgs.Insert(company));
-```
+The following sections extend the same model. Combine the properties in one declaration per class.
 
 ---
 
@@ -232,53 +217,49 @@ Connection.Insert(GXInsertArgs.Insert(user));
 
 ## ⚡ Quick Start
 
-Create all related tables with a single call, do CRUD, and prefer `GXDeleteArgs.Delete(obj)` when you have the instance.
+The following example is self-contained. It uses an in-memory SQLite database and a simple model to demonstrate create, read, update, and delete operations.
 
 ```csharp
-using Gurux.ORM;
-using System.Collections.Generic;
+using Gurux.Service.Orm;
+using Gurux.Service.Orm.Common;
+using System.ComponentModel.DataAnnotations;
 using System.Data.SQLite;
+using System.Runtime.Serialization;
 
 class Program
 {
     static void Main()
     {
-        // 1. Connect to SQLite (you can also use MySQL, SQL Server, etc.)
-        var sqlite = new SQLiteConnection("Data Source=:memory:");
-        var Connection = new GXDbConnection(sqlite, null);
+        using var sqlite = new SQLiteConnection("Data Source=:memory:");
+        // GXDbConnection opens the underlying connection if necessary.
+        var connection = new GXDbConnection(sqlite);
+        connection.CreateTable<Person>(true, false);
 
-        // 2. Create all related tables starting from GXCountry
-        Connection.CreateTable<GXCountry>(true, false);
+        var person = new Person { Name = "Alice" };
+        connection.Insert(GXInsertArgs.Insert(person));
+        // The generated ID is written back to person.Id.
 
-        // 3. Insert data
-        GXCountry finland = new GXCountry { Name = "Finland" };
-        GXCompany gurux = new GXCompany { Name = "Gurux Ltd", Country = finland };
-        GXCompany sample = new GXCompany { Name = "Sample Co", Country = finland };
-        finland.Companies = new List<GXCompany> { gurux, sample };
-        Connection.Insert(GXInsertArgs.Insert(finland));
+        var query = GXSelectArgs.Select<Person>(p => "*", p => p.Id == person.Id);
+        var people = connection.Select<Person>(query);
 
-        GXUser john = new GXUser { Name = "John", Company = gurux };
-        GXUser jane = new GXUser { Name = "Jane", Company = gurux };
-        Connection.Insert(GXInsertArgs.Insert(john));
-        Connection.Insert(GXInsertArgs.Insert(jane));
-
-        GXUserGroup devs = new GXUserGroup { Name = "Developers" };
-        john.Groups = new[] { devs };
-        Connection.Insert(GXInsertArgs.Insert(john));
-
-        // 4. Query data
-        GXSelectArgs selectUsers = GXSelectArgs.SelectAll<GXUser>();
-        List<GXUser> users = Connection.Select<GXUser>(selectUsers);
-
-        // 5. Update data
-        john.Name = "John Updated";
-        Connection.Update(GXUpdateArgs.Update(john, q => q.Name));
-
-        // 6. Delete data (preferred when you have the instance)
-        Connection.Delete(GXDeleteArgs.Delete(john));
+        person.Name = "Alice Updated";
+        connection.Update(GXUpdateArgs.Update(person, p => p.Name));
+        connection.Delete(GXDeleteArgs.Delete(person));
     }
 }
+
+[DataContract]
+public class Person : IUnique<int>
+{
+    [DataMember, AutoIncrement]
+    public int Id { get; set; }
+
+    [DataMember, IsRequired, StringLength(120)]
+    public string Name { get; set; } = string.Empty;
+}
 ```
+
+The remaining examples use the related `GXCountry`, `GXCompany`, `GXUser`, and `GXUserGroup` models above. `Connection` denotes an initialized `GXDbConnection`.
 
 ---
 
@@ -309,7 +290,7 @@ arg.Joins.AddInnerJoin<GXUserToUserGroup, GXUserGroup>(j => j.GroupId, j => j.Id
 arg.Where.And<GXUserGroup>(g => g.Name == "Developers");
 
 // Sort: users by Name (ascending)
-arg.OrderBy.Add<GXUser>(u => u.Name, true);
+arg.OrderBy.Add<GXUser>(u => u.Name);
 
 var developers = Connection.Select<GXUser>(arg);
 ```
@@ -323,11 +304,11 @@ var groupsSub = GXSelectArgs.Select<GXUserGroup>(g => g.Id, g => g.Name == "Deve
 // Users whose Groups contain one of the subquery results
 var usersInDevs = GXSelectArgs.Select<GXUser>(
     s => "*",
-    u => GXSql.In(u => u.Groups, groupsSub)
+    u => GXSql.In(u.Groups, groupsSub)
 );
 
 // Optional sort
-usersInDevs.OrderBy.Add<GXUser>(u => u.Name, true);
+usersInDevs.OrderBy.Add<GXUser>(u => u.Name);
 
 var developers2 = Connection.Select<GXUser>(usersInDevs);
 ```
@@ -383,44 +364,21 @@ Use `Exclude<T>()` to omit specific fields from **queries** and **updates**. Gre
 **Exclude in Select**
 
 ```csharp
-// Select all fields for GXUser, but exclude heavy/sensitive ones
-GXSelectArgs args = GXSelectArgs.SelectAll<GXUser>(it);
-args.Exclude<GXUser>(q => new
-{
-    // Fields to exclude from the query result:
-    // e.g., q.PasswordHash, q.ProfileImageBlob, q.InternalNote
-});
-
+GXSelectArgs args = GXSelectArgs.SelectAll<GXUser>();
+args.Exclude<GXUser>(q => q.Company);
 var users = Connection.Select<GXUser>(args);
 ```
 
 **Exclude in Update**
 
 ```csharp
-// Update from an instance 'it' while skipping server-managed or immutable fields
-GXUpdateArgs args = GXUpdateArgs.Update(it);
-args.Exclude<GXUser>(q => new
-{
-    // Fields to exclude from updates:
-    // e.g., q.Id, q.CreatedAt, q.Company, q.PasswordHash
-});
-
+// user is an existing GXUser instance.
+GXUpdateArgs args = GXUpdateArgs.Update(user);
+args.Exclude<GXUser>(q => new { q.Id, q.Company });
 Connection.Update(args);
 ```
 
-**Practical example**
-
-```csharp
-// READ: don't fetch large binary data or secrets
-GXSelectArgs s = GXSelectArgs.SelectAll<GXUser>(it);
-s.Exclude<GXUser>(q => new { q.PasswordHash, q.AvatarBlob });
-var list = Connection.Select<GXUser>(s);
-
-// UPDATE: avoid changing keys or audit fields
-GXUpdateArgs u = GXUpdateArgs.Update(it);
-u.Exclude<GXUser>(q => new { q.Id, q.Company, q.CreatedAt, q.UpdatedAt });
-Connection.Update(u);
-```
+For a targeted update, explicitly select the properties to change, as shown below.
 
 ---
 
@@ -547,17 +505,15 @@ Connection.Delete(GXDeleteArgs.DeleteById<GXUser>(5));
 
 ```csharp
 GXSelectArgs sub = GXSelectArgs.Select<GXUser>(q => q.Id, q => q.Id > 100);
-GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => q.Id > GXSql.In(q => q.Users, sub));
+GXSelectArgs arg = GXSelectArgs.Select<GXUserGroup>(null, q => GXSql.In(q.Users, sub));
 ```
 
 ---
 
----
-
-## Check is table empty.
+## Checking Whether a Table Is Empty
 
 ```csharp
-GXSelectArgs arg = GXSelectArgs.IsEmpty<GXUser>()
+GXSelectArgs arg = GXSelectArgs.IsEmpty<GXUser>();
 if (Connection.SingleOrDefault<bool>(arg))
 {
     // Table is empty
@@ -572,8 +528,15 @@ else
 
 ## 📚 Further Resources
 
-For examples and tests, check:  
-`Gurux.Service_Simple_UnitTests` directory
+For additional examples and database-specific tests, see [Gurux.Service_Simple_UnitTests](Gurux.Service_Simple_UnitTests/).
+
+To build from the repository root:
+
+```shell
+dotnet build Development/Gurux.Service.sln
+```
+
+The project is licensed under GPL-2.0-only. See [LICENSE](LICENSE).
 
 Need help?  
 Ask your questions on the [Gurux Forum](https://www.gurux.fi/forum/gurux.service).

@@ -104,13 +104,23 @@ namespace Gurux.Service.Orm.Settings
         /// <inheritdoc />
         public override string GetColumnConstraintsQuery(string schema, string tableName)
         {
-            return string.Format(@"SELECT tc.constraint_name, ccu.table_schema, ccu.table_name, kcu.column_name, ccu.column_name, kcu.ordinal_position, rc.delete_rule, rc.update_rule
-FROM information_schema.table_constraints AS tc
-INNER JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
-INNER JOIN information_schema.referential_constraints AS rc ON tc.constraint_name = rc.constraint_name AND tc.table_schema = rc.constraint_schema
-INNER JOIN information_schema.key_column_usage AS ccu ON ccu.constraint_name = rc.unique_constraint_name AND ccu.constraint_schema = rc.unique_constraint_schema AND ccu.ordinal_position = kcu.position_in_unique_constraint
-WHERE tc.constraint_type = 'FOREIGN KEY' AND {1}
-ORDER BY tc.constraint_name, kcu.ordinal_position", schema, GetTableFilter(tableName, "kcu.table_schema", "kcu.table_name"));
+            // Constraint names can be reused by different tables in one schema.
+            // Join catalog OIDs rather than names and pair composite key columns
+            // by their positions in conkey/confkey. This also avoids repeatedly
+            // expanding the expensive information_schema constraint views.
+            return $@"SELECT fk.conname, rn.nspname, referenced.relname, source_column.attname, target_column.attname, columns.position,
+CASE fk.confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'r' THEN 'RESTRICT' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' ELSE 'NO ACTION' END,
+CASE fk.confupdtype WHEN 'c' THEN 'CASCADE' WHEN 'r' THEN 'RESTRICT' WHEN 'n' THEN 'SET NULL' WHEN 'd' THEN 'SET DEFAULT' ELSE 'NO ACTION' END
+FROM pg_catalog.pg_constraint AS fk
+INNER JOIN pg_catalog.pg_class AS source ON source.oid = fk.conrelid
+INNER JOIN pg_catalog.pg_namespace AS sn ON sn.oid = source.relnamespace
+INNER JOIN pg_catalog.pg_class AS referenced ON referenced.oid = fk.confrelid
+INNER JOIN pg_catalog.pg_namespace AS rn ON rn.oid = referenced.relnamespace
+CROSS JOIN LATERAL unnest(fk.conkey, fk.confkey) WITH ORDINALITY AS columns(source_number, target_number, position)
+INNER JOIN pg_catalog.pg_attribute AS source_column ON source_column.attrelid = fk.conrelid AND source_column.attnum = columns.source_number
+INNER JOIN pg_catalog.pg_attribute AS target_column ON target_column.attrelid = fk.confrelid AND target_column.attnum = columns.target_number
+WHERE fk.contype = 'f' AND {GetTableFilter(tableName, "sn.nspname", "source.relname")}
+ORDER BY fk.conname, columns.position";
         }
 
         /// <inheritdoc />
