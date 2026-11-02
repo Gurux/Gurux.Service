@@ -1,10 +1,11 @@
-name: Publish Gurux.Service NuGet package
+name: Publish Gurux.Service NuGet packages
 
 on:
   push:
     branches: [master]
     paths:
       - 'Development/**'
+      - 'Gurux.Service.Common/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - 'Directory.Packages.props'
@@ -15,6 +16,13 @@ on:
       - 'gurux_service.ico'
   workflow_dispatch:
     inputs:
+      project:
+        description: 'Project to publish'
+        required: true
+        type: choice
+        options:
+          - Gurux.Service
+          - Gurux.Service.Common
       version:
         description: 'Optional version override, e.g. 3.0.2611.201; blank = automatic'
         required: false
@@ -28,8 +36,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  detect:
     if: github.repository == 'Gurux/Gurux.Service' && github.ref == 'refs/heads/master'
+    runs-on: windows-latest
+    outputs:
+      matrix: ${{ steps.detect.outputs.matrix }}
+      has_changes: ${{ steps.detect.outputs.has_changes }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Select changed projects
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          SELECTED_PROJECT: ${{ inputs.project }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $projects = @(
+            @{ project = 'Gurux.Service'; path = 'Development/Gurux.Service.csproj'; prefix = 'Development/' },
+            @{ project = 'Gurux.Service.Common'; path = 'Gurux.Service.Common/Gurux.Service.Common.csproj'; prefix = 'Gurux.Service.Common/' }
+          )
+          if ($env:EVENT_NAME -eq 'workflow_dispatch') {
+            $selected = @($projects | Where-Object { $_.project -eq $env:SELECTED_PROJECT })
+            if ($selected.Count -ne 1) { throw 'Unknown project.' }
+          } else {
+            if ($env:BEFORE_SHA -match '^0+$') {
+              $files = @(git ls-tree -r --name-only $env:AFTER_SHA)
+            } else {
+              $files = @(git diff --name-only --no-renames $env:BEFORE_SHA $env:AFTER_SHA)
+            }
+            if ($LASTEXITCODE -ne 0) { throw 'Could not determine changed files.' }
+            $sharedFiles = @(
+              'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props',
+              'NuGet.Config', 'nuget.config', 'global.json', 'gurux_service.png', 'gurux_service.ico'
+            )
+            $sharedChanged = @($files | Where-Object { $sharedFiles -contains $_ }).Count -gt 0
+            $selected = @($projects | Where-Object {
+              $prefix = $_.prefix
+              $sharedChanged -or @($files | Where-Object { $_.StartsWith($prefix) }).Count -gt 0
+            })
+          }
+          $include = @($selected | ForEach-Object { @{ project = $_.project; path = $_.path } })
+          $matrix = @{ include = $include } | ConvertTo-Json -Depth 5 -Compress
+          "matrix=$matrix" >> $env:GITHUB_OUTPUT
+          "has_changes=$($selected.Count -gt 0)" >> $env:GITHUB_OUTPUT
+          Write-Host "Selected projects: $($selected.project -join ', ')"
+
+  publish:
+    needs: detect
+    if: needs.detect.outputs.has_changes == 'True'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
     runs-on: windows-latest
     timeout-minutes: 60
     permissions:
@@ -39,8 +103,8 @@ jobs:
       run:
         shell: pwsh
     env:
-      PROJECT_ID: Gurux.Service
-      PROJECT_PATH: Development/Gurux.Service.csproj
+      PROJECT_ID: ${{ matrix.project }}
+      PROJECT_PATH: ${{ matrix.path }}
       BUILD_CONFIGURATION: Release
       MAJOR_VERSION: '3'
       MINOR_VERSION: '0'
@@ -97,7 +161,7 @@ jobs:
             $version = "$prefix.$revision"
           }
           if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
-            throw 'Use a four-part numeric version, for example 4.1.2611.101.'
+            throw 'Use a four-part numeric version, for example 3.0.2611.201.'
           }
           foreach ($part in $version.Split('.')) {
             $number = 0
