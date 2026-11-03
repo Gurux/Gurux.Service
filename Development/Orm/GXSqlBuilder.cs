@@ -749,7 +749,7 @@ namespace Gurux.Service.Orm
                         if (primaryId == null)
                         {
                             throw new Exception(string.Format("Relation create failed. Foreign table '{0}' do not have relation to table '{1}'.",
-                                GXDbHelpers.ConvertToString(null, TargetType.Table, null, type, null),
+                                GXDbHelpers.OriginalTableName(type),
                                 GXDbHelpers.OriginalTableName(mainType)));
                         }
                         s.Relation.PrimaryId = primaryId;
@@ -807,7 +807,7 @@ namespace Gurux.Service.Orm
                     if (secondary == null)
                     {
                         throw new Exception(string.Format("Table {0} Relation create failed. Class must be derived from IUnique or target type must set in ForeignKey or Relation attribute.",
-                            GXDbHelpers.ConvertToString(null, TargetType.Table, null, mainType, null)));
+                            GXDbHelpers.OriginalTableName(mainType)));
                     }
                     s.Relation.ForeignId = secondary;
                     //Update relation map fields.
@@ -840,7 +840,7 @@ namespace Gurux.Service.Orm
                     if (secondary == null)
                     {
                         throw new Exception(string.Format("Table {0} Relation create failed. Class must be derived from IUnique or target type must set in ForeignKey or Relation attribute.",
-                            GXDbHelpers.ConvertToString(null, TargetType.Table, null, mainType, null)));
+                            GXDbHelpers.OriginalTableName(mainType)));
                     }
                     s.Relation.ForeignId = secondary;
                 }
