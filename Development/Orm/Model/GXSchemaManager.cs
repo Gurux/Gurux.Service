@@ -280,6 +280,19 @@ namespace Gurux.Service.Orm.Model
         /// </summary>
         public void CreateTable(IDbTransaction? transaction, GXTableSchema schema)
         {
+            CreateTableCore(transaction, schema, query =>
+                ExecuteNonQuery(this, transaction?.Connection ?? Connection, transaction, OnSqlExecuted, query));
+        }
+
+        internal IReadOnlyList<string> GetCreateTableStatements(GXTableSchema schema)
+        {
+            var statements = new List<string>();
+            CreateTableCore(null, schema, statements.Add);
+            return statements;
+        }
+
+        private void CreateTableCore(IDbTransaction? transaction, GXTableSchema schema, Action<string> execute)
+        {
             if (schema == null)
             {
                 throw new ArgumentNullException(nameof(schema));
@@ -358,7 +371,7 @@ namespace Gurux.Service.Orm.Model
                 //Deferred segment allocation can fail the first SERIALIZABLE insert (ORA-08177).
                 sb.Append(" SEGMENT CREATION IMMEDIATE");
             }
-            ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, sb.ToString());
+            execute(sb.ToString());
 
             var primaryKeyNames = primaryKeys.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var index in schema.Indexes)
@@ -384,7 +397,7 @@ namespace Gurux.Service.Orm.Model
                     indexName = QuoteSchemaIdentifier(schema.Schema) + "." + indexName;
                     indexTable = QuoteSchemaIdentifier(schema.Name);
                 }
-                ExecuteNonQuery(this, connection, transaction, OnSqlExecuted,
+                execute(
                     $"CREATE {(index.Unique ? "UNIQUE " : "")}INDEX {indexName} ON {indexTable} ({columns})");
             }
 
@@ -397,11 +410,11 @@ namespace Gurux.Service.Orm.Model
                 }
                 foreach (string query in queries)
                 {
-                    ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                    execute(query);
                 }
             }
 
-            AddSchemaComments(connection, transaction, tableName, schema);
+            AddSchemaComments(connection, transaction, tableName, schema, execute);
         }
 
         private string QuoteSchemaIdentifier(string name)
@@ -525,6 +538,12 @@ namespace Gurux.Service.Orm.Model
                 return column.DbType;
             }
             Type type = Nullable.GetUnderlyingType(column.Type) ?? column.Type;
+            if (type == typeof(decimal) && column.Precision.HasValue && column.Scale.HasValue)
+            {
+                if (column.Precision < 1 || column.Precision > 38 || column.Scale < 0 || column.Scale > column.Precision)
+                    throw new NotSupportedException("Unsupported decimal precision or scale.");
+                return $"DECIMAL({column.Precision.Value}, {column.Scale.Value})";
+            }
             if ((type == typeof(string) || type == typeof(char[]) ||
                 type == typeof(object)) &&
                 column.MaxLength.HasValue)
@@ -588,7 +607,7 @@ namespace Gurux.Service.Orm.Model
         private void AddSchemaComments(IDbConnection connection,
             IDbTransaction? transaction,
             string tableName,
-            GXTableSchema schema)
+            GXTableSchema schema, Action<string>? execute = null)
         {
             if (!string.IsNullOrEmpty(schema.Comment))
             {
@@ -596,7 +615,8 @@ namespace Gurux.Service.Orm.Model
                     Builder.Database, tableName, null, schema.Comment);
                 if (!string.IsNullOrEmpty(query))
                 {
-                    ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                    if (execute != null) execute(query);
+                    else ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
                 }
             }
             foreach (GXColumnSchema column in schema.Columns)
@@ -612,7 +632,8 @@ namespace Gurux.Service.Orm.Model
                     column.Comment);
                 if (!string.IsNullOrEmpty(query))
                 {
-                    ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
+                    if (execute != null) execute(query);
+                    else ExecuteNonQuery(this, connection, transaction, OnSqlExecuted, query);
                 }
             }
         }

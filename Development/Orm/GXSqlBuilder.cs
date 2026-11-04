@@ -92,6 +92,8 @@ namespace Gurux.Service.Orm
         /// <returns>The CLR type corresponding to the database type and column length.</returns>
         internal Type GetDataType(string type, int len)
         {
+            if (string.Equals(type, "boolean", StringComparison.OrdinalIgnoreCase)) return typeof(bool);
+            if (Settings.Type == DatabaseType.MSSQL && string.Equals(type, "varchar", StringComparison.OrdinalIgnoreCase)) return typeof(string);
             if (len == -1 || len == 65535)
             {
                 if (string.Compare(Settings.StringColumnDefinition(0), type, true) == 0)
@@ -248,6 +250,8 @@ namespace Gurux.Service.Orm
             }
             else if (Settings.Type == DatabaseType.SqLite)
             {
+                if (string.Equals(type, "DATETIME", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(type, "TIMESTAMP", StringComparison.OrdinalIgnoreCase)) return typeof(DateTime);
                 if (string.Equals(type, "integer", StringComparison.OrdinalIgnoreCase))
                 {
                     //SQLite uses smallint for sbyte, byte and short.
@@ -1457,12 +1461,20 @@ namespace Gurux.Service.Orm
             databaseType = str;
             int lengthStart = str.IndexOf('(');
             if (lengthStart > 0 && str.EndsWith(')') &&
+                (str.StartsWith("decimal(", StringComparison.OrdinalIgnoreCase) ||
+                 str.StartsWith("numeric(", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Precision and scale do not change the CLR decimal type.
+                str = str[..lengthStart];
+            }
+            if (lengthStart > 0 && str.EndsWith(')') &&
                 int.TryParse(str[(lengthStart + 1)..^1], out int parsedLength))
             {
                 len = parsedLength;
                 str = str[..lengthStart];
             }
-            Type type = GetDataType(str, len);
+            Type type = string.Equals(str, "decimal", StringComparison.OrdinalIgnoreCase)
+                ? typeof(decimal) : GetDataType(str, len);
             if (type == null)
             {
                 throw new ArgumentException("Invalid data type: " + str);
