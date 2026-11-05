@@ -1,34 +1,29 @@
-//
 // --------------------------------------------------------------------------
-//  Gurux Ltd
+// Gurux Ltd
 //
+// Copyright (c) Gurux Ltd.
 //
+// This file is part of Gurux Device Framework.
 //
-// Filename:        $HeadURL$
+// Commit: $Format:%H$
+// Date:   $Format:%cI$
 //
-// Version:         $Revision$,
-//                  $Date$
-//                  $Author$
+// This software is available under either of the following licenses:
 //
-// Copyright (c) Gurux Ltd
+// 1. GNU General Public License, version 2 only (GPL-2.0-only).
+//    See the LICENSE file included with this distribution.
 //
-//---------------------------------------------------------------------------
+// 2. A commercial license granted by Gurux Ltd under a separate written
+//    agreement. Use under this option requires a valid commercial license
+//    and is governed by the terms of that agreement.
 //
-//  DESCRIPTION
+// If you have not obtained a commercial license from Gurux Ltd,
+// use of this software is governed by GPL-2.0-only.
 //
-// This file is a part of Gurux Device Framework.
+// Commercial licensing: https://www.gurux.fi/
 //
-// Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; version 2 of the License.
-// Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-// See the GNU General Public License for more details.
-//
-// This code is licensed under the GNU General Public License v2.
-// Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
-//---------------------------------------------------------------------------
+// SPDX-License-Identifier: GPL-2.0-only OR LicenseRef-Gurux-Commercial
+// --------------------------------------------------------------------------
 
 using Gurux.Service.Orm.Common.Enums;
 using Gurux.Service.Orm.Common.Model;
@@ -97,7 +92,10 @@ namespace Gurux.Service.Orm
         {
             ArgumentNullException.ThrowIfNull(destination);
             if (!destination.CanWrite)
+            {
                 throw new ArgumentException("Stream must be writable.", nameof(destination));
+            }
+
             ValidateFormat(format);
             EnsureProvider();
             cancellationToken.ThrowIfCancellationRequested();
@@ -174,53 +172,83 @@ namespace Gurux.Service.Orm
         {
             ArgumentNullException.ThrowIfNull(source);
             if (!source.CanRead)
+            {
                 throw new ArgumentException("Stream must be readable.", nameof(source));
+            }
+
             ValidateFormat(format);
             EnsureProvider();
             if (!Enum.IsDefined(mode))
+            {
                 throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
             token.ThrowIfCancellationRequested();
             if (format == DatabaseBackupFormat.Sql)
             {
                 if (mode != DatabaseImportMode.Append)
+                {
                     throw new NotSupportedException("SQL scripts define their own DDL. Replacement modes apply to JSON only.");
+                }
+
                 await ImportSqlAsync(source, selected, token).ConfigureAwait(false);
                 return;
             }
             using var document = await JsonDocument.ParseAsync(source, cancellationToken: token).ConfigureAwait(false);
             var root = document.RootElement;
             if (!root.TryGetProperty("formatVersion", out var version) || version.GetInt32() != 1)
+            {
                 throw new InvalidDataException("Unsupported backup format version.");
+            }
+
             if (!Enum.TryParse<DatabaseType>(root.GetProperty("databaseType").GetString(), out var sourceType) || !Enum.IsDefined(sourceType))
+            {
                 throw new InvalidDataException("Unknown source database type.");
+            }
+
             var imports = new List<ImportTable>();
             foreach (var element in root.GetProperty("tables").EnumerateArray())
             {
                 var metadata = element.GetProperty("schema");
                 // Validate type names before GXColumnSchema.TypeName resolves any types.
                 foreach (var column in metadata.GetProperty("columns").EnumerateArray())
+                {
                     RequireType(column.GetProperty("typeName").GetString());
+                }
+
                 var schema = metadata.Deserialize<GXTableSchema>(JsonOptions) ?? throw new InvalidDataException("Missing schema.");
                 ValidateSchema(schema);
                 if (selected != null && !selected.Contains(schema.Name))
+                {
                     continue;
+                }
+
                 var rows = new List<object?[]>();
                 foreach (var row in element.GetProperty("rows").EnumerateArray())
                 {
                     if (row.GetArrayLength() != schema.Columns.Count)
+                    {
                         throw new InvalidDataException("Row width differs from schema.");
+                    }
+
                     rows.Add(row.EnumerateArray().Select(ReadValue).ToArray());
                 }
                 PrepareSchema(schema, sourceType);
                 imports.Add(new ImportTable(schema, rows));
             }
             if (imports.Select(t => t.Schema.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != imports.Count)
+            {
                 throw new InvalidDataException("Duplicate table names.");
+            }
+
             CheckSelection(selected, imports.Select(t => t.Schema.Name));
             var ordered = OrderTables(imports.Select(t => t.Schema).ToList());
             // Generate all DDL before any destructive actions, including provider validation.
             foreach (var schema in ordered)
+            {
                 Schema.GetCreateTableStatements(schema);
+            }
+
             await using var transaction = await database.Connection.BeginTransactionAsync(token).ConfigureAwait(false);
             try
             {
@@ -230,17 +258,26 @@ namespace Gurux.Service.Orm
                     if (Schema.TableExist(transaction, schema.Name))
                     {
                         if (mode == DatabaseImportMode.ReplaceTables)
+                        {
                             await ExecuteAsync("DROP TABLE " + TableName(schema), transaction, token).ConfigureAwait(false);
+                        }
                         else if (mode == DatabaseImportMode.ReplaceData)
+                        {
                             await ExecuteAsync("DELETE FROM " + TableName(schema), transaction, token).ConfigureAwait(false);
+                        }
                     }
                 }
                 foreach (var schema in ordered)
                 {
                     token.ThrowIfCancellationRequested();
                     if (!Schema.TableExist(transaction, schema.Name))
+                    {
                         foreach (var sql in Schema.GetCreateTableStatements(schema))
+                        {
                             await ExecuteAsync(sql, transaction, token).ConfigureAwait(false);
+                        }
+                    }
+
                     var data = imports.Single(t => ReferenceEquals(t.Schema, schema));
                     await InsertRowsAsync(data, transaction, token).ConfigureAwait(false);
                 }
@@ -265,32 +302,50 @@ namespace Gurux.Service.Orm
             {
                 var metadata = columns.Single(c => c.ColumnName == column.Name);
                 if (database.DatabaseType != DatabaseType.SqLite && metadata.DataType != null)
+                {
                     column.Type = metadata.DataType;
+                }
+
                 column.IsAutoIncrement |= metadata.IsAutoIncrement == true;
                 column.IsComputed |= metadata.IsExpression == true;
                 column.Precision = metadata.NumericPrecision;
                 column.Scale = metadata.NumericScale;
                 if (metadata.ColumnSize.HasValue && (column.Type == typeof(string) || column.Type == typeof(byte[])))
+                {
                     column.MaxLength = metadata.ColumnSize;
+                }
+
                 string native = metadata.DataTypeName ?? "";
                 if (native.Length != 0 && !native.Contains('('))
                 {
                     if (column.Type == typeof(decimal) && column.Precision > 0 && column.Scale >= 0)
+                    {
                         native += $"({column.Precision},{column.Scale})";
+                    }
                     else if (native.Equals("varchar", StringComparison.OrdinalIgnoreCase) || native.Equals("nvarchar", StringComparison.OrdinalIgnoreCase) ||
                         native.Equals("char", StringComparison.OrdinalIgnoreCase) || native.Equals("nchar", StringComparison.OrdinalIgnoreCase) ||
                         native.Equals("binary", StringComparison.OrdinalIgnoreCase) || native.Equals("varbinary", StringComparison.OrdinalIgnoreCase) ||
                         native.Equals("character varying", StringComparison.OrdinalIgnoreCase))
+                    {
                         native += column.MaxLength > 0 && column.MaxLength < int.MaxValue ? $"({column.MaxLength})" :
                             database.DatabaseType == DatabaseType.MSSQL ? "(max)" : "";
+                    }
                 }
                 column.DbType = native;
                 if (native.Equals("date", StringComparison.OrdinalIgnoreCase))
+                {
                     column.Type = typeof(DateOnly);
+                }
+
                 if (native.StartsWith("time", StringComparison.OrdinalIgnoreCase) && !native.StartsWith("timestamp", StringComparison.OrdinalIgnoreCase))
+                {
                     column.Type = database.DatabaseType is DatabaseType.MySQL or DatabaseType.MariaDB ? typeof(TimeSpan) : typeof(TimeOnly);
+                }
+
                 if (native.Contains("with time zone", StringComparison.OrdinalIgnoreCase) || native.StartsWith("timestamptz", StringComparison.OrdinalIgnoreCase) || native.StartsWith("datetimeoffset", StringComparison.OrdinalIgnoreCase))
+                {
                     column.Type = typeof(DateTimeOffset);
+                }
             }
             if (database.DatabaseType is DatabaseType.MySQL or DatabaseType.MariaDB)
             {
@@ -307,7 +362,9 @@ namespace Gurux.Service.Orm
                     var column = schema.Columns.Single(c => c.Name == typeReader.GetString(0));
                     column.DbType = typeReader.GetString(1);
                     if (!typeReader.IsDBNull(2))
+                    {
                         column.DateTimePrecision = Convert.ToInt32(typeReader.GetValue(2), CultureInfo.InvariantCulture);
+                    }
                 }
             }
         }
@@ -315,7 +372,10 @@ namespace Gurux.Service.Orm
         private static object? ReadValue(JsonElement value)
         {
             if (value.ValueKind == JsonValueKind.Null)
+            {
                 return null;
+            }
+
             var type = RequireType(value.GetProperty("type").GetString());
             return value.GetProperty("value").Deserialize(type, JsonOptions);
         }
@@ -326,21 +386,37 @@ namespace Gurux.Service.Orm
             schema.Catalog = null;
             schema.Schema = null;
             foreach (var key in schema.ForeignKeys)
+            {
                 key.ReferencedSchema = "";
+            }
+
             foreach (var column in schema.Columns)
             {
                 if (column.IsComputed || column.ComputedExpression != null)
+                {
                     throw new NotSupportedException("Computed columns cannot be restored: " + column.Name);
+                }
+
                 if (column.DefaultValue is JsonElement json)
+                {
                     column.DefaultValue = json.ValueKind == JsonValueKind.Null ? null : json.ToString();
+                }
+
                 if (sourceType != database.DatabaseType)
                 {
                     if (column.DefaultValue != null && !column.IsAutoIncrement && !column.IsIdentity)
+                    {
                         throw new NotSupportedException("Cross-product default expressions require explicit mapping: " + column.Name);
+                    }
+
                     column.DbType = "";
                     if (column.Type == typeof(decimal) && database.DatabaseType == DatabaseType.SqLite)
+                    {
                         column.DbType = "TEXT"; // SQLite NUMERIC affinity would round through IEEE double.
+                    }
+
                     if (column.Type == typeof(DateTime))
+                    {
                         column.DbType = database.DatabaseType switch
                         {
                             DatabaseType.MySQL or DatabaseType.MariaDB => "DATETIME(6)",
@@ -348,18 +424,27 @@ namespace Gurux.Service.Orm
                             DatabaseType.PostgreSQL => "TIMESTAMP(6) WITHOUT TIME ZONE",
                             _ => ""
                         };
+                    }
+
                     if (column.Type == typeof(DateTimeOffset))
+                    {
                         column.DbType = database.DatabaseType switch
                         {
                             DatabaseType.PostgreSQL => "TIMESTAMP(6) WITH TIME ZONE",
                             DatabaseType.MSSQL => "DATETIMEOFFSET(7)",
                             _ => "VARCHAR(40)"
                         };
+                    }
+
                     if (column.Type == typeof(TimeSpan))
+                    {
                         column.DbType = database.DatabaseType is DatabaseType.MySQL or DatabaseType.MariaDB ? "TIME(6)" : "VARCHAR(40)";
+                    }
                 }
                 if (column.IsAutoIncrement || column.IsIdentity)
+                {
                     column.DefaultValue = null;
+                }
             }
         }
 
@@ -368,7 +453,10 @@ namespace Gurux.Service.Orm
             var schema = table.Schema;
             bool identity = database.DatabaseType == DatabaseType.MSSQL && schema.Columns.Any(c => c.IsAutoIncrement || c.IsIdentity);
             if (identity)
+            {
                 await ExecuteAsync("SET IDENTITY_INSERT " + TableName(schema) + " ON", transaction, token).ConfigureAwait(false);
+            }
+
             try
             {
                 foreach (var row in table.Rows)
@@ -380,94 +468,171 @@ namespace Gurux.Service.Orm
                         parameter.ParameterName = "@p" + i;
                         parameter.Value = ConvertValue(row[i], schema.Columns[i].Type) ?? DBNull.Value;
                         if (parameter.Value is DBNull)
+                        {
                             parameter.DbType = GetParameterType(schema.Columns[i].Type);
+                        }
                         else if (parameter.Value is DateTime && database.DatabaseType == DatabaseType.MSSQL)
+                        {
                             parameter.DbType = DbType.DateTime2;
+                        }
+
                         command.Parameters.Add(parameter);
                     }
                     await command.ExecuteNonQueryAsync(token).ConfigureAwait(false);
                 }
                 foreach (var sql in ReseedStatements(schema))
+                {
                     await ExecuteAsync(sql, transaction, token).ConfigureAwait(false);
+                }
             }
             finally
             {
                 if (identity)
+                {
                     await ExecuteAsync("SET IDENTITY_INSERT " + TableName(schema) + " OFF", transaction, CancellationToken.None).ConfigureAwait(false);
+                }
             }
         }
 
         private object? ConvertValue(object? value, Type columnType)
         {
             if (value == null)
+            {
                 return null;
+            }
+
             if (columnType == typeof(TimeSpan) && value is TimeSpan duration &&
                 database.DatabaseType is not (DatabaseType.MySQL or DatabaseType.MariaDB))
+            {
                 return duration.ToString("c", CultureInfo.InvariantCulture);
+            }
+
             if (columnType == typeof(DateOnly) && value is DateTime day)
+            {
                 value = DateOnly.FromDateTime(day);
+            }
+
             if (columnType == typeof(TimeOnly) && value is TimeSpan time)
+            {
                 value = TimeOnly.FromTimeSpan(time);
+            }
+
             if (columnType == typeof(DateTimeOffset))
             {
                 if (value is DateTime dateValue)
+                {
                     value = new DateTimeOffset(DateTime.SpecifyKind(dateValue, DateTimeKind.Utc));
+                }
+
                 if (value is DateTimeOffset offset)
+                {
                     value = database.DatabaseType switch
                     {
                         DatabaseType.PostgreSQL => offset.ToUniversalTime(),
                         DatabaseType.MySQL or DatabaseType.MariaDB => offset.ToString("O", CultureInfo.InvariantCulture),
                         _ => offset
                     };
+                }
             }
             if (database.DatabaseType == DatabaseType.PostgreSQL)
             {
                 if (columnType == typeof(bool) && value is not bool)
+                {
                     return Convert.ToInt64(value, CultureInfo.InvariantCulture) != 0;
+                }
+
                 if (columnType == typeof(Guid) && value is string text)
+                {
                     return Guid.Parse(text);
+                }
+
                 if (value is DateTime date)
+                {
                     return DateTime.SpecifyKind(date, DateTimeKind.Unspecified);
+                }
             }
             if (value is Guid guid && database.DatabaseType is DatabaseType.MySQL or DatabaseType.MariaDB)
+            {
                 return guid.ToByteArray();
+            }
+
             return value;
         }
 
         private static DbType GetParameterType(Type type)
         {
             if (type == typeof(byte[]))
+            {
                 return DbType.Binary;
+            }
+
             if (type == typeof(Guid))
+            {
                 return DbType.Guid;
+            }
+
             if (type == typeof(bool))
+            {
                 return DbType.Boolean;
+            }
+
             if (type == typeof(DateTime))
+            {
                 return DbType.DateTime2;
+            }
+
             if (type == typeof(DateTimeOffset))
+            {
                 return DbType.DateTimeOffset;
+            }
+
             if (type == typeof(DateOnly))
+            {
                 return DbType.Date;
+            }
+
             if (type == typeof(TimeOnly) || type == typeof(TimeSpan))
+            {
                 return DbType.Time;
+            }
+
             if (type == typeof(decimal))
+            {
                 return DbType.Decimal;
+            }
+
             if (type == typeof(float))
+            {
                 return DbType.Single;
+            }
+
             if (type == typeof(double))
+            {
                 return DbType.Double;
+            }
+
             if (type == typeof(long) || type == typeof(ulong))
+            {
                 return DbType.Int64;
+            }
+
             if (type == typeof(int) || type == typeof(uint) || type == typeof(short) || type == typeof(ushort) || type == typeof(byte) || type == typeof(sbyte))
+            {
                 return DbType.Int32;
+            }
+
             return DbType.String;
         }
 
         private IEnumerable<string> ReseedStatements(GXTableSchema schema)
         {
             if (database.DatabaseType == DatabaseType.PostgreSQL)
+            {
                 foreach (var column in schema.Columns.Where(c => c.IsAutoIncrement || c.IsIdentity))
+                {
                     yield return "SELECT setval(pg_get_serial_sequence(" + StringLiteral(TableName(schema)) + "," + StringLiteral(column.Name) + "), COALESCE(MAX(" + Quote(column.Name) + "),1), MAX(" + Quote(column.Name) + ") IS NOT NULL) FROM " + TableName(schema);
+                }
+            }
         }
 
         private string InsertPrefix(GXTableSchema schema) => "INSERT INTO " + TableName(schema) + " (" + string.Join(",", schema.Columns.Select(c => Quote(c.Name))) + ") VALUES ";
@@ -476,7 +641,10 @@ namespace Gurux.Service.Orm
         {
             char open = database.Builder.Settings.ColumnNameQuoteCharacter;
             if (open == '\0')
+            {
                 open = '"';
+            }
+
             char close = open == '[' ? ']' : open;
             return open + name.Replace(close.ToString(), new string(close, 2)) + close;
         }
@@ -496,13 +664,17 @@ namespace Gurux.Service.Orm
         private static void ValidateFormat(DatabaseBackupFormat format)
         {
             if (!Enum.IsDefined(format))
+            {
                 throw new ArgumentOutOfRangeException(nameof(format));
+            }
         }
         private void EnsureProvider()
         {
             if (database.DatabaseType is not (DatabaseType.SqLite or DatabaseType.MSSQL or
                 DatabaseType.PostgreSQL or DatabaseType.MySQL or DatabaseType.MariaDB))
+            {
                 throw new NotSupportedException("Logical backup supports SQLite, SQL Server, PostgreSQL, MySQL and MariaDB.");
+            }
         }
         private static Type RequireType(string? name) => name != null && Types.TryGetValue(name, out var type)
             ? type : throw new NotSupportedException("Unsupported backup type: " + name);
@@ -513,27 +685,42 @@ namespace Gurux.Service.Orm
             foreach (var name in tables)
             {
                 if (string.IsNullOrWhiteSpace(name))
+                {
                     throw new ArgumentException("Table name is empty.", nameof(tables));
+                }
+
                 if (!names.Add(name))
+                {
                     throw new ArgumentException("Duplicate table: " + name, nameof(tables));
+                }
             }
             return names;
         }
         private static void CheckSelection(HashSet<string>? selected, IEnumerable<string> available)
         {
             if (selected != null && !selected.IsSubsetOf(available))
+            {
                 throw new InvalidDataException("Selected table is absent from backup.");
+            }
         }
         private static void ValidateSchema(GXTableSchema schema)
         {
             if (string.IsNullOrWhiteSpace(schema.Name) || schema.Columns.Count == 0 ||
                 schema.Columns.Any(c => string.IsNullOrWhiteSpace(c.Name)) ||
                 schema.Columns.Select(c => c.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != schema.Columns.Count)
+            {
                 throw new InvalidDataException("Invalid table or column names.");
+            }
+
             foreach (var column in schema.Columns)
+            {
                 RequireType(column.TypeName);
+            }
+
             if (schema.Columns.Any(c => c.IsComputed))
+            {
                 throw new NotSupportedException("Computed columns cannot be backed up.");
+            }
         }
         private static List<GXTableSchema> OrderTables(List<GXTableSchema> tables)
         {
@@ -542,22 +729,36 @@ namespace Gurux.Service.Orm
             void Visit(GXTableSchema table)
             {
                 if (result.Contains(table))
+                {
                     return;
+                }
+
                 if (!visiting.Add(table))
+                {
                     throw new NotSupportedException("Cyclic foreign keys require a provider-specific restore strategy.");
+                }
+
                 foreach (var key in table.ForeignKeys)
                 {
                     var parent = tables.SingleOrDefault(t => string.Equals(t.Name, key.ReferencedTable, StringComparison.OrdinalIgnoreCase));
                     if (parent == table)
+                    {
                         throw new NotSupportedException("Self-referencing tables require an explicit row ordering strategy.");
+                    }
+
                     if (parent != null)
+                    {
                         Visit(parent);
+                    }
                 }
                 visiting.Remove(table);
                 result.Add(table);
             }
             foreach (var table in tables)
+            {
                 Visit(table);
+            }
+
             return result;
         }
     }

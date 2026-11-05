@@ -1,34 +1,29 @@
-//
 // --------------------------------------------------------------------------
-//  Gurux Ltd
+// Gurux Ltd
 //
+// Copyright (c) Gurux Ltd.
 //
+// This file is part of Gurux Device Framework.
 //
-// Filename:        $HeadURL$
+// Commit: $Format:%H$
+// Date:   $Format:%cI$
 //
-// Version:         $Revision$,
-//                  $Date$
-//                  $Author$
+// This software is available under either of the following licenses:
 //
-// Copyright (c) Gurux Ltd
+// 1. GNU General Public License, version 2 only (GPL-2.0-only).
+//    See the LICENSE file included with this distribution.
 //
-//---------------------------------------------------------------------------
+// 2. A commercial license granted by Gurux Ltd under a separate written
+//    agreement. Use under this option requires a valid commercial license
+//    and is governed by the terms of that agreement.
 //
-//  DESCRIPTION
+// If you have not obtained a commercial license from Gurux Ltd,
+// use of this software is governed by GPL-2.0-only.
 //
-// This file is a part of Gurux Device Framework.
+// Commercial licensing: https://www.gurux.fi/
 //
-// Gurux Device Framework is Open Source software; you can redistribute it
-// and/or modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; version 2 of the License.
-// Gurux Device Framework is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-// See the GNU General Public License for more details.
-//
-// This code is licensed under the GNU General Public License v2.
-// Full text may be retrieved at http://www.gnu.org/licenses/gpl-2.0.txt
-//---------------------------------------------------------------------------
+// SPDX-License-Identifier: GPL-2.0-only OR LicenseRef-Gurux-Commercial
+// --------------------------------------------------------------------------
 
 using Gurux.Common.Internal;
 using Gurux.Orm.Internal.Enums;
@@ -102,15 +97,33 @@ namespace Gurux.Service.Orm
                     if ((p.Attributes & Attributes.ConcurrencyCheck) != 0)
                     {
                         var stamp = Guid.CreateVersion7();
-                        if (p.Type == typeof(Guid)) p.Set(item.Key, stamp);
-                        else if (p.Type == typeof(string)) p.Set(item.Key, stamp.ToString());
-                        else throw new ArgumentException($"Column {property.Key} is not a string or Guid type.");
+                        if (p.Type == typeof(Guid))
+                        {
+                            p.Set(item.Key, stamp);
+                        }
+                        else if (p.Type == typeof(string))
+                        {
+                            p.Set(item.Key, stamp.ToString());
+                        }
+                        else
+                        {
+                            throw new ArgumentException($"Column {property.Key} is not a string or Guid type.");
+                        }
                     }
                     else if ((p.Attributes & Attributes.CurrentTimestamp) != 0)
                     {
-                        if (p.Type == typeof(DateTime) || p.Type == typeof(DateTime?)) p.Set(item.Key, DateTime.Now);
-                        else if (p.Type == typeof(DateTimeOffset) || p.Type == typeof(DateTimeOffset?)) p.Set(item.Key, DateTimeOffset.Now);
-                        else throw new ArgumentException($"Column {property.Key} is not a DateTime or DateTimeOffset type.");
+                        if (p.Type == typeof(DateTime) || p.Type == typeof(DateTime?))
+                        {
+                            p.Set(item.Key, DateTime.Now);
+                        }
+                        else if (p.Type == typeof(DateTimeOffset) || p.Type == typeof(DateTimeOffset?))
+                        {
+                            p.Set(item.Key, DateTimeOffset.Now);
+                        }
+                        else
+                        {
+                            throw new ArgumentException($"Column {property.Key} is not a DateTime or DateTimeOffset type.");
+                        }
                     }
                 }
             }
@@ -288,7 +301,10 @@ namespace Gurux.Service.Orm
                                 value = a.ToString(false);
                             }
                             if (a == null && p.Relation == null && GXJsonCollection.IsCollection(p.Type))
+                            {
                                 value = GXJsonCollection.Encode(value, p.Type);
+                            }
+
                             tmp = GXDbHelpers.ConvertToString(Parent.Settings, TargetType.Column, null, name, null);
                             args.StringBuilder.Append(tmp);
                             args.StringBuilder.Append(" = ");

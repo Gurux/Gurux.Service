@@ -1,3 +1,30 @@
+// --------------------------------------------------------------------------
+// Gurux Ltd
+//
+// Copyright (c) Gurux Ltd.
+//
+// This file is part of Gurux Device Framework.
+//
+// Commit: $Format:%H$
+// Date:   $Format:%cI$
+//
+// This software is available under either of the following licenses:
+//
+// 1. GNU General Public License, version 2 only (GPL-2.0-only).
+//    See the LICENSE file included with this distribution.
+//
+// 2. A commercial license granted by Gurux Ltd under a separate written
+//    agreement. Use under this option requires a valid commercial license
+//    and is governed by the terms of that agreement.
+//
+// If you have not obtained a commercial license from Gurux Ltd,
+// use of this software is governed by GPL-2.0-only.
+//
+// Commercial licensing: https://www.gurux.fi/
+//
+// SPDX-License-Identifier: GPL-2.0-only OR LicenseRef-Gurux-Commercial
+// --------------------------------------------------------------------------
+
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -42,8 +69,17 @@ public class StringCollectionColumnTests
         string[] expected = ["one", "a,b", "quote\"", "O'Reilly", @"C:\temp\file", "\r\n", "\0", "ää漢字🙂", "", null!];
         CollectionRow[] rows = [new() { Id = 1, Arvo = expected.Where(_ => true), Name = "keep" },
             new() { Id = 2, Arvo = null }, new() { Id = 3, Arvo = [] }];
-        if (range) db.Insert(GXInsertArgs.InsertRange(rows));
-        else foreach (var row in rows) db.Insert(GXInsertArgs.Insert(row));
+        if (range)
+        {
+            db.Insert(GXInsertArgs.InsertRange(rows));
+        }
+        else
+        {
+            foreach (var row in rows)
+            {
+                db.Insert(GXInsertArgs.Insert(row));
+            }
+        }
 
         var raw = (string)Scalar(sqlite, "SELECT Arvo FROM CollectionRow WHERE Id = 1");
         CollectionAssert.AreEqual(expected, JsonSerializer.Deserialize<string[]>(raw));
@@ -57,8 +93,18 @@ public class StringCollectionColumnTests
         selected[0].Arvo = ["updated", "duplicate", "duplicate"];
         selected[1].Arvo = [];
         selected[2].Arvo = null;
-        if (range) db.Update(GXUpdateArgs.UpdateRange(selected, r => r.Arvo!));
-        else foreach (var row in selected) db.Update(GXUpdateArgs.Update(row, r => r.Arvo!));
+        if (range)
+        {
+            db.Update(GXUpdateArgs.UpdateRange(selected, r => r.Arvo!));
+        }
+        else
+        {
+            foreach (var row in selected)
+            {
+                db.Update(GXUpdateArgs.Update(row, r => r.Arvo!));
+            }
+        }
+
         var updated = db.Select<CollectionRow>(GXSelectArgs.SelectAll<CollectionRow>()).OrderBy(r => r.Id).ToArray();
         CollectionAssert.AreEqual(new[] { "updated", "duplicate", "duplicate" }, updated[0].Arvo!.ToArray());
         Assert.IsEmpty(updated[1].Arvo!);
