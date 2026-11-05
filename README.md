@@ -536,11 +536,24 @@ To build from the repository root:
 dotnet build Development/Gurux.Service.sln
 ```
 
-The project is licensed under GPL-2.0-only. See [LICENSE](LICENSE).
-
 Need help?  
 Ask your questions on the [Gurux Forum](https://www.gurux.fi/forum/gurux.service).
 
 ---
 
 ![Debug SQL Example](debug.png)
+
+## License
+
+Gurux ORM is available under either of the following licenses:
+
+- **Open-source license:** GNU General Public License, version 2 only
+  (GPL-2.0-only). See [LICENSE](LICENSE) for the full license text.
+- **Commercial license:** Available from Gurux Ltd under a separate
+  written agreement. This option allows use under the terms of that
+  agreement instead of GPL-2.0-only.
+
+A valid commercial license is required to use the commercial licensing
+option. See [Gurux Commercial License Notice](LICENSES/LicenseRef-Gurux-Commercial.txt).
+
+For commercial licensing inquiries, [contact Gurux Ltd](https://www.gurux.fi/).

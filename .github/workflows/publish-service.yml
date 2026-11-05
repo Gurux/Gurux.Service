@@ -110,9 +110,14 @@ jobs:
       MINOR_VERSION: '0'
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: |
+            9.0.x
+            10.0.x
 
       - name: Determine this package's version
         env:
@@ -194,6 +199,25 @@ jobs:
           if (-not (Test-Path $package)) { throw "Package missing: $package" }
           "PACKAGE_PATH=$package" >> $env:GITHUB_ENV
 
+      - name: Run unit tests before publishing
+        run: |
+          dotnet test Gurux.Service_Simple_UnitTests/Gurux.Service_Simple_Unit_Test.csproj `
+            --configuration "$env:BUILD_CONFIGURATION" `
+            '-p:GeneratePackageOnBuild=false' `
+            '-p:SignAssembly=false' '-p:SignManifests=false'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check version tag before publishing
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = "$env:PROJECT_ID/v$env:BUILD_BUILDNUMBER"
+          $existing = git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect remote tags.' }
+          if ($existing) {
+            $commit = ($existing | Select-Object -Last 1) -split '\s+' | Select-Object -First 1
+            if ($commit -ne $env:GITHUB_SHA) { throw "Tag $tag already points to another commit." }
+          }
+
       - name: NuGet login (Trusted Publishing)
         uses: NuGet/login@v1
         id: login
@@ -216,10 +240,61 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $tag = "$env:PROJECT_ID/v$env:BUILD_BUILDNUMBER"
+          $existing = git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect remote tags.' }
+          if ($existing) {
+            $commit = ($existing | Select-Object -Last 1) -split '\s+' | Select-Object -First 1
+            if ($commit -ne $env:GITHUB_SHA) { throw "Tag $tag already points to another commit." }
+            git fetch origin "refs/tags/${tag}:refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not fetch existing tag.' }
+          } else {
+            git tag $tag $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create tag.' }
+            git push origin "refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not push tag; existing tags are never moved.' }
+          }
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
 
-          git tag $tag $env:GITHUB_SHA
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Create source archive and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          $commit = git rev-parse "$tag^{commit}"
+          if ($LASTEXITCODE -ne 0 -or $commit -ne $env:GITHUB_SHA) {
+            throw 'Source archive tag does not match the package build commit.'
+          }
+          $asset = "$env:PROJECT_ID.$env:BUILD_BUILDNUMBER-source.zip"
+          git archive --format=zip "--output=$asset" $tag
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create source archive.' }
 
-          git push origin "refs/tags/$tag"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json' }
+          $encodedTag = [Uri]::EscapeDataString($tag)
+          $release = $null
+          try {
+            $release = Invoke-RestMethod -Headers $headers `
+              -Uri "$env:GITHUB_API_URL/repos/$env:GITHUB_REPOSITORY/releases/tags/$encodedTag"
+          } catch {
+            if ([int]$_.Exception.Response.StatusCode -ne 404) { throw }
+          }
+          if ($null -eq $release) {
+            gh release create $tag --verify-tag --title "$env:PROJECT_ID $env:BUILD_BUILDNUMBER" `
+              --notes "Source archive for $env:PROJECT_ID $env:BUILD_BUILDNUMBER. Commit and Date fields identify the release commit, not each file's last change."
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create release.' }
+          }
+          $existingAsset = @($release.assets | Where-Object { $_.name -eq $asset })
+          if ($existingAsset.Count -gt 0) {
+            $download = Join-Path $env:RUNNER_TEMP ([Guid]::NewGuid().ToString())
+            New-Item -ItemType Directory -Path $download | Out-Null
+            gh release download $tag --pattern $asset --dir $download
+            if ($LASTEXITCODE -ne 0) { throw 'Could not verify existing source asset.' }
+            if ((Get-FileHash $asset).Hash -ne (Get-FileHash (Join-Path $download $asset)).Hash) {
+              throw 'Existing source asset differs; it will not be overwritten.'
+            }
+            Write-Host 'Identical source asset already exists; reusing it.'
+          } else {
+            gh release upload $tag $asset
+            if ($LASTEXITCODE -ne 0) { throw 'Could not upload source asset; existing assets are never overwritten.' }
+          }
 

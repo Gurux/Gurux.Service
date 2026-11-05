@@ -1,0 +1,34 @@
+Gurux Commercial License Notice
+SPDX license reference: LicenseRef-Gurux-Commercial
+
+Copyright (c) Gurux Ltd.
+
+The software identified by LicenseRef-Gurux-Commercial is available under
+a commercial license from Gurux Ltd pursuant to a separate written
+agreement between Gurux Ltd and the licensee.
+
+This notice does not itself grant a commercial license or any rights to
+use, copy, modify, distribute, sublicense, or otherwise exploit the
+software under the commercial licensing option.
+
+All commercial license rights, restrictions, fees, warranty provisions,
+liability limitations, support obligations, and termination provisions
+are governed exclusively by the applicable written agreement. In the
+event of any conflict between this notice and that agreement, the
+agreement prevails.
+
+Where the software is identified as dual-licensed under
+"GPL-2.0-only OR LicenseRef-Gurux-Commercial", recipients may instead
+use the software under the GNU General Public License, version 2 only,
+subject to its terms. A commercial license is not required to exercise
+rights granted under that GPL option. The full GPL version 2 license
+text is provided in the LICENSE file accompanying the software.
+
+Third-party components remain subject to their respective licenses.
+This notice does not replace or modify those licenses.
+
+For commercial licensing inquiries, contact Gurux Ltd:
+https://www.gurux.fi/
+
+
+
